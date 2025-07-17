@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useAutoTrainingBackend } from './useAutoTrainingBackend'
-import type { AutoTrainingConfig } from '../services/autoTrainingService'
+import type { AutoTrainingConfig } from '../types/autoTraining'
 
 // Default comprehensive configuration with MongoDB persistence
 const DEFAULT_AUTO_TRAINING_CONFIG: AutoTrainingConfig = {

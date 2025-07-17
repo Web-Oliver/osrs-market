@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { mongoService, type SystemStatus, type EfficiencyMetrics, type LiveMonitoringData } from '../services/mongoService'
 
-// Use LiveMonitoringData from mongoDataPersistence
+// Use LiveMonitoringData from mongoService
 type LiveData = LiveMonitoringData
 
 // SystemStatus imported from mongoService

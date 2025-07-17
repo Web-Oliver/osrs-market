@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import type { AutoTrainingConfig } from '../services/autoTrainingService'
+import type { AutoTrainingConfig } from '../types/autoTraining'
 
 const BASE_URL = 'http://localhost:3001/api/auto-training'
 
