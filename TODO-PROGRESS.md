@@ -6,80 +6,80 @@ This checklist outlines the remaining tasks for the React frontend of the OSRS F
 
 ### **Step 5.1: Custom Notification Component & Hook**
 
-* \[ \] USE CONTEXT7 FOR DOCUMETNATION TAILWINDCSS Core Frontend Dashboard Features  
-* \[ \] CONTEXT7 IS A MCP FOR FINDING DOCUMENTATION NOT A PATTERN USE CONTEXT7 MCP YOU HAVE AVALIBLE  
-* \[ \] Create src/components/NotificationToast.tsx:  
-  * \[ \] Define React functional component NotificationToast.  
-  * \[ \] Accept props: id, message, type, onDismiss.  
-  * \[ \] Implement Tailwind CSS styling for bg-opacity-90, shadow-lg, rounded-lg, p-4, m-2.  
-  * \[ \] Apply distinct styling (colors, icons from lucide-react or SVG) for success, error, warning, info types.  
-  * \[ \] Position fixed at top-right.  
-  * \[ \] Include "X" (close) button and click-anywhere dismissal.  
-  * \[ \] Add ARIA attributes (role="alert", aria-live="assertive").  
-* \[ \] Create src/hooks/useNotifications.ts:  
-  * \[ \] Implement custom React hook useNotifications.  
-  * \[ \] Provide showSuccess(), showError(), showWarning(), showInfo() functions.  
-  * \[ \] Return array of active notifications and dismissNotification(id).  
-  * \[ \] Generate unique id for each notification (e.g., crypto.randomUUID()).  
-* \[ \] **Integration:**  
-  * \[ \] In App.tsx, import and use useNotifications.  
-  * \[ \] Render NotificationToast components dynamically.  
-  * \[ \] Add demonstration buttons in App.tsx to trigger different toast types.  
-    \[ \] UPDATE THE TODO-PROGRESS.MD FILE AND CHECK OFF WHAT YOU DID
+* \[x\] USE CONTEXT7 FOR DOCUMETNATION TAILWINDCSS Core Frontend Dashboard Features  
+* \[x\] CONTEXT7 IS A MCP FOR FINDING DOCUMENTATION NOT A PATTERN USE CONTEXT7 MCP YOU HAVE AVALIBLE  
+* \[x\] Create src/components/NotificationToast.tsx:  
+  * \[x\] Define React functional component NotificationToast.  
+  * \[x\] Accept props: id, message, type, onDismiss.  
+  * \[x\] Implement Tailwind CSS styling for bg-opacity-90, shadow-lg, rounded-lg, p-4, m-2.  
+  * \[x\] Apply distinct styling (colors, icons from lucide-react or SVG) for success, error, warning, info types.  
+  * \[x\] Position fixed at top-right.  
+  * \[x\] Include "X" (close) button and click-anywhere dismissal.  
+  * \[x\] Add ARIA attributes (role="alert", aria-live="assertive").  
+* \[x\] Create src/hooks/useNotifications.ts:  
+  * \[x\] Implement custom React hook useNotifications.  
+  * \[x\] Provide showSuccess(), showError(), showWarning(), showInfo() functions.  
+  * \[x\] Return array of active notifications and dismissNotification(id).  
+  * \[x\] Generate unique id for each notification (e.g., crypto.randomUUID()).  
+* \[x\] **Integration:**  
+  * \[x\] In App.tsx, import and use useNotifications.  
+  * \[x\] Render NotificationToast components dynamically.  
+  * \[x\] Add demonstration buttons in App.tsx to trigger different toast types.  
+    \[x\] UPDATE THE TODO-PROGRESS.MD FILE AND CHECK OFF WHAT YOU DID
 
 ### **Step 5.2: Replace Alerts in AITradingDashboard.tsx & AutoTrainingDashboard.tsx**
 
-* \[ \] USE CONTEXT7 FOR DOCUMETNATION TAILWINDCS custom notification component  
-* \[ \] CONTEXT7 IS A MCP FOR FINDING DOCUMENTATION NOT A PATTERN USE CONTEXT7 MCP YOU HAVE AVALIBLE  
-* \[ \] Modify src/components/AITradingDashboard.tsx:  
-  * \[ \] Locate and replace all alert() calls with useNotifications functions (showSuccess(), showError(), etc.).  
-  * \[ \] Ensure useNotifications is imported and used.  
-* \[ \] Modify src/components/AutoTrainingDashboard.tsx:  
-  * \[ \] Locate and replace all alert() calls with useNotifications functions (showSuccess(), showError(), etc.).  
-  * \[ \] Ensure useNotifications is imported and used.  
-* \[ \] **Integration:**  
-  * \[ \] Verify AITradingDashboard.tsx and AutoTrainingDashboard.tsx are correctly rendered in App.tsx.  
-    \[ \] UPDATE THE TODO-PROGRESS.MD FILE AND CHECK OFF WHAT YOU DID
+* \[x\] USE CONTEXT7 FOR DOCUMETNATION TAILWINDCS custom notification component  
+* \[x\] CONTEXT7 IS A MCP FOR FINDING DOCUMENTATION NOT A PATTERN USE CONTEXT7 MCP YOU HAVE AVALIBLE  
+* \[x\] Modify src/components/AITradingDashboard.tsx:  
+  * \[x\] Locate and replace all alert() calls with useNotifications functions (showSuccess(), showError(), etc.).  
+  * \[x\] Ensure useNotifications is imported and used.  
+* \[x\] Modify src/components/AutoTrainingDashboard.tsx:  
+  * \[x\] Locate and replace all alert() calls with useNotifications functions (showSuccess(), showError(), etc.).  
+  * \[x\] Ensure useNotifications is imported and used.  
+* \[x\] **Integration:**  
+  * \[x\] Verify AITradingDashboard.tsx and AutoTrainingDashboard.tsx are correctly rendered in App.tsx.  
+    \[x\] UPDATE THE TODO-PROGRESS.MD FILE AND CHECK OFF WHAT YOU DID
 
 ### **Step 5.3: Implement Full Charting in AITradingDashboard.tsx & AutoTrainingDashboard.tsx (Recharts)**
 
-* \[ \] USE CONTEXT7 FOR DOCUMETNATION TAILWINDCS Dashboard, Recharts  
-* \[ \] CONTEXT7 IS A MCP FOR FINDING DOCUMENTATION NOT A PATTERN USE CONTEXT7 MCP YOU HAVE AVALIBLE  
-* \[ \] Install recharts dependency.  
-* \[ \] Modify src/components/AITradingDashboard.tsx:  
-  * \[ \] In "Training Progress" section, replace static numbers with actual charts.  
-  * \[ \] Use **Recharts LineChart** components to visualize:  
-    * \[ \] **Loss Curve**: X-axis: Time (Timestamp), Y-axis: Loss Value.  
-    * \[ \] **Reward History**: X-axis: Time (Timestamp), Y-axis: Reward Value.  
-    * \[ \] **Epsilon Decay**: X-axis: Time (Timestamp), Y-axis: Epsilon Value.  
-    * \[ \] **Portfolio Value Trend**: X-axis: Time (Timestamp), Y-axis: Portfolio Value.  
-  * \[ \] For now, use **mock data** for these charts. Create a mock array of objects, where each object represents a data point with timestamp, loss, reward, epsilon, portfolioValue fields.  
-  * \[ \] Ensure charts are responsive and visually appealing using Tailwind CSS.  
-* \[ \] Modify src/components/AutoTrainingDashboard.tsx:  
-  * \[ \] Add similar Recharts LineChart components for training progress in "Recent Training Metrics" section.  
-  * \[ \] Use mock data.  
-* \[ \] **Integration:**  
-  * \[ \] Ensure recharts components are imported correctly.  
-  * \[ \] Manage mock data within component's state or a simple mock hook for now.  
-    \[ \] UPDATE THE TODO-PROGRESS.MD FILE AND CHECK OFF WHAT YOU DID
+* \[x\] USE CONTEXT7 FOR DOCUMETNATION TAILWINDCS Dashboard, Recharts  
+* \[x\] CONTEXT7 IS A MCP FOR FINDING DOCUMENTATION NOT A PATTERN USE CONTEXT7 MCP YOU HAVE AVALIBLE  
+* \[x\] Install recharts dependency.  
+* \[x\] Modify src/components/AITradingDashboard.tsx:  
+  * \[x\] In "Training Progress" section, replace static numbers with actual charts.  
+  * \[x\] Use **Recharts LineChart** components to visualize:  
+    * \[x\] **Loss Curve**: X-axis: Time (Timestamp), Y-axis: Loss Value.  
+    * \[x\] **Reward History**: X-axis: Time (Timestamp), Y-axis: Reward Value.  
+    * \[x\] **Epsilon Decay**: X-axis: Time (Timestamp), Y-axis: Epsilon Value.  
+    * \[x\] **Portfolio Value Trend**: X-axis: Time (Timestamp), Y-axis: Portfolio Value.  
+  * \[x\] For now, use **mock data** for these charts. Create a mock array of objects, where each object represents a data point with timestamp, loss, reward, epsilon, portfolioValue fields.  
+  * \[x\] Ensure charts are responsive and visually appealing using Tailwind CSS.  
+* \[x\] Modify src/components/AutoTrainingDashboard.tsx:  
+  * \[x\] Add similar Recharts LineChart components for training progress in "Recent Training Metrics" section.  
+  * \[x\] Use mock data.  
+* \[x\] **Integration:**  
+  * \[x\] Ensure recharts components are imported correctly.  
+  * \[x\] Manage mock data within component's state or a simple mock hook for now.  
+    \[x\] UPDATE THE TODO-PROGRESS.MD FILE AND CHECK OFF WHAT YOU DID
 
 ### **Step 5.4: Hook up Live Console Output (WebSockets)**
 
-* \[ \] USE CONTEXT7 FOR DOCUMETNATION WebSockets  
-* \[ \] CONTEXT7 IS A MCP FOR FINDING DOCUMENTATION NOT A PATTERN USE CONTEXT7 MCP YOU HAVE AVALIBLE  
-* \[ \] Modify src/components/LiveMonitoringDashboard.tsx:  
-  * \[ \] In the "Live Console Output" section, replace the mocked static div elements with a dynamic display that consumes messages from a WebSocket.  
-  * \[ \] Implement a useEffect hook to establish a WebSocket connection when the component mounts and close it when it unmounts.  
-  * \[ \] The WebSocket URL should be configurable (e.g., ws://localhost:8080/ws/logs).  
-  * \[ \] When a message is received from the WebSocket:  
-    * \[ \] Parse the message (assume it's JSON).  
-    * \[ \] Each log entry should include: timestamp (Unix milliseconds), level (e.g., 'info', 'warn', 'error', 'debug'), service (e.g., 'DataScraper', 'MarketAnalysis', 'AITraining'), message (the log content), and optionally itemId and traceId.  
-    * \[ \] Display the log entries in a scrollable container, formatted nicely using formatters.ts for the timestamp.  
-    * \[ \] Apply distinct styling (e.g., text color) based on the level of the log.  
-  * \[ \] Implement basic error handling for WebSocket connection failures.  
-* \[ \] **Integration:**  
-  * \[ \] Ensure LiveMonitoringDashboard.tsx is correctly imported and rendered in App.tsx.  
-    \[ \] UPDATE THE TODO-PROGRESS.MD FILE AND CHECK OFF WHAT YOU DID
+* \[x\] USE CONTEXT7 FOR DOCUMETNATION WebSockets  
+* \[x\] CONTEXT7 IS A MCP FOR FINDING DOCUMENTATION NOT A PATTERN USE CONTEXT7 MCP YOU HAVE AVALIBLE  
+* \[x\] Modify src/components/LiveMonitoringDashboard.tsx:  
+  * \[x\] In the "Live Console Output" section, replace the mocked static div elements with a dynamic display that consumes messages from a WebSocket.  
+  * \[x\] Implement a useEffect hook to establish a WebSocket connection when the component mounts and close it when it unmounts.  
+  * \[x\] The WebSocket URL should be configurable (e.g., ws://localhost:8080/ws/logs).  
+  * \[x\] When a message is received from the WebSocket:  
+    * \[x\] Parse the message (assume it's JSON).  
+    * \[x\] Each log entry should include: timestamp (Unix milliseconds), level (e.g., 'info', 'warn', 'error', 'debug'), service (e.g., 'DataScraper', 'MarketAnalysis', 'AITraining'), message (the log content), and optionally itemId and traceId.  
+    * \[x\] Display the log entries in a scrollable container, formatted nicely using formatters.ts for the timestamp.  
+    * \[x\] Apply distinct styling (e.g., text color) based on the level of the log.  
+  * \[x\] Implement basic error handling for WebSocket connection failures.  
+* \[x\] **Integration:**  
+  * \[x\] Ensure LiveMonitoringDashboard.tsx is correctly imported and rendered in App.tsx.  
+    \[x\] UPDATE THE TODO-PROGRESS.MD FILE AND CHECK OFF WHAT YOU DID
 
 ### **Step 5.5: Implement Watchlist Persistence (MongoDB via Backend API)**
 

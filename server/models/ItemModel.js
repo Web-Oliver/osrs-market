@@ -166,6 +166,13 @@ const ItemSchema = new mongoose.Schema({
     enum: ['active', 'deprecated', 'removed'],
     default: 'active',
     index: true
+  },
+
+  // 6-month historical scraping status
+  has6MonthHistoryScraped: {
+    type: Boolean,
+    default: false,
+    index: true
   }
 }, {
   // Context7 Pattern: Schema options

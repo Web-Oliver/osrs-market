@@ -33,20 +33,23 @@ describe('MarketDataService', () => {
       await mongoose.connect('mongodb://localhost:27017/osrs_market_test');
     }
 
-    // Create a test item for referencing
-    testItem = await ItemModel.create({
-      itemId: 4151,
-      name: 'Abyssal whip',
-      examine: 'A weapon from the abyss.',
-      members: true,
-      lowalch: 72000,
-      highalch: 108000,
-      tradeable_on_ge: true,
-      stackable: false,
-      noted: false,
-      value: 120001,
-      weight: 0.453
-    });
+    // Create a test item for referencing, or use existing one
+    testItem = await ItemModel.findOne({ itemId: 4151 });
+    if (!testItem) {
+      testItem = await ItemModel.create({
+        itemId: 4151,
+        name: 'Abyssal whip',
+        examine: 'A weapon from the abyss.',
+        members: true,
+        lowalch: 72000,
+        highalch: 108000,
+        tradeable_on_ge: true,
+        stackable: false,
+        noted: false,
+        value: 120001,
+        weight: 0.453
+      });
+    }
   });
 
   beforeEach(() => {

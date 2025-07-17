@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { 
   LineChart, Line, 
   ResponsiveContainer, XAxis, YAxis, CartesianGrid, 
@@ -11,7 +11,9 @@ import {
   Pause, Play, Search, Filter, Download,
   Bell, RefreshCw, Globe, Server
 } from 'lucide-react'
+import useWebSocket, { ReadyState } from 'react-use-websocket'
 import { mongoService, type SystemStatus, type EfficiencyMetrics, type LiveMonitoringData } from '../services/mongoService'
+import { formatTime } from '../utils/formatters'
 
 // Use LiveMonitoringData from mongoService
 type LiveData = LiveMonitoringData
@@ -31,6 +33,21 @@ type SystemAction = {
   severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
   duration?: number
   metadata?: Record<string, unknown>
+}
+
+// WebSocket log entry types
+type LogEntry = {
+  timestamp: number
+  level: 'info' | 'warn' | 'error' | 'debug'
+  service: string
+  message: string
+  itemId?: number
+  traceId?: string
+}
+
+type WebSocketLogMessage = {
+  type: 'log'
+  data: LogEntry
 }
 
 type ActivityFilter = {
@@ -67,6 +84,17 @@ const LiveMonitoringDashboard: React.FC = () => {
   const [showActivityFeed, setShowActivityFeed] = useState(true)
   const [notifications, setNotifications] = useState<SystemAction[]>([])
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  
+  // WebSocket state for live console output
+  const [socketUrl] = useState(() => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    const host = window.location.hostname
+    const port = window.location.port ? ':' + (parseInt(window.location.port) + 1) : ':8081' // Assume WebSocket server is on port 8081
+    return `${protocol}//${host}${port}/ws/logs`
+  })
+  const [logEntries, setLogEntries] = useState<LogEntry[]>([])
+  const [isWebSocketConnected, setIsWebSocketConnected] = useState(false)
+  const [webSocketError, setWebSocketError] = useState<string | null>(null)
 
   // Colors for charts following Context7 design patterns
   const chartColors = {
@@ -341,14 +369,52 @@ const LiveMonitoringDashboard: React.FC = () => {
     }
   }, [isMonitoring, refreshInterval])
 
-  // Format time for charts
-  const formatTime = (timestamp: number) => {
+  // Format time for charts (remove this as we're importing from utils)
+  const formatTimeForChart = (timestamp: number) => {
     return new Date(timestamp).toLocaleTimeString([], { 
       hour: '2-digit', 
       minute: '2-digit', 
       second: '2-digit' 
     })
   }
+  
+  // Generate mock log entries for fallback when WebSocket is not available
+  const generateMockLogEntry = useCallback((): LogEntry => {
+    const services = ['MongoDB-Debug', 'DataCollector-Debug', 'RateLimiter-Debug', 'SmartSelector-Debug']
+    const messages = [
+      'Context7 optimized query executed',
+      'Smart item filtering applied',
+      'Making rate-limited API request',
+      'Items grouped by tier',
+      'Real-time change stream activated',
+      'Market summary generated',
+      'API request successful',
+      'Live monitoring data saved with Context7 optimizations',
+      'Collection cycle completed'
+    ]
+    
+    return {
+      timestamp: Date.now(),
+      level: Math.random() > 0.8 ? 'warn' : 'info',
+      service: services[Math.floor(Math.random() * services.length)],
+      message: messages[Math.floor(Math.random() * messages.length)],
+      traceId: Math.random().toString(36).substr(2, 9)
+    }
+  }, [])
+  
+  // Add mock log entries when WebSocket is not connected (for demo purposes)
+  useEffect(() => {
+    if (!isWebSocketConnected && isMonitoring) {
+      const interval = setInterval(() => {
+        setLogEntries(prev => {
+          const mockEntry = generateMockLogEntry()
+          return [mockEntry, ...prev].slice(0, 100)
+        })
+      }, 3000) // Generate mock logs every 3 seconds
+      
+      return () => clearInterval(interval)
+    }
+  }, [isWebSocketConnected, isMonitoring, generateMockLogEntry])
 
   // Format uptime
   const formatUptime = (ms: number) => {
@@ -396,7 +462,7 @@ const LiveMonitoringDashboard: React.FC = () => {
     if (active && payload && payload.length) {
       return (
         <div className={`bg-white p-3 border border-gray-200 rounded-lg shadow-lg`}>
-          <p className={`text-sm font-medium text-gray-900 mb-2`}>{formatTime(label || 0)}</p>
+          <p className={`text-sm font-medium text-gray-900 mb-2`}>{formatTimeForChart(label || 0)}</p>
           {payload.map((entry, index: number) => (
             <div key={index} className={`flex items-center space-x-2 text-sm`}>
               <div 
@@ -467,7 +533,7 @@ const LiveMonitoringDashboard: React.FC = () => {
                   <span className="text-xs text-gray-500">{action.duration}ms</span>
                 )}
                 <span className="text-xs text-gray-500">
-                  {formatTime(action.timestamp)}
+                  {formatTimeForChart(action.timestamp)}
                 </span>
               </div>
             </div>
@@ -625,11 +691,20 @@ const LiveMonitoringDashboard: React.FC = () => {
           </div>
           
           <div className={`flex items-center space-x-4`}>
-            <div className={`flex items-center space-x-2`}>
-              <Database className={`h-4 w-4 ${isConnectedToMongo ? 'text-green-500' : 'text-red-500'}`} />
-              <span className={`text-sm font-medium ${isConnectedToMongo ? 'text-green-600' : 'text-red-600'}`}>
-                MongoDB {isConnectedToMongo ? 'Connected' : 'Disconnected'}
-              </span>
+            <div className={`flex items-center space-x-4`}>
+              <div className={`flex items-center space-x-2`}>
+                <Database className={`h-4 w-4 ${isConnectedToMongo ? 'text-green-500' : 'text-red-500'}`} />
+                <span className={`text-sm font-medium ${isConnectedToMongo ? 'text-green-600' : 'text-red-600'}`}>
+                  MongoDB {isConnectedToMongo ? 'Connected' : 'Disconnected'}
+                </span>
+              </div>
+              
+              <div className={`flex items-center space-x-2`}>
+                <Wifi className={`h-4 w-4 ${isWebSocketConnected ? 'text-green-500' : 'text-red-500'}`} />
+                <span className={`text-sm font-medium ${isWebSocketConnected ? 'text-green-600' : 'text-red-600'}`}>
+                  WebSocket {connectionStatus}
+                </span>
+              </div>
             </div>
             
             {notifications.length > 0 && (
@@ -789,7 +864,7 @@ const LiveMonitoringDashboard: React.FC = () => {
               <CartesianGrid stroke="#f0f0f0" strokeDasharray="5 5" />
               <XAxis 
                 dataKey="timestamp" 
-                tickFormatter={formatTime}
+                tickFormatter={formatTimeForChart}
                 tick={{ fontSize: 12, fill: '#6b7280' }}
               />
               <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} />
@@ -820,7 +895,7 @@ const LiveMonitoringDashboard: React.FC = () => {
               <CartesianGrid stroke="#f0f0f0" strokeDasharray="5 5" />
               <XAxis 
                 dataKey="timestamp" 
-                tickFormatter={formatTime}
+                tickFormatter={formatTimeForChart}
                 tick={{ fontSize: 12, fill: '#6b7280' }}
               />
               <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} />
@@ -1116,22 +1191,51 @@ const LiveMonitoringDashboard: React.FC = () => {
       <div className={`bg-black rounded-lg shadow-sm border border-gray-200 p-6 mt-6`}>
         <div className={`flex items-center justify-between mb-4`}>
           <h3 className={`text-lg font-semibold text-green-400`}>Live Console Output</h3>
-          <div className={`flex items-center space-x-2`}>
-            <div className={`w-2 h-2 bg-green-400 rounded-full animate-pulse`} />
-            <span className={`text-green-400 text-sm`}>LIVE</span>
+          <div className={`flex items-center space-x-4`}>
+            <div className={`flex items-center space-x-2`}>
+              <div className={`w-2 h-2 ${isWebSocketConnected ? 'bg-green-400' : 'bg-red-400'} rounded-full ${isWebSocketConnected ? 'animate-pulse' : ''}`} />
+              <span className={`text-sm ${isWebSocketConnected ? 'text-green-400' : 'text-red-400'}`}>
+                {isWebSocketConnected ? 'LIVE' : 'DISCONNECTED'}
+              </span>
+            </div>
+            {webSocketError && (
+              <span className={`text-xs text-red-400`}>
+                {webSocketError}
+              </span>
+            )}
           </div>
         </div>
         <div className={`bg-black text-green-400 font-mono text-sm space-y-1 max-h-64 overflow-y-auto`}>
-          <div>[{formatTime(Date.now())}] [MongoDB-Debug] Context7 optimized query executed</div>
-          <div>[{formatTime(Date.now())}] [DataCollector-Debug] Smart item filtering applied</div>
-          <div>[{formatTime(Date.now())}] [RateLimiter-Debug] Making rate-limited API request</div>
-          <div>[{formatTime(Date.now())}] [SmartSelector-Debug] Items grouped by tier</div>
-          <div>[{formatTime(Date.now())}] [MongoDB-Debug] Real-time change stream activated</div>
-          <div>[{formatTime(Date.now())}] [DataCollector-Debug] Market summary generated</div>
-          <div>[{formatTime(Date.now())}] [RateLimiter-Debug] API request successful</div>
-          <div>[{formatTime(Date.now())}] [MongoDB-Debug] Live monitoring data saved with Context7 optimizations</div>
-          <div>[{formatTime(Date.now())}] [MongoDB-Debug] Aggregation pipeline completed - {typeof aggregatedStats?.monitoring === 'object' && aggregatedStats.monitoring && typeof (aggregatedStats.monitoring as Record<string, unknown>).totalApiRequests === 'number' ? ((aggregatedStats.monitoring as Record<string, unknown>).totalApiRequests as number) : 0} total requests</div>
-          <div>[{formatTime(Date.now())}] [DataCollector-Debug] Collection cycle completed</div>
+          {logEntries.length === 0 ? (
+            <div className={`text-gray-500 text-center py-4`}>
+              {isWebSocketConnected ? 'Waiting for log messages...' : 'WebSocket disconnected. Showing demo logs.'}
+            </div>
+          ) : (
+            logEntries.map((entry, index) => {
+              const getLogColor = (level: string) => {
+                switch (level) {
+                  case 'error': return 'text-red-400'
+                  case 'warn': return 'text-yellow-400'
+                  case 'debug': return 'text-blue-400'
+                  default: return 'text-green-400'
+                }
+              }
+              
+              return (
+                <div key={`${entry.timestamp}-${index}`} className={`${getLogColor(entry.level)}`}>
+                  <span className={`text-gray-500`}>[{formatTime(entry.timestamp)}]</span>
+                  <span className={`text-gray-300`}> [{entry.service}]</span>
+                  <span className={`ml-2`}>{entry.message}</span>
+                  {entry.traceId && (
+                    <span className={`text-gray-500 ml-2`}>(trace: {entry.traceId})</span>
+                  )}
+                  {entry.itemId && (
+                    <span className={`text-gray-500 ml-2`}>(item: {entry.itemId})</span>
+                  )}
+                </div>
+              )
+            })
+          )}
         </div>
       </div>
     </div>

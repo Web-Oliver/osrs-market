@@ -29,7 +29,6 @@ const MarketPriceSnapshotSchema = new Schema({
    */
   itemId: {
     type: Number,
-    ref: 'Item',
     required: true,
     index: true,
     validate: {
@@ -398,8 +397,7 @@ MarketPriceSnapshotSchema.methods.getFormattedTimestamp = function() {
  */
 MarketPriceSnapshotSchema.statics.getLatestSnapshot = function(itemId, interval = 'latest') {
   return this.findOne({ itemId, interval })
-    .sort({ timestamp: -1 })
-    .populate('itemId', 'name examine value');
+    .sort({ timestamp: -1 });
 };
 
 /**
@@ -431,8 +429,7 @@ MarketPriceSnapshotSchema.statics.getHighVolumeSnapshots = function(minVolume = 
     interval
   })
   .sort({ volume: -1, timestamp: -1 })
-  .limit(limit)
-  .populate('itemId', 'name examine value');
+  .limit(limit);
 };
 
 /**
@@ -444,8 +441,7 @@ MarketPriceSnapshotSchema.statics.getHighVolumeSnapshots = function(minVolume = 
 MarketPriceSnapshotSchema.statics.getSnapshotsBySource = function(source, limit = 100) {
   return this.find({ source })
     .sort({ createdAt: -1 })
-    .limit(limit)
-    .populate('itemId', 'name examine value');
+    .limit(limit);
 };
 
 /**

@@ -18,6 +18,8 @@ const { Logger } = require('../utils/Logger');
 const { CacheManager } = require('../utils/CacheManager');
 const { MetricsCalculator } = require('../utils/MetricsCalculator');
 const { PerformanceMonitor } = require('../utils/PerformanceMonitor');
+const { ItemModel } = require('../models/ItemModel');
+const { ScrapeQueueModel } = require('../models/ScrapeQueueModel');
 
 class DataCollectionService {
   constructor() {
@@ -93,25 +95,102 @@ class DataCollectionService {
       
       this.logger.info(`✅ Discovered ${discoveredItems.length} items from Top 100 lists`);
       
-      // TODO: Process discovered items and store them in ItemModel
-      // This should create new Item records for items not already in the database
-      // For now, we'll just log the discovered items
+      // Process discovered items and store them in ItemModel
+      let newItemsCount = 0;
+      let queuedItemsCount = 0;
       
-      const itemSummary = discoveredItems.slice(0, 10).map(item => ({
-        id: item.itemId,
-        name: item.name
-      }));
+      for (const discoveredItem of discoveredItems) {
+        try {
+          // Check if item already exists
+          const existingItem = await ItemModel.findOne({ itemId: discoveredItem.itemId });
+          
+          if (!existingItem) {
+            // Create new item record with basic information
+            const newItem = await ItemModel.create({
+              itemId: discoveredItem.itemId,
+              name: discoveredItem.name,
+              examine: discoveredItem.examine || 'Item discovered from Top 100 lists',
+              members: discoveredItem.members || false,
+              lowalch: discoveredItem.lowalch || 0,
+              highalch: discoveredItem.highalch || 0,
+              tradeable_on_ge: true, // Items from Top 100 are GE tradeable
+              stackable: discoveredItem.stackable || false,
+              noted: false,
+              value: discoveredItem.value || 1,
+              weight: discoveredItem.weight || 0,
+              dataSource: 'osrs_ge_scraper',
+              status: 'active',
+              has6MonthHistoryScraped: false
+            });
+            
+            this.logger.info(`📦 Created new item: ${newItem.name} (ID: ${newItem.itemId})`);
+            newItemsCount++;
+            
+            // Queue the new item for 6-month historical data scraping
+            await this.queueItemFor6MonthScrape(newItem.itemId);
+            queuedItemsCount++;
+            
+          } else {
+            this.logger.debug(`⏭️  Item already exists: ${existingItem.name} (ID: ${existingItem.itemId})`);
+          }
+          
+        } catch (itemError) {
+          this.logger.error(`❌ Failed to process item ${discoveredItem.itemId}: ${discoveredItem.name}`, itemError);
+          // Continue processing other items
+        }
+      }
       
-      this.logger.info('📋 Sample discovered items:', itemSummary);
+      this.logger.info(`✅ Processing complete: ${newItemsCount} new items created, ${queuedItemsCount} items queued for historical scraping`);
       
       return {
         success: true,
         itemsDiscovered: discoveredItems.length,
+        newItemsCreated: newItemsCount,
+        itemsQueuedForScraping: queuedItemsCount,
         items: discoveredItems
       };
       
     } catch (error) {
       this.logger.error('❌ Failed to discover and store new items', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Queue item for 6-month historical data scraping
+   * @param {number} itemId - The item ID to queue for scraping
+   * @returns {Promise<void>}
+   */
+  async queueItemFor6MonthScrape(itemId) {
+    try {
+      // Check if item already has 6-month history scraped
+      const item = await ItemModel.findOne({ itemId, has6MonthHistoryScraped: true });
+      
+      if (item) {
+        this.logger.debug(`⏭️  Item ${itemId} already has 6-month history scraped, skipping queue`);
+        return;
+      }
+      
+      // Check if item is already queued
+      const existingQueueItem = await ScrapeQueueModel.findOne({ itemId });
+      
+      if (existingQueueItem) {
+        this.logger.debug(`⏭️  Item ${itemId} is already queued for scraping (status: ${existingQueueItem.status})`);
+        return;
+      }
+      
+      // Add item to scrape queue
+      await ScrapeQueueModel.create({
+        itemId: itemId,
+        status: 'pending',
+        createdAt: new Date(),
+        retries: 0
+      });
+      
+      this.logger.info(`🔄 Queued item ${itemId} for 6-month historical data scraping`);
+      
+    } catch (error) {
+      this.logger.error(`❌ Failed to queue item ${itemId} for 6-month scraping`, error);
       throw error;
     }
   }
