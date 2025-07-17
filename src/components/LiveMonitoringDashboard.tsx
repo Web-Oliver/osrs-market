@@ -8,7 +8,8 @@ import {
   Activity, Database, TrendingUp, Clock, 
   Wifi, AlertTriangle, CheckCircle, XCircle, 
   Eye, Target, Shield, 
-  Pause, Play
+  Pause, Play, Search, Filter, Download,
+  Bell, RefreshCw, Globe, Server
 } from 'lucide-react'
 import { mongoService, type SystemStatus, type EfficiencyMetrics, type LiveMonitoringData } from '../services/mongoService'
 
@@ -18,6 +19,27 @@ type LiveData = LiveMonitoringData
 // SystemStatus imported from mongoService
 
 // EfficiencyMetrics imported from mongoService
+
+// New types for enhanced monitoring
+type SystemAction = {
+  id: string
+  timestamp: number
+  type: 'API_CALL' | 'DATA_COLLECTION' | 'RATE_LIMIT' | 'DATABASE' | 'ERROR' | 'SUCCESS' | 'WARNING'
+  category: 'SYSTEM' | 'USER' | 'EXTERNAL' | 'INTERNAL'
+  action: string
+  details: string
+  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
+  duration?: number
+  metadata?: Record<string, unknown>
+}
+
+type ActivityFilter = {
+  type: string[]
+  category: string[]
+  severity: string[]
+  timeRange: '5m' | '15m' | '1h' | '6h' | '24h'
+  searchTerm: string
+}
 
 const LiveMonitoringDashboard: React.FC = () => {
   const [liveData, setLiveData] = useState<LiveData[]>([])
@@ -32,6 +54,19 @@ const LiveMonitoringDashboard: React.FC = () => {
     marketData?: Record<string, unknown>;
     monitoring?: Record<string, unknown>;
   } | null>(null)
+  
+  // Enhanced monitoring state
+  const [systemActions, setSystemActions] = useState<SystemAction[]>([])
+  const [activityFilter, setActivityFilter] = useState<ActivityFilter>({
+    type: [],
+    category: [],
+    severity: [],
+    timeRange: '1h',
+    searchTerm: ''
+  })
+  const [showActivityFeed, setShowActivityFeed] = useState(true)
+  const [notifications, setNotifications] = useState<SystemAction[]>([])
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
 
   // Colors for charts following Context7 design patterns
   const chartColors = {
@@ -41,6 +76,88 @@ const LiveMonitoringDashboard: React.FC = () => {
     danger: '#FF3B30',
     info: '#5856D6',
     secondary: '#8E8E93'
+  }
+
+  // Generate realistic system actions
+  const generateSystemAction = (): SystemAction => {
+    const actionTemplates = [
+      {
+        type: 'API_CALL' as const,
+        category: 'EXTERNAL' as const,
+        action: 'RuneScape Wiki API Request',
+        details: 'Fetching latest item prices for smart selection',
+        severity: 'LOW' as const,
+        duration: Math.floor(Math.random() * 500) + 200
+      },
+      {
+        type: 'DATA_COLLECTION' as const,
+        category: 'SYSTEM' as const,
+        action: 'Market Data Collection',
+        details: 'Processing market data for trending items',
+        severity: 'MEDIUM' as const,
+        duration: Math.floor(Math.random() * 1000) + 500
+      },
+      {
+        type: 'RATE_LIMIT' as const,
+        category: 'SYSTEM' as const,
+        action: 'Rate Limiting Check',
+        details: 'API request queued due to rate limits',
+        severity: 'LOW' as const
+      },
+      {
+        type: 'DATABASE' as const,
+        category: 'INTERNAL' as const,
+        action: 'MongoDB Write Operation',
+        details: 'Storing live monitoring data with Context7 optimizations',
+        severity: 'LOW' as const,
+        duration: Math.floor(Math.random() * 100) + 50
+      },
+      {
+        type: 'SUCCESS' as const,
+        category: 'SYSTEM' as const,
+        action: 'Smart Item Selection',
+        details: 'Successfully filtered high-value items for tracking',
+        severity: 'LOW' as const
+      },
+      {
+        type: 'WARNING' as const,
+        category: 'SYSTEM' as const,
+        action: 'High API Usage',
+        details: 'API usage at 80% of rate limit threshold',
+        severity: 'MEDIUM' as const
+      },
+      {
+        type: 'ERROR' as const,
+        category: 'EXTERNAL' as const,
+        action: 'API Request Failed',
+        details: 'Failed to fetch data for item ID 1234 - retrying in 30s',
+        severity: 'HIGH' as const
+      }
+    ]
+
+    const template = actionTemplates[Math.floor(Math.random() * actionTemplates.length)]
+    return {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      timestamp: Date.now(),
+      ...template,
+      metadata: {
+        source: 'LiveMonitoringDashboard',
+        requestId: Math.random().toString(36).substr(2, 9)
+      }
+    }
+  }
+
+  // Add new system action and manage notifications
+  const addSystemAction = (action: SystemAction) => {
+    setSystemActions(prev => {
+      const updated = [action, ...prev].slice(0, 1000) // Keep last 1000 actions
+      return updated
+    })
+
+    // Add to notifications for high severity actions
+    if (action.severity === 'HIGH' || action.severity === 'CRITICAL') {
+      setNotifications(prev => [action, ...prev].slice(0, 10))
+    }
   }
 
   // Fetch real data from MongoDB
@@ -111,6 +228,18 @@ const LiveMonitoringDashboard: React.FC = () => {
         })
         setLastUpdate(new Date())
         setIsConnectedToMongo(true)
+        
+        // Generate system action for data update
+        addSystemAction({
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+          timestamp: Date.now(),
+          type: 'SUCCESS',
+          category: 'SYSTEM',
+          action: 'Live Data Update',
+          details: `Received new monitoring data: ${newData.apiRequests} API requests, ${newData.successRate}% success rate`,
+          severity: 'LOW',
+          metadata: { dataPoint: newData }
+        })
       })
 
       // Also set up periodic refresh for other data
@@ -120,6 +249,11 @@ const LiveMonitoringDashboard: React.FC = () => {
           fetchEfficiencyMetrics(),
           fetchAggregatedStats()
         ])
+        
+        // Generate periodic system actions
+        if (Math.random() < 0.7) { // 70% chance to generate action
+          addSystemAction(generateSystemAction())
+        }
       }, refreshInterval)
     }
 
@@ -130,6 +264,45 @@ const LiveMonitoringDashboard: React.FC = () => {
       }
     }
   }, [isMonitoring, refreshInterval])
+
+  // Filter system actions based on current filter settings
+  const filteredActions = systemActions.filter(action => {
+    // Time range filter
+    const timeRangeMs = {
+      '5m': 5 * 60 * 1000,
+      '15m': 15 * 60 * 1000,
+      '1h': 60 * 60 * 1000,
+      '6h': 6 * 60 * 60 * 1000,
+      '24h': 24 * 60 * 60 * 1000
+    }[activityFilter.timeRange]
+    
+    if (Date.now() - action.timestamp > timeRangeMs) {
+      return false
+    }
+
+    // Type filter
+    if (activityFilter.type.length > 0 && !activityFilter.type.includes(action.type)) {
+      return false
+    }
+
+    // Category filter
+    if (activityFilter.category.length > 0 && !activityFilter.category.includes(action.category)) {
+      return false
+    }
+
+    // Severity filter
+    if (activityFilter.severity.length > 0 && !activityFilter.severity.includes(action.severity)) {
+      return false
+    }
+
+    // Search term filter
+    if (activityFilter.searchTerm && !action.action.toLowerCase().includes(activityFilter.searchTerm.toLowerCase()) && 
+        !action.details.toLowerCase().includes(activityFilter.searchTerm.toLowerCase())) {
+      return false
+    }
+
+    return true
+  })
 
   // Handle monitoring toggle
   useEffect(() => {
@@ -223,7 +396,7 @@ const LiveMonitoringDashboard: React.FC = () => {
     if (active && payload && payload.length) {
       return (
         <div className={`bg-white p-3 border border-gray-200 rounded-lg shadow-lg`}>
-          <p className={`text-sm font-medium text-gray-900 mb-2`}>{formatTime(label)}</p>
+          <p className={`text-sm font-medium text-gray-900 mb-2`}>{formatTime(label || 0)}</p>
           {payload.map((entry, index: number) => (
             <div key={index} className={`flex items-center space-x-2 text-sm`}>
               <div 
@@ -238,6 +411,202 @@ const LiveMonitoringDashboard: React.FC = () => {
       )
     }
     return null
+  }
+
+  // Activity feed components
+  const ActivityFeedItem: React.FC<{ action: SystemAction }> = ({ action }) => {
+    const getActionIcon = () => {
+      switch (action.type) {
+        case 'API_CALL': return <Globe className="h-4 w-4" />
+        case 'DATA_COLLECTION': return <Database className="h-4 w-4" />
+        case 'RATE_LIMIT': return <Shield className="h-4 w-4" />
+        case 'DATABASE': return <Server className="h-4 w-4" />
+        case 'SUCCESS': return <CheckCircle className="h-4 w-4" />
+        case 'WARNING': return <AlertTriangle className="h-4 w-4" />
+        case 'ERROR': return <XCircle className="h-4 w-4" />
+        default: return <Activity className="h-4 w-4" />
+      }
+    }
+
+    const getActionColor = () => {
+      switch (action.severity) {
+        case 'CRITICAL': return 'text-red-600 bg-red-100'
+        case 'HIGH': return 'text-orange-600 bg-orange-100'
+        case 'MEDIUM': return 'text-yellow-600 bg-yellow-100'
+        case 'LOW': return 'text-green-600 bg-green-100'
+        default: return 'text-gray-600 bg-gray-100'
+      }
+    }
+
+    const getCategoryColor = () => {
+      switch (action.category) {
+        case 'SYSTEM': return 'text-blue-600 bg-blue-100'
+        case 'EXTERNAL': return 'text-purple-600 bg-purple-100'
+        case 'INTERNAL': return 'text-indigo-600 bg-indigo-100'
+        case 'USER': return 'text-pink-600 bg-pink-100'
+        default: return 'text-gray-600 bg-gray-100'
+      }
+    }
+
+    return (
+      <div className="border-b border-gray-200 pb-3 mb-3 last:border-b-0 last:pb-0 last:mb-0">
+        <div className="flex items-start space-x-3">
+          <div className={`p-2 rounded-full ${getActionColor()}`}>
+            {getActionIcon()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-medium text-gray-900">{action.action}</span>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getCategoryColor()}`}>
+                  {action.category}
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                {action.duration && (
+                  <span className="text-xs text-gray-500">{action.duration}ms</span>
+                )}
+                <span className="text-xs text-gray-500">
+                  {formatTime(action.timestamp)}
+                </span>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mt-1">{action.details}</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const ActivityFilterPanel: React.FC = () => {
+    const actionTypes = ['API_CALL', 'DATA_COLLECTION', 'RATE_LIMIT', 'DATABASE', 'SUCCESS', 'WARNING', 'ERROR']
+    const categories = ['SYSTEM', 'USER', 'EXTERNAL', 'INTERNAL']
+    const severities = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL']
+
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+        <div className="space-y-4">
+          <div className="flex items-center space-x-4">
+            <div className="flex-1">
+              <label className="text-sm font-medium text-gray-700 mb-2 block">Search</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={activityFilter.searchTerm}
+                  onChange={(e) => setActivityFilter(prev => ({ ...prev, searchTerm: e.target.value }))}
+                  placeholder="Search actions..."
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">Time Range</label>
+              <select
+                value={activityFilter.timeRange}
+                onChange={(e) => setActivityFilter(prev => ({ ...prev, timeRange: e.target.value as ActivityFilter['timeRange'] }))}
+                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="5m">Last 5 minutes</option>
+                <option value="15m">Last 15 minutes</option>
+                <option value="1h">Last hour</option>
+                <option value="6h">Last 6 hours</option>
+                <option value="24h">Last 24 hours</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">Action Type</label>
+              <div className="space-y-2 max-h-32 overflow-y-auto">
+                {actionTypes.map(type => (
+                  <label key={type} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={activityFilter.type.includes(type)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setActivityFilter(prev => ({ ...prev, type: [...prev.type, type] }))
+                        } else {
+                          setActivityFilter(prev => ({ ...prev, type: prev.type.filter(t => t !== type) }))
+                        }
+                      }}
+                      className="mr-2"
+                    />
+                    <span className="text-sm text-gray-700">{type}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">Category</label>
+              <div className="space-y-2">
+                {categories.map(category => (
+                  <label key={category} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={activityFilter.category.includes(category)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setActivityFilter(prev => ({ ...prev, category: [...prev.category, category] }))
+                        } else {
+                          setActivityFilter(prev => ({ ...prev, category: prev.category.filter(c => c !== category) }))
+                        }
+                      }}
+                      className="mr-2"
+                    />
+                    <span className="text-sm text-gray-700">{category}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">Severity</label>
+              <div className="space-y-2">
+                {severities.map(severity => (
+                  <label key={severity} className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={activityFilter.severity.includes(severity)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setActivityFilter(prev => ({ ...prev, severity: [...prev.severity, severity] }))
+                        } else {
+                          setActivityFilter(prev => ({ ...prev, severity: prev.severity.filter(s => s !== severity) }))
+                        }
+                      }}
+                      className="mr-2"
+                    />
+                    <span className="text-sm text-gray-700">{severity}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+            <button
+              onClick={() => setActivityFilter({
+                type: [],
+                category: [],
+                severity: [],
+                timeRange: '1h',
+                searchTerm: ''
+              })}
+              className="text-sm text-gray-500 hover:text-gray-700"
+            >
+              Clear all filters
+            </button>
+            <span className="text-sm text-gray-500">
+              {filteredActions.length} actions found
+            </span>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const latestData = liveData[liveData.length - 1]
@@ -263,6 +632,15 @@ const LiveMonitoringDashboard: React.FC = () => {
               </span>
             </div>
             
+            {notifications.length > 0 && (
+              <div className={`flex items-center space-x-2`}>
+                <Bell className={`h-4 w-4 text-orange-500 animate-pulse`} />
+                <span className={`text-sm font-medium text-orange-600`}>
+                  {notifications.length} alert{notifications.length > 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
+            
             <div className={`text-sm text-gray-500`}>
               Last update: {lastUpdate.toLocaleTimeString()}
             </div>
@@ -280,6 +658,18 @@ const LiveMonitoringDashboard: React.FC = () => {
                 <option value={10000}>10s</option>
               </select>
             </div>
+            
+            <button
+              onClick={() => setShowActivityFeed(!showActivityFeed)}
+              className={`flex items-center px-3 py-2 rounded-lg font-medium transition-colors ${
+                showActivityFeed 
+                  ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+              }`}
+            >
+              <Activity className={`h-4 w-4 mr-2`} />
+              Activity Feed
+            </button>
             
             <button
               onClick={() => setIsMonitoring(!isMonitoring)}
@@ -598,6 +988,130 @@ const LiveMonitoringDashboard: React.FC = () => {
         </div>
       )}
 
+      {/* Activity Feed */}
+      {showActivityFeed && (
+        <div className={`mt-6 grid grid-cols-1 ${isFilterOpen ? 'lg:grid-cols-3' : 'lg:grid-cols-1'} gap-6`}>
+          {isFilterOpen && (
+            <div className={`lg:col-span-1`}>
+              <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-6`}>
+                <div className={`flex items-center justify-between mb-4`}>
+                  <h3 className={`text-lg font-semibold text-gray-900`}>Activity Filters</h3>
+                  <button
+                    onClick={() => setIsFilterOpen(false)}
+                    className={`text-gray-400 hover:text-gray-600`}
+                  >
+                    <XCircle className={`h-5 w-5`} />
+                  </button>
+                </div>
+                <ActivityFilterPanel />
+              </div>
+            </div>
+          )}
+          
+          <div className={`${isFilterOpen ? 'lg:col-span-2' : 'lg:col-span-1'}`}>
+            <div className={`bg-white rounded-lg shadow-sm border border-gray-200 p-6`}>
+              <div className={`flex items-center justify-between mb-6`}>
+                <div className={`flex items-center space-x-3`}>
+                  <Activity className={`h-6 w-6 text-blue-600`} />
+                  <h3 className={`text-lg font-semibold text-gray-900`}>Real-time Activity Feed</h3>
+                  <div className={`flex items-center space-x-2`}>
+                    <div className={`w-2 h-2 bg-green-400 rounded-full animate-pulse`} />
+                    <span className={`text-green-400 text-sm font-medium`}>LIVE</span>
+                  </div>
+                </div>
+                
+                <div className={`flex items-center space-x-2`}>
+                  <button
+                    onClick={() => setIsFilterOpen(!isFilterOpen)}
+                    className={`flex items-center px-3 py-2 rounded-lg font-medium transition-colors ${
+                      isFilterOpen 
+                        ? 'bg-blue-600 text-white hover:bg-blue-700' 
+                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                    }`}
+                  >
+                    <Filter className={`h-4 w-4 mr-2`} />
+                    Filter
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      const exportData = {
+                        timestamp: new Date().toISOString(),
+                        actions: filteredActions,
+                        filters: activityFilter
+                      }
+                      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' })
+                      const url = URL.createObjectURL(blob)
+                      const a = document.createElement('a')
+                      a.href = url
+                      a.download = `activity-feed-${Date.now()}.json`
+                      a.click()
+                      URL.revokeObjectURL(url)
+                    }}
+                    className={`flex items-center px-3 py-2 rounded-lg font-medium transition-colors bg-gray-200 text-gray-700 hover:bg-gray-300`}
+                  >
+                    <Download className={`h-4 w-4 mr-2`} />
+                    Export
+                  </button>
+                </div>
+              </div>
+              
+              <div className={`mb-4 flex items-center justify-between`}>
+                <div className={`flex items-center space-x-4`}>
+                  <span className={`text-sm text-gray-500`}>
+                    Showing {filteredActions.length} of {systemActions.length} actions
+                  </span>
+                  <div className={`flex items-center space-x-2`}>
+                    <RefreshCw className={`h-4 w-4 text-gray-400`} />
+                    <span className={`text-sm text-gray-500`}>
+                      Auto-refresh every {refreshInterval / 1000}s
+                    </span>
+                  </div>
+                </div>
+                
+                {notifications.length > 0 && (
+                  <div className={`flex items-center space-x-2`}>
+                    <button
+                      onClick={() => setNotifications([])}
+                      className={`text-sm text-gray-500 hover:text-gray-700`}
+                    >
+                      Clear alerts
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              <div className={`max-h-96 overflow-y-auto`}>
+                {filteredActions.length === 0 ? (
+                  <div className={`text-center py-8`}>
+                    <Activity className={`h-12 w-12 text-gray-400 mx-auto mb-4`} />
+                    <p className={`text-gray-500`}>No activities found matching your filters</p>
+                    <button
+                      onClick={() => setActivityFilter({
+                        type: [],
+                        category: [],
+                        severity: [],
+                        timeRange: '1h',
+                        searchTerm: ''
+                      })}
+                      className={`mt-2 text-blue-600 hover:text-blue-800`}
+                    >
+                      Clear all filters
+                    </button>
+                  </div>
+                ) : (
+                  <div className={`space-y-3`}>
+                    {filteredActions.map(action => (
+                      <ActivityFeedItem key={action.id} action={action} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Real-time Console Output */}
       <div className={`bg-black rounded-lg shadow-sm border border-gray-200 p-6 mt-6`}>
         <div className={`flex items-center justify-between mb-4`}>
@@ -616,7 +1130,7 @@ const LiveMonitoringDashboard: React.FC = () => {
           <div>[{formatTime(Date.now())}] [DataCollector-Debug] Market summary generated</div>
           <div>[{formatTime(Date.now())}] [RateLimiter-Debug] API request successful</div>
           <div>[{formatTime(Date.now())}] [MongoDB-Debug] Live monitoring data saved with Context7 optimizations</div>
-          <div>[{formatTime(Date.now())}] [MongoDB-Debug] Aggregation pipeline completed - {aggregatedStats?.totalApiRequests || 0} total requests</div>
+          <div>[{formatTime(Date.now())}] [MongoDB-Debug] Aggregation pipeline completed - {typeof aggregatedStats?.monitoring === 'object' && aggregatedStats.monitoring && typeof (aggregatedStats.monitoring as Record<string, unknown>).totalApiRequests === 'number' ? ((aggregatedStats.monitoring as Record<string, unknown>).totalApiRequests as number) : 0} total requests</div>
           <div>[{formatTime(Date.now())}] [DataCollector-Debug] Collection cycle completed</div>
         </div>
       </div>

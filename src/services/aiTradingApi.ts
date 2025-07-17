@@ -269,7 +269,7 @@ export class AITradingApi {
     } catch (error) {
       return {
         success: false,
-        data: { overall: {}, byMarketCondition: {}, recentTrends: [], modelEvolution: {} },
+        data: { overall: {}, byMarketCondition: [], recentTrends: [], modelEvolution: {} },
         error: error instanceof Error ? error.message : 'Unknown error'
       }
     }

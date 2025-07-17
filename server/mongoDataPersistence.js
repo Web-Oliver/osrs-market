@@ -82,6 +82,17 @@ class MongoDataPersistence {
           { timestamp: -1 },
           { apiRequests: -1 },
           { successRate: -1 }
+        ],
+        ai_decisions: [
+          { timestamp: -1 },
+          { sessionId: 1, timestamp: -1 },
+          { itemId: 1, timestamp: -1 },
+          { action: 1, confidence: -1 }
+        ],
+        historical_prices: [
+          { itemId: 1, timestamp: -1 },
+          { interval: 1, timestamp: -1 },
+          { timestamp: -1 }
         ]
       };
 
@@ -312,6 +323,281 @@ class MongoDataPersistence {
       };
     } catch (error) {
       console.error('Error getting aggregated stats:', error);
+      throw error;
+    }
+  }
+
+  // ==========================================
+  // AI DECISIONS AND TRADING METHODS
+  // ==========================================
+
+  /**
+   * Save AI trading decision
+   */
+  async saveAIDecision(decision) {
+    if (!this.isConnected) {
+      throw new Error('Database not connected');
+    }
+
+    try {
+      const collection = this.database.collection('ai_decisions');
+      const document = {
+        ...decision,
+        timestamp: decision.timestamp || Date.now(),
+        _id: undefined
+      };
+
+      const result = await collection.insertOne(document);
+      return result.insertedId;
+    } catch (error) {
+      console.error('Error saving AI decision:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get AI decisions for analysis
+   */
+  async getAIDecisions(filters = {}, options = {}) {
+    if (!this.isConnected) {
+      throw new Error('Database not connected');
+    }
+
+    try {
+      const collection = this.database.collection('ai_decisions');
+      const query = {};
+
+      if (filters.sessionId) query.sessionId = filters.sessionId;
+      if (filters.itemId) query.itemId = filters.itemId;
+      if (filters.action) query.action = filters.action;
+      if (filters.startTime && filters.endTime) {
+        query.timestamp = { $gte: filters.startTime, $lte: filters.endTime };
+      }
+
+      const cursor = collection.find(query);
+      
+      if (options.sort) cursor.sort(options.sort);
+      if (options.limit) cursor.limit(options.limit);
+      if (options.skip) cursor.skip(options.skip);
+
+      return await cursor.toArray();
+    } catch (error) {
+      console.error('Error getting AI decisions:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update AI decision with outcome
+   */
+  async updateAIDecisionOutcome(decisionId, outcome) {
+    if (!this.isConnected) {
+      throw new Error('Database not connected');
+    }
+
+    try {
+      const collection = this.database.collection('ai_decisions');
+      const result = await collection.updateOne(
+        { _id: decisionId },
+        { 
+          $set: { 
+            outcome: outcome,
+            updatedAt: Date.now()
+          }
+        }
+      );
+      return result.modifiedCount > 0;
+    } catch (error) {
+      console.error('Error updating AI decision outcome:', error);
+      throw error;
+    }
+  }
+
+  // ==========================================
+  // HISTORICAL PRICE DATA METHODS
+  // ==========================================
+
+  /**
+   * Save historical price data (5min, 1hour, latest)
+   */
+  async saveHistoricalPrice(priceData) {
+    if (!this.isConnected) {
+      throw new Error('Database not connected');
+    }
+
+    try {
+      const collection = this.database.collection('historical_prices');
+      const document = {
+        ...priceData,
+        timestamp: priceData.timestamp || Date.now(),
+        _id: undefined
+      };
+
+      const result = await collection.insertOne(document);
+      return result.insertedId;
+    } catch (error) {
+      console.error('Error saving historical price:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Bulk save historical prices for efficiency
+   */
+  async bulkSaveHistoricalPrices(pricesArray) {
+    if (!this.isConnected) {
+      throw new Error('Database not connected');
+    }
+
+    try {
+      const collection = this.database.collection('historical_prices');
+      const documents = pricesArray.map(price => ({
+        ...price,
+        timestamp: price.timestamp || Date.now(),
+        _id: undefined
+      }));
+
+      const result = await collection.insertMany(documents, { ordered: false });
+      return {
+        insertedCount: result.insertedCount,
+        insertedIds: result.insertedIds
+      };
+    } catch (error) {
+      console.error('Error bulk saving historical prices:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get historical prices for AI training
+   */
+  async getHistoricalPrices(itemId, interval = '5min', limit = 1000) {
+    if (!this.isConnected) {
+      throw new Error('Database not connected');
+    }
+
+    try {
+      const collection = this.database.collection('historical_prices');
+      const query = { itemId, interval };
+
+      return await collection
+        .find(query)
+        .sort({ timestamp: -1 })
+        .limit(limit)
+        .toArray();
+    } catch (error) {
+      console.error('Error getting historical prices:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get price history for multiple items (for AI training)
+   */
+  async getBulkHistoricalPrices(itemIds, interval = '5min', hoursBack = 24) {
+    if (!this.isConnected) {
+      throw new Error('Database not connected');
+    }
+
+    try {
+      const collection = this.database.collection('historical_prices');
+      const startTime = Date.now() - (hoursBack * 60 * 60 * 1000);
+      
+      const query = {
+        itemId: { $in: itemIds },
+        interval: interval,
+        timestamp: { $gte: startTime }
+      };
+
+      return await collection
+        .find(query)
+        .sort({ itemId: 1, timestamp: -1 })
+        .toArray();
+    } catch (error) {
+      console.error('Error getting bulk historical prices:', error);
+      throw error;
+    }
+  }
+
+  // ==========================================
+  // LEARNING SESSION METHODS
+  // ==========================================
+
+  /**
+   * Save learning session data
+   */
+  async saveLearningSession(session) {
+    if (!this.isConnected) {
+      throw new Error('Database not connected');
+    }
+
+    try {
+      const collection = this.database.collection('learning_sessions');
+      const document = {
+        ...session,
+        timestamp: session.timestamp || Date.now(),
+        _id: undefined
+      };
+
+      const result = await collection.insertOne(document);
+      return result.insertedId;
+    } catch (error) {
+      console.error('Error saving learning session:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get performance metrics for AI optimization
+   */
+  async getPerformanceMetrics(sessionId = null, limit = 100) {
+    if (!this.isConnected) {
+      throw new Error('Database not connected');
+    }
+
+    try {
+      const decisionsCollection = this.database.collection('ai_decisions');
+      const outcomesCollection = this.database.collection('trade_outcomes');
+
+      // Aggregate decisions and outcomes
+      const pipeline = [
+        ...(sessionId ? [{ $match: { sessionId } }] : []),
+        {
+          $lookup: {
+            from: 'trade_outcomes',
+            localField: '_id',
+            foreignField: 'decisionId',
+            as: 'outcome'
+          }
+        },
+        {
+          $unwind: { path: '$outcome', preserveNullAndEmptyArrays: true }
+        },
+        {
+          $group: {
+            _id: '$sessionId',
+            totalDecisions: { $sum: 1 },
+            successfulTrades: { 
+              $sum: { $cond: [{ $gt: ['$outcome.profitLoss', 0] }, 1, 0] }
+            },
+            totalProfit: { $sum: { $ifNull: ['$outcome.profitLoss', 0] } },
+            avgConfidence: { $avg: '$confidence' },
+            decisionBreakdown: {
+              $push: {
+                action: '$action',
+                confidence: '$confidence',
+                profit: '$outcome.profitLoss'
+              }
+            }
+          }
+        },
+        { $sort: { _id: -1 } },
+        { $limit: limit }
+      ];
+
+      return await decisionsCollection.aggregate(pipeline).toArray();
+    } catch (error) {
+      console.error('Error getting performance metrics:', error);
       throw error;
     }
   }

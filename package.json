@@ -7,14 +7,19 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "server": "cd server && npm run dev",
+    "client": "vite",
+    "start": "concurrently \"npm run server\" \"npm run client\"",
+    "start:dev": "concurrently --names \"SERVER,CLIENT\" --prefix-colors \"blue,green\" \"npm run server\" \"npm run client\""
   },
   "dependencies": {
     "@types/node": "^24.0.14",
     "lucide-react": "^0.525.0",
     "mongodb": "^6.17.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "recharts": "^3.1.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
@@ -22,6 +27,7 @@
     "@types/react": "19.1.8",
     "@types/react-dom": "19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
+    "concurrently": "^9.2.0",
     "eslint": "^9.30.1",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",

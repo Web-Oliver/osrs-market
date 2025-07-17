@@ -575,14 +575,18 @@ class AITradingController {
 
       const signals = [];
       for (const item of items) {
-        // Create mock price history for analysis
-        const prices = [
-          item.priceData.low || 0,
-          (item.priceData.low + item.priceData.high) / 2 || 0,
-          item.priceData.high || 0
-        ].filter(p => p > 0);
+        // Use actual price history for analysis
+        if (!item.priceHistory || item.priceHistory.length < 3) {
+          this.logger.warn(`Insufficient price history for item ${item.id}`, {
+            itemId: item.id,
+            historyLength: item.priceHistory ? item.priceHistory.length : 0
+          });
+          continue;
+        }
 
-        if (prices.length > 0) {
+        const prices = item.priceHistory.map(point => point.price || point.high || 0).filter(p => p > 0);
+        
+        if (prices.length >= 3) {
           const analysis = this.tradingAnalysis.getMarketAnalysis(prices, item.priceData);
           const flippingOpportunity = this.tradingAnalysis.identifyFlippingOpportunity(
             item.id,

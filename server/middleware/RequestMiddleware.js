@@ -46,10 +46,11 @@ class RequestMiddleware {
 
       // Context7 Pattern: Response logging
       const originalSend = res.send;
+      const logger = this.logger;
       res.send = function(data) {
         const duration = Date.now() - req.startTime;
         
-        this.logger.info('Response sent', {
+        logger.info('Response sent', {
           requestId: req.id,
           statusCode: res.statusCode,
           duration: `${duration}ms`,
@@ -58,7 +59,7 @@ class RequestMiddleware {
         });
 
         return originalSend.call(this, data);
-      }.bind(this);
+      };
 
       next();
     };
@@ -284,10 +285,11 @@ class RequestMiddleware {
 
       // Context7 Pattern: Monitor response
       const originalSend = res.send;
+      const logger = this.logger;
       res.send = function(data) {
         const metrics = monitor.finish();
         
-        this.logger.info('Performance metrics', {
+        logger.info('Performance metrics', {
           requestId: req.id,
           duration: metrics.duration,
           memoryUsage: metrics.memoryUsage,
@@ -305,7 +307,7 @@ class RequestMiddleware {
         });
 
         return originalSend.call(this, data);
-      }.bind(this);
+      };
 
       next();
     };

@@ -64,6 +64,71 @@ router.post(
 );
 
 /**
+ * Context7 Pattern: POST /api/market-data/snapshot
+ * Save market snapshot using MarketDataService directly
+ * Implementation of Step 0.3 requirement
+ */
+router.post(
+  '/snapshot',
+  requestMiddleware.requestSizeLimit({ limit: '1mb' }),
+  requestMiddleware.validateRequest({
+    body: {
+      itemId: { type: 'number', required: true, min: 1 },
+      timestamp: { type: 'number', required: true, min: 0 },
+      interval: { type: 'string', required: true, enum: ['daily_scrape', '5m', '1h', 'latest', '6m_scrape'] },
+      highPrice: { type: 'number', required: true, min: 0 },
+      lowPrice: { type: 'number', required: true, min: 0 },
+      volume: { type: 'number', required: true, min: 0 },
+      source: { type: 'string', optional: true, enum: ['osrs_wiki_api', 'ge_scraper', 'manual_entry', 'calculated'] },
+      // Optional calculated metrics
+      marginGp: { type: 'number', optional: true },
+      marginPercent: { type: 'number', optional: true },
+      volatility: { type: 'number', optional: true, min: 0 },
+      velocity: { type: 'number', optional: true, min: 0 },
+      trendMovingAverage: { type: 'number', optional: true, min: 0 },
+      rsi: { type: 'number', optional: true, min: 0, max: 100 },
+      macd: { type: 'number', optional: true },
+      momentumScore: { type: 'number', optional: true, min: -100, max: 100 },
+      riskScore: { type: 'number', optional: true, min: 0, max: 100 },
+      expectedProfitPerHour: { type: 'number', optional: true, min: 0 },
+      profitPerGeSlot: { type: 'number', optional: true, min: 0 },
+      confidence: { type: 'number', optional: true, min: 0, max: 1 }
+    }
+  }),
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
+  async (req, res) => {
+    try {
+      const { MarketDataService } = require('../services/MarketDataService');
+      const marketDataService = new MarketDataService();
+      const snapshot = await marketDataService.saveMarketSnapshot(req.body);
+      
+      res.status(201).json({
+        success: true,
+        data: snapshot,
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      if (error.message.includes('Missing required fields') || 
+          error.message.includes('Invalid interval') ||
+          error.message.includes('High price cannot be less than low price') ||
+          error.message.includes('RSI must be between 0 and 100')) {
+        res.status(400).json({
+          success: false,
+          error: error.message,
+          timestamp: Date.now()
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: 'Internal server error',
+          timestamp: Date.now()
+        });
+      }
+    }
+  }
+);
+
+/**
  * Context7 Pattern: GET /api/market-data/summary
  * Get market data summary with analytics
  */
@@ -86,7 +151,7 @@ router.get(
   '/item/:itemId/history',
   requestMiddleware.validateRequest({
     params: {
-      itemId: { type: 'number', required: true, min: 1 }
+      itemId: { type: 'string', required: true, pattern: '^[1-9][0-9]*$' }
     },
     query: {
       startTime: { type: 'number', min: 0, optional: true },
@@ -97,6 +162,74 @@ router.get(
   }),
   requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.getItemPriceHistory)
+);
+
+/**
+ * Context7 Pattern: GET /api/market-data/:itemId
+ * Get market snapshots for a specific item using MarketDataService directly
+ * Implementation of Step 0.3 requirement
+ */
+router.get(
+  '/:itemId',
+  requestMiddleware.validateRequest({
+    params: {
+      itemId: { type: 'string', required: true, pattern: '^[1-9][0-9]*$' }
+    },
+    query: {
+      interval: { type: 'string', optional: true, enum: ['daily_scrape', '5m', '1h', 'latest', '6m_scrape'] },
+      startDate: { type: 'string', optional: true, pattern: '^[0-9]+$' },
+      endDate: { type: 'string', optional: true, pattern: '^[0-9]+$' }
+    }
+  }),
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 120 }), // 120 requests per minute
+  async (req, res) => {
+    try {
+      const { MarketDataService } = require('../services/MarketDataService');
+      const marketDataService = new MarketDataService();
+      const itemId = parseInt(req.params.itemId);
+      const { interval, startDate, endDate } = req.query;
+      
+      // Convert string parameters to appropriate types
+      const startDateNum = startDate ? parseInt(startDate) : undefined;
+      const endDateNum = endDate ? parseInt(endDate) : undefined;
+      
+      const snapshots = await marketDataService.getMarketSnapshots(
+        itemId,
+        interval,
+        startDateNum,
+        endDateNum
+      );
+      
+      if (snapshots.length === 0) {
+        res.status(404).json({
+          success: false,
+          error: 'No market snapshots found for the specified criteria',
+          timestamp: Date.now()
+        });
+      } else {
+        res.status(200).json({
+          success: true,
+          data: snapshots,
+          count: snapshots.length,
+          timestamp: Date.now()
+        });
+      }
+    } catch (error) {
+      if (error.message.includes('itemId must be a valid number')) {
+        res.status(400).json({
+          success: false,
+          error: error.message,
+          timestamp: Date.now()
+        });
+      } else {
+        res.status(500).json({
+          success: false,
+          error: 'Internal server error',
+          timestamp: Date.now()
+        });
+      }
+    }
+  }
 );
 
 /**
@@ -283,6 +416,82 @@ router.get(
   }),
   requestMiddleware.rateLimit({ windowMs: 60000, max: 30 }), // 30 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.getPortfolioAnalysis)
+);
+
+/**
+ * Context7 Pattern: GET /api/market-data/live
+ * Get live market data from OSRS Wiki API
+ */
+router.get(
+  '/live',
+  requestMiddleware.validateRequest({
+    query: {
+      itemIds: { type: 'string', optional: true }, // comma-separated list
+      limit: { type: 'number', min: 1, max: 100, optional: true }
+    }
+  }),
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 30 }), // 30 requests per minute
+  async (req, res) => {
+    try {
+      const { itemIds, limit = 50 } = req.query;
+      
+      const options = {
+        itemIds: itemIds ? itemIds.split(',').map(id => parseInt(id)) : null,
+        limit: parseInt(limit)
+      };
+      
+      const liveData = await marketDataController.getLiveMarketData(options);
+      
+      res.json({
+        success: true,
+        data: liveData,
+        timestamp: Date.now(),
+        source: 'osrs_wiki_api'
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        timestamp: Date.now()
+      });
+    }
+  }
+);
+
+/**
+ * Context7 Pattern: GET /api/market-data/prices
+ * Get latest prices from OSRS Wiki API
+ */
+router.get(
+  '/prices',
+  requestMiddleware.validateRequest({
+    query: {
+      itemIds: { type: 'string', optional: true } // comma-separated list
+    }
+  }),
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
+  async (req, res) => {
+    try {
+      const { itemIds } = req.query;
+      
+      const prices = await marketDataController.getLatestPrices(
+        itemIds ? itemIds.split(',').map(id => parseInt(id)) : null
+      );
+      
+      res.json({
+        success: true,
+        data: prices,
+        timestamp: Date.now(),
+        source: 'osrs_wiki_api'
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        timestamp: Date.now()
+      });
+    }
+  }
 );
 
 /**

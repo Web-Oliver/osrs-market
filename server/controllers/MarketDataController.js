@@ -26,6 +26,8 @@ class MarketDataController {
     this.getItemPriceHistory = this.getItemPriceHistory.bind(this);
     this.getTopTradedItems = this.getTopTradedItems.bind(this);
     this.searchItems = this.searchItems.bind(this);
+    this.getLiveMarketData = this.getLiveMarketData.bind(this);
+    this.getLatestPrices = this.getLatestPrices.bind(this);
   }
 
   /**
@@ -323,6 +325,61 @@ class MarketDataController {
         requestId: req.id
       });
       next(error);
+    }
+  }
+
+  /**
+   * Context7 Pattern: Get live market data from OSRS Wiki API
+   */
+  async getLiveMarketData(options) {
+    try {
+      this.logger.info('Fetching live market data', { options });
+
+      const liveData = await this.marketDataService.fetchLiveMarketData(options);
+
+      this.logger.info('Successfully fetched live market data', {
+        itemCount: liveData.length
+      });
+
+      return liveData;
+    } catch (error) {
+      this.logger.error('Error fetching live market data', error, { options });
+      throw error;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Get latest prices from OSRS Wiki API
+   */
+  async getLatestPrices(itemIds = null) {
+    try {
+      this.logger.info('Fetching latest prices', { itemIds });
+
+      const prices = await this.marketDataService.osrsWikiService.getLatestPrices();
+
+      // Filter for specific items if requested
+      if (itemIds && itemIds.length > 0) {
+        const filteredData = {};
+        for (const itemId of itemIds) {
+          const itemIdStr = itemId.toString();
+          if (prices.data[itemIdStr]) {
+            filteredData[itemIdStr] = prices.data[itemIdStr];
+          }
+        }
+        return {
+          ...prices,
+          data: filteredData
+        };
+      }
+
+      this.logger.info('Successfully fetched latest prices', {
+        itemCount: Object.keys(prices.data).length
+      });
+
+      return prices;
+    } catch (error) {
+      this.logger.error('Error fetching latest prices', error, { itemIds });
+      throw error;
     }
   }
 }

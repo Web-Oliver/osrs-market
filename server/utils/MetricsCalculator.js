@@ -79,21 +79,21 @@ class MetricsCalculator {
       return trends;
     }
 
-    // Mock trend calculation (in real implementation, this would use historical data)
-    const mockTrendData = {
-      apiRequests: this.generateTrendData(stats.totalApiRequests || 100, 10),
-      successRate: this.generateTrendData(stats.avgSuccessRate || 95, 5),
-      responseTime: this.generateTrendData(stats.avgResponseTime || 850, 20),
-      itemsProcessed: this.generateTrendData(stats.totalItemsProcessed || 1000, 15),
-      profit: this.generateTrendData(stats.totalProfit || 50000, 25)
-    };
-
-    // Calculate trend direction for each metric
-    Object.keys(trends).forEach(metric => {
-      if (mockTrendData[metric]) {
-        trends[metric] = this.calculateTrendDirection(mockTrendData[metric]);
-      }
-    });
+    // Calculate trends based on historical data (requires actual historical metrics)
+    if (stats.historicalData && stats.historicalData.length >= 2) {
+      Object.keys(trends).forEach(metric => {
+        const historicalValues = stats.historicalData.map(point => point[metric]).filter(val => val !== undefined);
+        if (historicalValues.length >= 2) {
+          trends[metric] = this.calculateTrendDirection(historicalValues);
+        }
+      });
+    } else {
+      this.logger.warn('Insufficient historical data for trend calculation');
+      // Set all trends to 'unknown' when no historical data is available
+      Object.keys(trends).forEach(metric => {
+        trends[metric] = 'unknown';
+      });
+    }
 
     return trends;
   }
@@ -425,19 +425,17 @@ class MetricsCalculator {
   }
 
   /**
-   * Generate mock trend data
+   * Extract historical trend data from actual metrics
    */
-  generateTrendData(baseValue, variance) {
-    const data = [];
-    let current = baseValue;
-    
-    for (let i = 0; i < 10; i++) {
-      const change = (Math.random() - 0.5) * variance;
-      current += change;
-      data.push(current);
+  extractHistoricalTrend(historicalData, metricName) {
+    if (!historicalData || historicalData.length < 2) {
+      return [];
     }
     
-    return data;
+    return historicalData
+      .map(point => point[metricName])
+      .filter(val => val !== undefined && val !== null)
+      .slice(-10); // Get last 10 data points
   }
 
   /**

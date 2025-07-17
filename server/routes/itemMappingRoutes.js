@@ -1,0 +1,305 @@
+/**
+ * 🛣️ Item Mapping Routes - Context7 Express Router
+ * 
+ * Context7 Pattern: Express Router with RESTful Design
+ * - SOLID: Single Responsibility - Item mapping HTTP routing
+ * - DRY: Reusable middleware patterns and route handlers
+ * - RESTful API design with proper HTTP methods and status codes
+ * - Comprehensive middleware integration (validation, rate limiting, etc.)
+ * - Security through input validation and rate limiting
+ */
+
+const express = require('express');
+const { ItemMappingController } = require('../controllers/ItemMappingController');
+const { RequestMiddleware } = require('../middleware/RequestMiddleware');
+const { ErrorMiddleware } = require('../middleware/ErrorMiddleware');
+
+const router = express.Router();
+
+// Context7 Pattern: Initialize dependencies
+const itemMappingController = new ItemMappingController();
+const requestMiddleware = new RequestMiddleware();
+const errorMiddleware = new ErrorMiddleware();
+
+// Context7 Pattern: Apply middleware to all routes
+router.use(requestMiddleware.performanceMonitoring());
+router.use(requestMiddleware.requestTracking());
+
+/**
+ * Context7 Pattern: POST /api/items/import
+ * One-time import of all item mappings from OSRS Wiki API
+ */
+router.post(
+  '/import',
+  requestMiddleware.validateRequest({
+    body: {
+      force: { type: 'boolean', optional: true }
+    }
+  }),
+  requestMiddleware.rateLimit({ windowMs: 300000, max: 2 }), // 2 requests per 5 minutes
+  errorMiddleware.handleAsyncError(itemMappingController.importMappings)
+);
+
+/**
+ * Context7 Pattern: GET /api/items/health
+ * Health check endpoint for monitoring
+ */
+router.get(
+  '/health',
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
+  errorMiddleware.handleAsyncError(itemMappingController.healthCheck)
+);
+
+/**
+ * Context7 Pattern: GET /api/items/sync/status
+ * Get synchronization status and statistics
+ */
+router.get(
+  '/sync/status',
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 30 }), // 30 requests per minute
+  errorMiddleware.handleAsyncError(itemMappingController.getSyncStatus)
+);
+
+/**
+ * Context7 Pattern: GET /api/items/search
+ * Search items by name with text search
+ */
+router.get(
+  '/search',
+  requestMiddleware.validateRequest({
+    query: {
+      searchTerm: { type: 'string', required: true, minLength: 2, maxLength: 100 },
+      limit: { type: 'number', min: 1, max: 100, optional: true },
+      members: { type: 'boolean', optional: true },
+      tradeable: { type: 'boolean', optional: true }
+    }
+  }),
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 120 }), // 120 requests per minute
+  errorMiddleware.handleAsyncError(itemMappingController.searchItems)
+);
+
+/**
+ * Context7 Pattern: GET /api/items/high-value
+ * Get high-value items for trading analysis
+ */
+router.get(
+  '/high-value',
+  requestMiddleware.validateRequest({
+    query: {
+      limit: { type: 'number', min: 1, max: 100, optional: true },
+      minValue: { type: 'number', min: 0, optional: true },
+      members: { type: 'boolean', optional: true }
+    }
+  }),
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
+  errorMiddleware.handleAsyncError(itemMappingController.getHighValueItems)
+);
+
+/**
+ * Context7 Pattern: GET /api/items/category/:category
+ * Get items by category classification
+ */
+router.get(
+  '/category/:category',
+  requestMiddleware.validateRequest({
+    params: {
+      category: { 
+        type: 'string', 
+        required: true,
+        enum: ['runes', 'potions', 'food', 'smithing', 'woodcutting', 'farming', 'high_value', 'members', 'free', 'general']
+      }
+    },
+    query: {
+      limit: { type: 'number', min: 1, max: 100, optional: true },
+      tradeable: { type: 'boolean', optional: true },
+      sort: { type: 'string', optional: true }
+    }
+  }),
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
+  errorMiddleware.handleAsyncError(itemMappingController.getItemsByCategory)
+);
+
+/**
+ * Context7 Pattern: GET /api/items
+ * Get items with pagination, filtering, and sorting
+ */
+router.get(
+  '/',
+  requestMiddleware.validateRequest({
+    query: {
+      page: { type: 'number', min: 1, optional: true },
+      limit: { type: 'number', min: 1, max: 100, optional: true },
+      members: { type: 'boolean', optional: true },
+      tradeable: { type: 'boolean', optional: true },
+      minValue: { type: 'number', min: 0, optional: true },
+      maxValue: { type: 'number', min: 0, optional: true },
+      sort: { type: 'string', optional: true }
+    }
+  }),
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 120 }), // 120 requests per minute
+  errorMiddleware.handleAsyncError(itemMappingController.getItems)
+);
+
+// ==========================================
+// ENHANCED DOMAIN-DRIVEN ROUTES
+// ==========================================
+
+/**
+ * Enhanced: GET /api/items/business/insights
+ * Get comprehensive business insights about items
+ */
+router.get(
+  '/business/insights',
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 20 }), // 20 requests per minute
+  errorMiddleware.handleAsyncError(itemMappingController.getBusinessInsights)
+);
+
+/**
+ * Enhanced: GET /api/items/business/:criteria
+ * Find items by business criteria using specifications
+ */
+router.get(
+  '/business/:criteria',
+  requestMiddleware.validateRequest({
+    params: {
+      criteria: { 
+        type: 'string', 
+        required: true,
+        enum: [
+          'profitableAlchemy',
+          'highValueTradeable', 
+          'flippingCandidates',
+          'freeToPlayTradeable',
+          'highEndMembersEquipment',
+          'newPlayerFriendly',
+          'bulkTradingItems',
+          'needsDataRefresh',
+          'recentlyUpdatedHighValue'
+        ]
+      }
+    },
+    query: {
+      valueThreshold: { type: 'number', min: 0, optional: true },
+      minimumProfit: { type: 'number', min: 0, optional: true },
+      maxAge: { type: 'number', min: 0, optional: true },
+      maxValue: { type: 'number', min: 0, optional: true }
+    }
+  }),
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
+  errorMiddleware.handleAsyncError(itemMappingController.findByBusinessCriteria)
+);
+
+/**
+ * Enhanced: GET /api/items/:itemId/enhanced
+ * Get single item by ID with business insights
+ */
+router.get(
+  '/:itemId/enhanced',
+  requestMiddleware.validateRequest({
+    params: {
+      itemId: { type: 'number', required: true, min: 1 }
+    }
+  }),
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 120 }), // 120 requests per minute
+  errorMiddleware.handleAsyncError(itemMappingController.getItemEnhanced)
+);
+
+/**
+ * Context7 Pattern: GET /api/items/:itemId
+ * Get single item by ID
+ */
+router.get(
+  '/:itemId',
+  requestMiddleware.validateRequest({
+    params: {
+      itemId: { type: 'number', required: true, min: 1 }
+    }
+  }),
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 200 }), // 200 requests per minute
+  errorMiddleware.handleAsyncError(itemMappingController.getItem)
+);
+
+/**
+ * Context7 Pattern: POST /api/items
+ * Create new item (admin operation)
+ */
+router.post(
+  '/',
+  requestMiddleware.requestSizeLimit({ limit: '1mb' }),
+  requestMiddleware.validateRequest({
+    body: {
+      itemId: { type: 'number', required: true, min: 1 },
+      name: { type: 'string', required: true, minLength: 1, maxLength: 200 },
+      examine: { type: 'string', optional: true, maxLength: 500 },
+      members: { type: 'boolean', optional: true },
+      lowalch: { type: 'number', min: 0, optional: true },
+      highalch: { type: 'number', min: 0, optional: true },
+      tradeable_on_ge: { type: 'boolean', optional: true },
+      stackable: { type: 'boolean', optional: true },
+      noted: { type: 'boolean', optional: true },
+      value: { type: 'number', min: 0, optional: true },
+      buy_limit: { type: 'number', min: 1, optional: true },
+      weight: { type: 'number', min: 0, optional: true },
+      icon: { type: 'string', optional: true }
+    }
+  }),
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 10 }), // 10 requests per minute
+  errorMiddleware.handleAsyncError(itemMappingController.createItem)
+);
+
+/**
+ * Context7 Pattern: PUT /api/items/:itemId
+ * Update existing item (admin operation)
+ */
+router.put(
+  '/:itemId',
+  requestMiddleware.requestSizeLimit({ limit: '1mb' }),
+  requestMiddleware.validateRequest({
+    params: {
+      itemId: { type: 'number', required: true, min: 1 }
+    },
+    body: {
+      name: { type: 'string', optional: true, minLength: 1, maxLength: 200 },
+      examine: { type: 'string', optional: true, maxLength: 500 },
+      members: { type: 'boolean', optional: true },
+      lowalch: { type: 'number', min: 0, optional: true },
+      highalch: { type: 'number', min: 0, optional: true },
+      tradeable_on_ge: { type: 'boolean', optional: true },
+      stackable: { type: 'boolean', optional: true },
+      noted: { type: 'boolean', optional: true },
+      value: { type: 'number', min: 0, optional: true },
+      buy_limit: { type: 'number', min: 1, optional: true },
+      weight: { type: 'number', min: 0, optional: true },
+      icon: { type: 'string', optional: true }
+    }
+  }),
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 20 }), // 20 requests per minute
+  errorMiddleware.handleAsyncError(itemMappingController.updateItem)
+);
+
+/**
+ * Context7 Pattern: DELETE /api/items/:itemId
+ * Delete item (admin operation - soft delete)
+ */
+router.delete(
+  '/:itemId',
+  requestMiddleware.validateRequest({
+    params: {
+      itemId: { type: 'number', required: true, min: 1 }
+    }
+  }),
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 10 }), // 10 requests per minute
+  errorMiddleware.handleAsyncError(itemMappingController.deleteItem)
+);
+
+/**
+ * Context7 Pattern: Error handling middleware
+ */
+router.use(errorMiddleware.handleError);
+
+/**
+ * Context7 Pattern: 404 handler for item mapping routes
+ */
+router.use(errorMiddleware.handleNotFound);
+
+module.exports = router;

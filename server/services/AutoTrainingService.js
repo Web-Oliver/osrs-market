@@ -10,8 +10,9 @@
  */
 
 const { Logger } = require('../utils/Logger');
-const { OSRSDataCollectorService } = require('./OSRSDataCollectorService');
+const { DataCollectionService } = require('./DataCollectionService');
 const { AITradingOrchestratorService } = require('./AITradingOrchestratorService');
+const { MongoDataPersistence } = require('../mongoDataPersistence');
 
 class AutoTrainingService {
   constructor(config = {}) {
@@ -65,6 +66,7 @@ class AutoTrainingService {
     this.sessionId = null;
     this.dataCollector = null;
     this.aiOrchestrator = null;
+    this.mongoPersistence = null;
 
     this.logger.info('🔄 Auto Training Service initialized', {
       enableAutoTraining: this.config.training.enableAutoTraining,
@@ -87,8 +89,17 @@ class AutoTrainingService {
     this.isRunning = true;
 
     try {
+      // Initialize MongoDB persistence for historical data access
+      const mongoConfig = {
+        connectionString: process.env.MONGODB_CONNECTION_STRING || 'mongodb://localhost:27017',
+        databaseName: process.env.MONGODB_DATABASE || 'osrs_market_data'
+      };
+      
+      this.mongoPersistence = new MongoDataPersistence(mongoConfig);
+      await this.mongoPersistence.initialize();
+      
       // Initialize data collector
-      this.dataCollector = new OSRSDataCollectorService(this.config.dataCollection);
+      this.dataCollector = new DataCollectionService(this.config.dataCollection);
       await this.dataCollector.startCollection();
 
       // Initialize AI orchestrator
@@ -172,23 +183,24 @@ class AutoTrainingService {
         throw new Error('Services not initialized');
       }
 
-      const latestData = this.dataCollector.getLatestData();
-      if (!latestData) {
-        this.logger.debug('⚠️ No data available for training');
+      // ENHANCED: Get historical data from MongoDB for proper AI training
+      const historicalData = await this.getHistoricalTrainingData();
+      if (!historicalData || historicalData.length === 0) {
+        this.logger.debug('⚠️ No historical data available for training');
         return;
       }
 
       // Check if we have enough data points
-      if (latestData.items.length < this.config.training.minDataPoints) {
-        this.logger.debug('⚠️ Insufficient data points', {
-          current: latestData.items.length,
+      if (historicalData.length < this.config.training.minDataPoints) {
+        this.logger.debug('⚠️ Insufficient historical data points', {
+          current: historicalData.length,
           required: this.config.training.minDataPoints
         });
         return;
       }
 
-      // Filter and select relevant items for training
-      const selectedItems = this.selectTrainingItems(latestData.items);
+      // Filter and select relevant items for training with historical context
+      const selectedItems = this.selectTrainingItems(historicalData);
       
       if (selectedItems.length === 0) {
         this.logger.debug('⚠️ No suitable items found for training');
@@ -229,6 +241,88 @@ class AutoTrainingService {
   }
 
   /**
+   * Context7 Pattern: Get historical training data from MongoDB
+   */
+  async getHistoricalTrainingData() {
+    try {
+      if (!this.mongoPersistence) {
+        throw new Error('MongoDB persistence not initialized');
+      }
+
+      // Get unique item IDs that have been actively traded (have historical data)
+      const recentHistoricalData = await this.mongoPersistence.getMarketData(
+        { 
+          // Get last 24 hours of data
+          startTime: Date.now() - (24 * 60 * 60 * 1000),
+          endTime: Date.now()
+        },
+        { 
+          sort: { timestamp: -1 },
+          limit: 10000 // Get up to 10k recent records
+        }
+      );
+
+      if (!recentHistoricalData || recentHistoricalData.length === 0) {
+        this.logger.warn('⚠️ No recent historical market data found');
+        return [];
+      }
+
+      // Group by item ID and build comprehensive data with price history
+      const itemDataMap = new Map();
+      
+      for (const record of recentHistoricalData) {
+        if (record.items && Array.isArray(record.items)) {
+          for (const item of record.items) {
+            const itemId = item.itemId;
+            if (!itemDataMap.has(itemId)) {
+              itemDataMap.set(itemId, {
+                id: itemId,
+                itemId: itemId,
+                priceData: item.priceData,
+                priceHistory: [],
+                volume: item.volume || 0,
+                grandExchange: true, // Assume true for historical data
+                timestamp: item.timestamp
+              });
+            }
+            
+            // Add to price history
+            const itemData = itemDataMap.get(itemId);
+            itemData.priceHistory.push({
+              timestamp: item.timestamp,
+              high: item.priceData?.high || 0,
+              low: item.priceData?.low || 0,
+              price: ((item.priceData?.high || 0) + (item.priceData?.low || 0)) / 2,
+              interval: item.interval || 'latest'
+            });
+          }
+        }
+      }
+
+      // Convert to array and filter items with sufficient history
+      const itemsWithHistory = Array.from(itemDataMap.values()).filter(item => 
+        item.priceHistory.length >= 3 // Need at least 3 data points for technical analysis
+      );
+
+      // Sort price history by timestamp for each item
+      itemsWithHistory.forEach(item => {
+        item.priceHistory.sort((a, b) => a.timestamp - b.timestamp);
+      });
+
+      this.logger.debug('📊 Historical training data prepared', {
+        totalRecords: recentHistoricalData.length,
+        uniqueItems: itemDataMap.size,
+        itemsWithSufficientHistory: itemsWithHistory.length
+      });
+
+      return itemsWithHistory;
+    } catch (error) {
+      this.logger.error('❌ Error fetching historical training data', error);
+      return [];
+    }
+  }
+
+  /**
    * Context7 Pattern: Select items for training based on filters
    */
   selectTrainingItems(items) {
@@ -237,7 +331,12 @@ class AutoTrainingService {
     }
 
     const filtered = items.filter(item => {
-      // Price range filter
+      // Ensure item has sufficient price history for AI training
+      if (!item.priceHistory || item.priceHistory.length < 3) {
+        return false;
+      }
+
+      // Price range filter using latest price data
       const avgPrice = ((item.priceData?.high || 0) + (item.priceData?.low || 0)) / 2;
       if (avgPrice < this.config.itemSelection.priceRangeMin) return false;
       if (avgPrice > this.config.itemSelection.priceRangeMax) return false;
@@ -256,11 +355,20 @@ class AutoTrainingService {
       return true;
     });
 
-    // Sort by trading potential (spread percentage desc)
+    // Sort by trading potential (spread percentage desc) and price history quality
     const sorted = filtered.sort((a, b) => {
       const spreadA = this.calculateSpread(a);
       const spreadB = this.calculateSpread(b);
-      return spreadB - spreadA;
+      
+      // Factor in price history quality (more history = better for training)
+      const historyQualityA = a.priceHistory.length;
+      const historyQualityB = b.priceHistory.length;
+      
+      // Combined score: spread percentage + history quality bonus
+      const scoreA = spreadA + (historyQualityA * 0.1);
+      const scoreB = spreadB + (historyQualityB * 0.1);
+      
+      return scoreB - scoreA;
     });
 
     return sorted.slice(0, this.config.itemSelection.maxItemsToTrade);

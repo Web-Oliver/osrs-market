@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useAITrading } from '../hooks/useAITrading'
 import { useItemPrices } from '../hooks/useItemPrices'
 import type { AdaptiveLearningConfig } from '../types/aiTrading'
+import type { PerformanceAnalytics } from '../services/aiTradingApi'
 
 export function AITradingDashboard() {
   const {
@@ -56,8 +57,8 @@ export function AITradingDashboard() {
     updateAdaptiveConfig(adaptiveConfig)
   }
 
-  const handleSaveModel = () => {
-    const modelData = saveModel()
+  const handleSaveModel = async () => {
+    const modelData = await saveModel()
     if (modelData) {
       alert('Model saved successfully!')
     }
@@ -71,9 +72,9 @@ export function AITradingDashboard() {
       const file = (e.target as HTMLInputElement).files?.[0]
       if (file) {
         const reader = new FileReader()
-        reader.onload = (event) => {
+        reader.onload = async (event) => {
           const modelData = event.target?.result as string
-          if (loadModel(modelData)) {
+          if (await loadModel(modelData)) {
             alert('Model loaded successfully!')
           }
         }
@@ -84,7 +85,15 @@ export function AITradingDashboard() {
   }
 
   const recentMetrics = trainingMetrics.slice(-10)
-  const analytics = getPerformanceAnalytics()
+  const [analytics, setAnalytics] = useState<PerformanceAnalytics | null>(null)
+  
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      const result = await getPerformanceAnalytics()
+      setAnalytics(result)
+    }
+    fetchAnalytics()
+  }, [getPerformanceAnalytics])
 
   return (
     <div className="space-y-6">
@@ -163,17 +172,13 @@ export function AITradingDashboard() {
                 <span className="ml-2 font-medium">{currentSession.status}</span>
               </div>
               <div>
-                <span className="text-blue-600">Episodes:</span>
-                <span className="ml-2 font-medium">{currentSession.episodeCount}</span>
+                <span className="text-blue-600">Session:</span>
+                <span className="ml-2 font-medium">{currentSession.sessionName}</span>
               </div>
               <div>
-                <span className="text-blue-600">Trades:</span>
-                <span className="ml-2 font-medium">{currentSession.totalTrades}</span>
-              </div>
-              <div>
-                <span className="text-blue-600">Profit:</span>
-                <span className="ml-2 font-medium text-green-600">
-                  {currentSession.totalProfit.toLocaleString()} GP
+                <span className="text-blue-600">Created:</span>
+                <span className="ml-2 font-medium">
+                  {new Date(currentSession.createdAt).toLocaleDateString()}
                 </span>
               </div>
             </div>
@@ -190,28 +195,28 @@ export function AITradingDashboard() {
             <div className="bg-green-50 rounded-lg p-4">
               <div className="text-green-600 text-sm font-medium">Success Rate</div>
               <div className="text-2xl font-bold text-green-900">
-                {performance.successRate.toFixed(1)}%
+                {performance && typeof performance.overall === 'object' && performance.overall && typeof (performance.overall as Record<string, unknown>).successRate === 'number' ? ((performance.overall as Record<string, unknown>).successRate as number).toFixed(1) : 'N/A'}%
               </div>
             </div>
             
             <div className="bg-blue-50 rounded-lg p-4">
               <div className="text-blue-600 text-sm font-medium">Total Profit</div>
               <div className="text-2xl font-bold text-blue-900">
-                {performance.totalProfit.toLocaleString()} GP
+                {performance && typeof performance.overall === 'object' && performance.overall && typeof (performance.overall as Record<string, unknown>).totalProfit === 'number' ? ((performance.overall as Record<string, unknown>).totalProfit as number).toLocaleString() : 'N/A'} GP
               </div>
             </div>
             
             <div className="bg-purple-50 rounded-lg p-4">
               <div className="text-purple-600 text-sm font-medium">Avg Profit/Trade</div>
               <div className="text-2xl font-bold text-purple-900">
-                {performance.averageProfit.toLocaleString()} GP
+                {performance && typeof performance.overall === 'object' && performance.overall && typeof (performance.overall as Record<string, unknown>).averageProfit === 'number' ? ((performance.overall as Record<string, unknown>).averageProfit as number).toLocaleString() : 'N/A'} GP
               </div>
             </div>
             
             <div className="bg-orange-50 rounded-lg p-4">
               <div className="text-orange-600 text-sm font-medium">Total Trades</div>
               <div className="text-2xl font-bold text-orange-900">
-                {performance.totalTrades}
+                {performance && typeof performance.overall === 'object' && performance.overall && typeof (performance.overall as Record<string, unknown>).totalTrades === 'number' ? ((performance.overall as Record<string, unknown>).totalTrades as number) : 'N/A'}
               </div>
             </div>
           </div>

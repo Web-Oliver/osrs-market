@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import type { FlippingOpportunity, MarketSignal, TradingPerformance } from '../types/trading'
+import type { FlippingOpportunity, MarketSignal, TradingPerformance, TechnicalIndicators } from '../types/trading'
 import type { ItemPrice } from '../types'
 import { useAITradingBackend } from './useAITradingBackend'
 
@@ -31,12 +31,12 @@ export function useMarketAnalysis() {
             strength: signal.signal.strength,
             confidence: signal.signal.confidence,
             timestamp: signal.signal.timestamp,
-            indicators: signal.indicators,
+            indicators: signal.indicators as unknown as TechnicalIndicators,
             recommendation: signal.signal.type === 'BUY' ? 'BUY' : 
                            signal.signal.type === 'SELL' ? 'SELL' : 'HOLD',
-            priceTarget: signal.flippingOpportunity?.buyPrice || 0,
-            stopLoss: signal.flippingOpportunity?.sellPrice || 0,
-            volume: signal.flippingOpportunity?.expectedVolume || 0
+            priceTarget: (signal.flippingOpportunity as Record<string, unknown>)?.buyPrice as number || 0,
+            stopLoss: (signal.flippingOpportunity as Record<string, unknown>)?.sellPrice as number || 0,
+            volume: (signal.flippingOpportunity as Record<string, unknown>)?.expectedVolume as number || 0
           }
           
           newSignals.set(signal.itemId, marketSignal)
@@ -46,18 +46,14 @@ export function useMarketAnalysis() {
             const opportunity: FlippingOpportunity = {
               itemId: signal.itemId,
               itemName: signal.itemName,
-              buyPrice: signal.flippingOpportunity.buyPrice,
-              sellPrice: signal.flippingOpportunity.sellPrice,
-              potentialProfit: signal.flippingOpportunity.potentialProfit,
-              roi: signal.flippingOpportunity.roi,
-              riskLevel: signal.flippingOpportunity.riskLevel,
-              marketCap: signal.flippingOpportunity.marketCap,
-              volume: signal.flippingOpportunity.expectedVolume,
-              spread: signal.flippingOpportunity.spread,
-              volatility: signal.analysis.volatility,
-              trendStrength: signal.analysis.trendStrength,
-              timeToFlip: signal.flippingOpportunity.timeToFlip,
-              competition: signal.flippingOpportunity.competition,
+              buyPrice: (signal.flippingOpportunity as Record<string, unknown>).buyPrice as number || 0,
+              sellPrice: (signal.flippingOpportunity as Record<string, unknown>).sellPrice as number || 0,
+              spreadPercentage: (signal.flippingOpportunity as Record<string, unknown>).spread as number || 0,
+              profitGP: (signal.flippingOpportunity as Record<string, unknown>).potentialProfit as number || 0,
+              roi: (signal.flippingOpportunity as Record<string, unknown>).roi as number || 0,
+              riskLevel: (signal.flippingOpportunity as Record<string, unknown>).riskLevel as 'LOW' | 'MEDIUM' | 'HIGH' || 'MEDIUM',
+              volume: (signal.flippingOpportunity as Record<string, unknown>).expectedVolume as number || 0,
+              timeToFlip: (signal.flippingOpportunity as Record<string, unknown>).timeToFlip as number || 0,
               lastUpdated: signal.signal.timestamp
             }
             
@@ -76,7 +72,7 @@ export function useMarketAnalysis() {
     } finally {
       setLoading(false)
     }
-  }, [backend])
+  }, [backend.generateTradingSignals])
 
   const getTopOpportunities = useCallback((limit: number = 10) => {
     return opportunities

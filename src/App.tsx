@@ -2,10 +2,11 @@ import { useState } from 'react'
 import { TradingDashboard } from './components/TradingDashboard'
 import { AITradingDashboard } from './components/AITradingDashboard'
 import { AutoTrainingDashboard } from './components/AutoTrainingDashboard'
+import LiveMonitoringDashboard from './components/LiveMonitoringDashboard'
 import './App.css'
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'manual' | 'ai' | 'auto'>('manual')
+  const [activeTab, setActiveTab] = useState<'manual' | 'ai' | 'auto' | 'monitoring'>('manual')
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -55,6 +56,16 @@ function App() {
               >
                 🔄 Auto Training
               </button>
+              <button
+                onClick={() => setActiveTab('monitoring')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'monitoring'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                📊 Live Monitoring
+              </button>
             </nav>
           </div>
         </div>
@@ -64,6 +75,7 @@ function App() {
         {activeTab === 'manual' && <TradingDashboard />}
         {activeTab === 'ai' && <AITradingDashboard />}
         {activeTab === 'auto' && <AutoTrainingDashboard />}
+        {activeTab === 'monitoring' && <LiveMonitoringDashboard />}
       </main>
       
       <footer className="bg-white border-t border-gray-200 mt-16">

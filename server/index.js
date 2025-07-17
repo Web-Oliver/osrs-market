@@ -11,6 +11,9 @@ const cors = require('cors');
 const path = require('path');
 const MongoDataPersistence = require('./services/mongoDataPersistence');
 
+// Import centralized routes
+const apiRoutes = require('./routes/index');
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
@@ -31,6 +34,9 @@ let mongoService = null;
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../dist')));
+
+// Use centralized API routes
+app.use('/api', apiRoutes);
 
 // Context7 optimized MongoDB connection
 async function connectToMongoDB() {
@@ -129,21 +135,21 @@ app.get('/api/system-status', async (req, res) => {
       dataCollection: {
         isActive: healthCheck.connected,
         totalCollections: dbSummary.marketDataCount + dbSummary.liveMonitoringCount,
-        successfulCalls: Math.floor(Math.random() * 1000) + 500,
-        failedCalls: Math.floor(Math.random() * 50) + 10,
-        successRate: '92.5%',
-        uptime: Date.now() - (Date.now() - 7200000), // 2 hours ago
-        averageResponseTime: '850ms'
+        successfulCalls: healthCheck.connected ? 'Available' : 'Unavailable',
+        failedCalls: healthCheck.connected ? 'Available' : 'Unavailable',
+        successRate: healthCheck.connected ? 'Available' : 'Unavailable',
+        uptime: healthCheck.connected ? 'Available' : 'Unavailable',
+        averageResponseTime: healthCheck.connected ? 'Available' : 'Unavailable'
       },
       apiRateLimiting: {
         status: 'HEALTHY',
-        requestsInLastMinute: Math.floor(Math.random() * 10) + 18,
-        requestsInLastHour: Math.floor(Math.random() * 100) + 450,
+        requestsInLastMinute: 'Tracking disabled - requires analytics service',
+        requestsInLastHour: 'Tracking disabled - requires analytics service',
         maxRequestsPerMinute: 30,
         maxRequestsPerHour: 1000,
-        queueLength: Math.floor(Math.random() * 3),
-        activeRequests: Math.floor(Math.random() * 2),
-        totalRequests: Math.floor(Math.random() * 5000) + 10000,
+        queueLength: 0,
+        activeRequests: 0,
+        totalRequests: 'Tracking disabled - requires analytics service',
         rateLimitedRequests: 0
       },
       smartItemSelection: {

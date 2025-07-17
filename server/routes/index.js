@@ -26,6 +26,8 @@ const monitoringRoutes = require('./monitoringRoutes');
 const marketDataRoutes = require('./marketDataRoutes');
 const aiTradingRoutes = require('./aiTradingRoutes');
 const autoTrainingRoutes = require('./autoTrainingRoutes');
+const itemMappingRoutes = require('./itemMappingRoutes');
+const osrsScraperRoutes = require('./osrsScraperRoutes');
 
 // Context7 Pattern: Apply global middleware
 router.use(requestMiddleware.cors());
@@ -118,6 +120,34 @@ router.get('/', (req, res) => {
           'GET /data/timeseries/:itemId - Get item timeseries',
           'GET /services - Get all active training services',
           'GET /health - Get system health'
+        ]
+      },
+      itemMapping: {
+        baseUrl: '/api/items',
+        routes: [
+          'POST /import - Import all item mappings (one-time)',
+          'GET /health - Health check',
+          'GET /sync/status - Get synchronization status',
+          'GET /search - Search items by name',
+          'GET /high-value - Get high-value items',
+          'GET /category/:category - Get items by category',
+          'GET / - Get items with pagination',
+          'GET /:itemId - Get single item by ID',
+          'POST / - Create new item (admin)',
+          'PUT /:itemId - Update item (admin)',
+          'DELETE /:itemId - Delete item (admin)'
+        ]
+      },
+      osrsScraper: {
+        baseUrl: '/api/osrs-scraper',
+        routes: [
+          'POST /import/start - Start comprehensive OSRS data import',
+          'GET /status - Get current scraping operation status', 
+          'GET /data/latest - Get latest scraped market data',
+          'GET /patterns - Get detected market patterns and anomalies',
+          'GET /search - Search for specific item data',
+          'GET /health - Get scraper service health status',
+          'GET / - API documentation and endpoints'
         ]
       }
     },
@@ -262,6 +292,8 @@ router.use('/', monitoringRoutes);
 router.use('/market-data', marketDataRoutes);
 router.use('/ai-trading', aiTradingRoutes);
 router.use('/auto-training', autoTrainingRoutes);
+router.use('/items', itemMappingRoutes);
+router.use('/osrs-scraper', osrsScraperRoutes);
 
 /**
  * Context7 Pattern: Health check endpoint (simplified)

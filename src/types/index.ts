@@ -30,3 +30,17 @@ export interface ApiResponse<T> {
   data: T
   error?: string
 }
+
+// Re-export AI trading types
+export type {
+  TradeOutcome,
+  MarketState,
+  TradingAction,
+  RewardFunction,
+  AgentMemory,
+  NeuralNetworkConfig,
+  TrainingMetrics,
+  ModelPrediction,
+  LearningSession,
+  AdaptiveLearningConfig
+} from './aiTrading'

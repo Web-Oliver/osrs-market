@@ -63,8 +63,7 @@ class MonitoringService {
       if (this.mongoService) {
         data = await this.mongoService.getLiveMonitoringData(limit);
       } else {
-        // Context7 Pattern: Fallback to mock data when MongoDB unavailable
-        data = this.generateFallbackLiveData(limit);
+        throw new Error('Database connection unavailable - cannot fetch live monitoring data');
       }
 
       // Context7 Pattern: Transform data for consistent API response
@@ -74,14 +73,13 @@ class MonitoringService {
       
       this.logger.debug('Successfully fetched live monitoring data', {
         recordCount: transformedData.length,
-        source: this.mongoService ? 'mongodb' : 'fallback'
+        source: 'mongodb'
       });
 
       return transformedData;
     } catch (error) {
       this.logger.error('Error fetching live monitoring data', error);
-      // Context7 Pattern: Always return data, even if fallback
-      return this.generateFallbackLiveData(limit);
+      throw error;
     }
   }
 
@@ -111,9 +109,7 @@ class MonitoringService {
 
         return insertedId;
       } else {
-        // Context7 Pattern: Mock response when MongoDB unavailable
-        this.logger.warn('MongoDB unavailable, simulating save operation');
-        return `mock_${Date.now()}`;
+        throw new Error('Database connection unavailable - cannot save monitoring data');
       }
     } catch (error) {
       this.logger.error('Error saving live monitoring data', error, { data });
@@ -140,8 +136,7 @@ class MonitoringService {
       if (this.mongoService) {
         stats = await this.mongoService.getAggregatedStats(timeRange);
       } else {
-        // Context7 Pattern: Generate fallback statistics
-        stats = this.generateFallbackStats(timeRange);
+        throw new Error('Database connection unavailable - cannot fetch aggregated statistics');
       }
 
       // Context7 Pattern: Calculate additional metrics
@@ -151,13 +146,13 @@ class MonitoringService {
       
       this.logger.debug('Successfully fetched aggregated statistics', {
         timeRange,
-        source: this.mongoService ? 'mongodb' : 'fallback'
+        source: 'mongodb'
       });
 
       return enhancedStats;
     } catch (error) {
       this.logger.error('Error fetching aggregated statistics', error, { timeRange });
-      return this.generateFallbackStats(timeRange);
+      throw error;
     }
   }
 
@@ -230,7 +225,7 @@ class MonitoringService {
       return systemStatus;
     } catch (error) {
       this.logger.error('Error fetching system status', error);
-      return this.generateFallbackSystemStatus();
+      throw error;
     }
   }
 
@@ -345,7 +340,7 @@ class MonitoringService {
     }
   }
 
-  // Context7 Pattern: Private helper methods for data transformation and fallbacks
+  // Context7 Pattern: Private helper methods for data transformation
 
   /**
    * Get database summary
@@ -423,91 +418,8 @@ class MonitoringService {
     };
   }
 
-  /**
-   * Generate fallback live data
-   */
-  generateFallbackLiveData(limit) {
-    const data = [];
-    const now = Date.now();
 
-    for (let i = 0; i < limit; i++) {
-      const baseRequests = 25 + Math.random() * 10;
-      const baseSuccess = 95 + Math.random() * 5;
-      const baseItems = 80 + Math.random() * 40;
-      const baseProfit = 1000 + Math.random() * 2000;
-      const baseResponse = 800 + Math.random() * 400;
 
-      data.push({
-        timestamp: now - (i * 2000),
-        apiRequests: Math.round(baseRequests),
-        successRate: Math.round(baseSuccess * 100) / 100,
-        itemsProcessed: Math.round(baseItems),
-        profit: Math.round(baseProfit),
-        memoryUsage: Math.round((45 + Math.random() * 15) * 100) / 100,
-        responseTime: Math.round(baseResponse),
-        rateLimitStatus: baseRequests > 28 ? 'THROTTLED' : 'HEALTHY',
-        itemSelectionEfficiency: Math.round((97 + Math.random() * 2) * 100) / 100,
-        dataQuality: Math.round((92 + Math.random() * 8) * 100) / 100
-      });
-    }
-
-    return data.reverse();
-  }
-
-  /**
-   * Generate fallback statistics
-   */
-  generateFallbackStats(timeRange) {
-    return {
-      totalApiRequests: 1247 + Math.floor(Math.random() * 100),
-      avgSuccessRate: 95.3 + Math.random() * 2,
-      totalItemsProcessed: 2156 + Math.floor(Math.random() * 200),
-      totalProfit: 125000 + Math.random() * 50000,
-      avgResponseTime: 850 + Math.random() * 300,
-      avgDataQuality: 94.2 + Math.random() * 4,
-      healthyPercentage: 96.8 + Math.random() * 2,
-      timeRangeHours: timeRange / 3600000
-    };
-  }
-
-  /**
-   * Generate fallback system status
-   */
-  generateFallbackSystemStatus() {
-    return {
-      dataCollection: {
-        isActive: false,
-        totalCollections: 0,
-        successfulCalls: 0,
-        failedCalls: 0,
-        successRate: '0%',
-        uptime: 0,
-        averageResponseTime: '0ms'
-      },
-      apiRateLimiting: {
-        status: 'UNKNOWN',
-        requestsInLastMinute: 0,
-        requestsInLastHour: 0,
-        maxRequestsPerMinute: 30,
-        maxRequestsPerHour: 1000,
-        queueLength: 0,
-        activeRequests: 0,
-        totalRequests: 0,
-        rateLimitedRequests: 0
-      },
-      smartItemSelection: {
-        totalSelected: 0,
-        capacity: 100,
-        utilizationPercent: '0%',
-        efficiency: 'System unavailable'
-      },
-      persistence: {
-        enabled: false,
-        type: 'mongodb',
-        mongoConnected: false
-      }
-    };
-  }
 }
 
 module.exports = { MonitoringService };

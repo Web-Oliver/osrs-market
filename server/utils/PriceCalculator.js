@@ -80,11 +80,26 @@ class PriceCalculator {
    * Context7 Pattern: Calculate price change
    */
   calculatePriceChange(item, period = '24h') {
-    // Mock price change calculation (in real implementation, use historical data)
-    const currentPrice = item.priceData?.high || 0;
-    const previousPrice = this.generateMockPreviousPrice(currentPrice, period);
+    if (!item.priceHistory || item.priceHistory.length < 2) {
+      this.logger.warn('Insufficient price history for price change calculation', {
+        itemId: item.itemId,
+        period
+      });
+      return {
+        absolute: 0,
+        percentage: 0,
+        direction: 'unknown'
+      };
+    }
     
-    if (previousPrice === 0) return 0;
+    const currentPrice = item.priceData?.high || 0;
+    const previousPrice = this.getPreviousPrice(item.priceHistory, period);
+    
+    if (previousPrice === 0) return {
+      absolute: 0,
+      percentage: 0,
+      direction: 'unknown'
+    };
     
     const change = currentPrice - previousPrice;
     const changePercent = (change / previousPrice) * 100;
@@ -465,12 +480,36 @@ class PriceCalculator {
   }
 
   /**
-   * Generate mock previous price for testing
+   * Get previous price from actual price history
    */
-  generateMockPreviousPrice(currentPrice, period) {
-    const variation = currentPrice * 0.1; // 10% variation
-    const change = (Math.random() - 0.5) * variation;
-    return Math.max(1, currentPrice - change);
+  getPreviousPrice(priceHistory, period) {
+    if (!priceHistory || priceHistory.length < 2) {
+      return 0;
+    }
+    
+    const now = Date.now();
+    let targetTime;
+    
+    switch (period) {
+      case '1h':
+        targetTime = now - (60 * 60 * 1000);
+        break;
+      case '24h':
+        targetTime = now - (24 * 60 * 60 * 1000);
+        break;
+      case '7d':
+        targetTime = now - (7 * 24 * 60 * 60 * 1000);
+        break;
+      default:
+        targetTime = now - (24 * 60 * 60 * 1000);
+    }
+    
+    // Find the closest price point to the target time
+    const previousPricePoint = priceHistory.find(point => 
+      point.timestamp <= targetTime
+    );
+    
+    return previousPricePoint ? previousPricePoint.priceData?.high || 0 : 0;
   }
 
   /**

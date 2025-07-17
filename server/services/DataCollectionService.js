@@ -12,6 +12,7 @@
 const { OSRSWikiService } = require('./OSRSWikiService');
 const { MonitoringService } = require('./MonitoringService');
 const { MarketDataService } = require('./MarketDataService');
+const { MongoDataPersistence } = require('../mongoDataPersistence');
 const { Logger } = require('../utils/Logger');
 const { CacheManager } = require('../utils/CacheManager');
 const { MetricsCalculator } = require('../utils/MetricsCalculator');
@@ -28,6 +29,9 @@ class DataCollectionService {
     this.osrsWikiService = new OSRSWikiService();
     this.monitoringService = new MonitoringService();
     this.marketDataService = new MarketDataService();
+    
+    // CRITICAL: Initialize MongoDB persistence
+    this.initializePersistence();
     
     // Collection state
     this.isCollecting = false;
@@ -48,6 +52,26 @@ class DataCollectionService {
       smartSelectionEnabled: true,
       adaptiveThresholds: true
     };
+  }
+
+  /**
+   * CRITICAL: Initialize MongoDB persistence
+   */
+  async initializePersistence() {
+    try {
+      const mongoConfig = {
+        connectionString: process.env.MONGODB_CONNECTION_STRING || 'mongodb://localhost:27017',
+        databaseName: process.env.MONGODB_DATABASE || 'osrs_market_data'
+      };
+      
+      this.mongoPersistence = new MongoDataPersistence(mongoConfig);
+      await this.mongoPersistence.initialize();
+      
+      this.logger.info('✅ MongoDB persistence initialized for data collection');
+    } catch (error) {
+      this.logger.error('❌ Failed to initialize MongoDB persistence', error);
+      this.mongoPersistence = null;
+    }
   }
 
   /**
@@ -164,19 +188,32 @@ class DataCollectionService {
       
       monitor.addMarker('collection_start');
       
-      // Get latest prices for selected items
-      const latestPrices = await this.osrsWikiService.getLatestPrices();
+      // Get prices from all intervals (latest, 5min, 1hour) for comprehensive AI training
+      const [latestPrices, fiveMinPrices, oneHourPrices] = await Promise.all([
+        this.osrsWikiService.getLatestPrices(),
+        this.osrsWikiService.get5MinutePrices(),
+        this.osrsWikiService.get1HourPrices()
+      ]);
       
       monitor.addMarker('prices_fetched');
-      this.collectionStats.apiRequestsCount++;
+      this.collectionStats.apiRequestsCount += 3; // Updated for 3 API calls
       
-      // Filter prices for selected items
-      const selectedPrices = this.filterSelectedItems(latestPrices);
+      // Filter prices for selected items across all intervals
+      const selectedLatest = this.filterSelectedItems(latestPrices);
+      const selected5Min = this.filterSelectedItems(fiveMinPrices);
+      const selected1Hour = this.filterSelectedItems(oneHourPrices);
       
       monitor.addMarker('prices_filtered');
       
-      // Process and analyze data
-      const processedData = await this.processCollectedData(selectedPrices);
+      // Process and analyze data for all intervals
+      const [latestProcessed, fiveMinProcessed, oneHourProcessed] = await Promise.all([
+        this.processCollectedData(selectedLatest, 'latest'),
+        this.processCollectedData(selected5Min, '5min'),
+        this.processCollectedData(selected1Hour, '1hour')
+      ]);
+      
+      // Combine all processed data
+      const processedData = [...latestProcessed, ...fiveMinProcessed, ...oneHourProcessed];
       
       monitor.addMarker('data_processed');
       
@@ -268,15 +305,11 @@ class DataCollectionService {
     } catch (error) {
       this.logger.error('Failed to initialize smart selection', error);
       
-      // Fallback to predefined high-value items
-      const fallbackItems = [
-        4151, 11802, 4712, 4724, 4725, 4726, 4727, 4728, 4729, 4730, // High-value items
-        554, 555, 556, 557, 558, 559, 560, 561, 562, 563, // Runes
-        384, 385, 386, 387, 388, 389, 390, 391, 392, 393 // Raw materials
-      ];
+      // When SmartItemSelectorService is unavailable, we cannot proceed without real data
+      throw new Error('SmartItemSelectorService is required for item selection - cannot use fallback data');
       
-      this.selectedItems.clear();
-      fallbackItems.forEach(itemId => this.selectedItems.add(itemId));
+      // Note: Previously this used hardcoded fallback items, but this has been removed
+      // to ensure only real market data is used for trading decisions
       
       this.logger.info('Using fallback item selection', {
         selectedItems: this.selectedItems.size
@@ -418,12 +451,13 @@ class DataCollectionService {
   /**
    * Context7 Pattern: Process collected data
    */
-  async processCollectedData(selectedPrices) {
+  async processCollectedData(selectedPrices, interval = 'latest') {
     const processed = [];
     
     for (const [itemId, priceData] of Object.entries(selectedPrices.data)) {
       const processedItem = {
         itemId: parseInt(itemId),
+        interval, // Track which interval this data comes from
         priceData,
         timestamp: selectedPrices.timestamp,
         profitMargin: this.calculateProfitMargin(priceData),
@@ -469,6 +503,35 @@ class DataCollectionService {
     }
     
     try {
+      // CRITICAL: Save to MongoDB for AI training and historical analysis
+      if (this.mongoPersistence) {
+        // Convert to historical price format for MongoDB
+        const historicalPrices = processedData.map(item => ({
+          itemId: item.itemId,
+          interval: item.interval || 'latest', // Use the actual interval from data
+          priceData: item.priceData,
+          high: item.priceData?.high || null,
+          low: item.priceData?.low || null,
+          highTime: item.priceData?.highTime || null,
+          lowTime: item.priceData?.lowTime || null,
+          profitMargin: item.profitMargin,
+          spread: item.spread,
+          volume: item.volume,
+          collectionSource: item.collectionSource,
+          timestamp: item.timestamp
+        }));
+
+        // Bulk save historical prices for AI training
+        await this.mongoPersistence.bulkSaveHistoricalPrices(historicalPrices);
+        
+        this.logger.debug('✅ Historical prices saved to MongoDB for AI training', {
+          itemsSaved: historicalPrices.length
+        });
+      } else {
+        this.logger.warn('⚠️ MongoDB persistence not available - data not saved');
+      }
+
+      // Also save to legacy MarketDataService for backwards compatibility
       const enrichedData = {
         items: processedData,
         collectionSource: 'DataCollectionService',
@@ -482,7 +545,8 @@ class DataCollectionService {
       await this.marketDataService.saveMarketData(enrichedData);
       
       this.logger.debug('Collected data saved successfully', {
-        itemsSaved: processedData.length
+        itemsSaved: processedData.length,
+        mongoDBSaved: !!this.mongoPersistence
       });
     } catch (error) {
       this.logger.error('Failed to save collected data', error);

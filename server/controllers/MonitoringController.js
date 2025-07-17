@@ -22,6 +22,7 @@ class MonitoringController {
     // Context7 Pattern: Bind methods to preserve 'this' context
     this.getLiveData = this.getLiveData.bind(this);
     this.saveLiveData = this.saveLiveData.bind(this);
+    this.getStreamData = this.getStreamData.bind(this);
     this.getAggregatedStats = this.getAggregatedStats.bind(this);
     this.getSystemStatus = this.getSystemStatus.bind(this);
     this.getEfficiencyMetrics = this.getEfficiencyMetrics.bind(this);
@@ -102,6 +103,68 @@ class MonitoringController {
     } catch (error) {
       this.logger.error('Error saving live monitoring data', error, {
         body: req.body,
+        requestId: req.id
+      });
+      next(error);
+    }
+  }
+
+  /**
+   * Context7 Pattern: Get streaming data for Server-Sent Events
+   * GET /api/live-monitoring/stream
+   */
+  async getStreamData(req, res, next) {
+    try {
+      this.logger.info('Starting live monitoring stream', {
+        ip: req.ip,
+        requestId: req.id
+      });
+
+      // Set up Server-Sent Events headers
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Cache-Control'
+      });
+
+      // Send initial connection message
+      res.write(`data: ${JSON.stringify({ type: 'connected', timestamp: Date.now() })}\n\n`);
+
+      // Set up interval to send real monitoring data
+      const intervalId = setInterval(async () => {
+        try {
+          const data = await this.monitoringService.getLiveMonitoringData(1);
+          if (data && data.length > 0) {
+            res.write(`data: ${JSON.stringify(data[0])}\n\n`);
+          }
+        } catch (error) {
+          this.logger.error('Error streaming monitoring data', error);
+          res.write(`data: ${JSON.stringify({ type: 'error', message: 'Stream error' })}\n\n`);
+        }
+      }, 2000); // Send data every 2 seconds
+
+      // Handle client disconnect
+      req.on('close', () => {
+        clearInterval(intervalId);
+        this.logger.info('Live monitoring stream closed', {
+          ip: req.ip,
+          requestId: req.id
+        });
+      });
+
+      // Handle server errors
+      req.on('error', (error) => {
+        clearInterval(intervalId);
+        this.logger.error('Live monitoring stream error', error, {
+          ip: req.ip,
+          requestId: req.id
+        });
+      });
+
+    } catch (error) {
+      this.logger.error('Error setting up live monitoring stream', error, {
         requestId: req.id
       });
       next(error);

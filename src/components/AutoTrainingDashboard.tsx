@@ -238,26 +238,26 @@ export function AutoTrainingDashboard() {
                 <>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Episodes:</span>
-                    <span className="font-medium">{stats.training.session.episodeCount}</span>
+                    <span className="font-medium">{typeof stats.training.session.episodeCount === 'number' ? stats.training.session.episodeCount : 'N/A'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Trades:</span>
-                    <span className="font-medium">{stats.training.session.totalTrades}</span>
+                    <span className="font-medium">{typeof stats.training.session.totalTrades === 'number' ? stats.training.session.totalTrades : 'N/A'}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Profit:</span>
                     <span className={`font-medium ${
-                      stats.training.session.totalProfit >= 0 
+                      typeof stats.training.session.totalProfit === 'number' && stats.training.session.totalProfit >= 0 
                         ? 'text-green-600' 
                         : 'text-red-600'
                     }`}>
-                      {stats.training.session.totalProfit.toFixed(0)} GP
+                      {typeof stats.training.session.totalProfit === 'number' ? stats.training.session.totalProfit.toFixed(0) : 'N/A'} GP
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Epsilon:</span>
                     <span className="font-medium">
-                      {stats.training.session.finalEpsilon?.toFixed(3) || 'N/A'}
+                      {typeof stats.training.session.finalEpsilon === 'number' ? stats.training.session.finalEpsilon.toFixed(3) : 'N/A'}
                     </span>
                   </div>
                 </>
@@ -279,25 +279,25 @@ export function AutoTrainingDashboard() {
                   <div className="flex justify-between">
                     <span className="text-gray-600">Success Rate:</span>
                     <span className="font-medium text-blue-600">
-                      {stats.training.performance.successRate?.toFixed(1) || 0}%
+                      {typeof stats.training.performance.successRate === 'number' ? stats.training.performance.successRate.toFixed(1) : 'N/A'}%
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Avg Profit:</span>
                     <span className="font-medium">
-                      {stats.training.performance.averageProfit?.toFixed(0) || 0} GP
+                      {typeof stats.training.performance.averageProfit === 'number' ? stats.training.performance.averageProfit.toFixed(0) : 'N/A'} GP
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Profit Factor:</span>
                     <span className="font-medium">
-                      {stats.training.performance.profitFactor?.toFixed(2) || 0}
+                      {typeof stats.training.performance.profitFactor === 'number' ? stats.training.performance.profitFactor.toFixed(2) : 'N/A'}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Max Drawdown:</span>
                     <span className="font-medium text-red-600">
-                      {stats.training.performance.maxDrawdown?.toFixed(0) || 0} GP
+                      {typeof stats.training.performance.maxDrawdown === 'number' ? stats.training.performance.maxDrawdown.toFixed(0) : 'N/A'} GP
                     </span>
                   </div>
                 </>
@@ -488,23 +488,17 @@ export function AutoTrainingDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {stats.training.metrics.slice(-5).map((metric: {
-                  episode: number;
-                  totalReward?: number;
-                  successRate?: number;
-                  profitability?: number;
-                  epsilon?: number;
-                }, index: number) => (
+                {stats.training.metrics.slice(-5).map((metric, index: number) => (
                   <tr key={index} className="border-b border-gray-100">
-                    <td className="py-2">{metric.episode}</td>
-                    <td className="py-2">{metric.totalReward?.toFixed(2) || 'N/A'}</td>
-                    <td className="py-2">{metric.successRate?.toFixed(1) || 0}%</td>
+                    <td className="py-2">{typeof metric.episode === 'number' ? metric.episode : 'N/A'}</td>
+                    <td className="py-2">{typeof metric.totalReward === 'number' ? metric.totalReward.toFixed(2) : 'N/A'}</td>
+                    <td className="py-2">{typeof metric.successRate === 'number' ? metric.successRate.toFixed(1) : 'N/A'}%</td>
                     <td className={`py-2 ${
-                      (metric.profitability || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                      (typeof metric.profitability === 'number' ? metric.profitability : 0) >= 0 ? 'text-green-600' : 'text-red-600'
                     }`}>
-                      {metric.profitability?.toFixed(0) || 0} GP
+                      {typeof metric.profitability === 'number' ? metric.profitability.toFixed(0) : 'N/A'} GP
                     </td>
-                    <td className="py-2">{metric.epsilon?.toFixed(3) || 'N/A'}</td>
+                    <td className="py-2">{typeof metric.epsilon === 'number' ? metric.epsilon.toFixed(3) : 'N/A'}</td>
                   </tr>
                 ))}
               </tbody>

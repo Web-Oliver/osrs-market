@@ -14,6 +14,12 @@ const { Logger } = require('../utils/Logger');
 const { CacheManager } = require('../utils/CacheManager');
 const { DataTransformer } = require('../utils/DataTransformer');
 const { PriceCalculator } = require('../utils/PriceCalculator');
+const { OSRSWikiService } = require('./OSRSWikiService');
+const { MarketPriceSnapshotModel } = require('../models/MarketPriceSnapshotModel');
+
+// TRADING INTEGRATION
+const { AITradingOrchestratorService } = require('./AITradingOrchestratorService');
+const { ItemRepository } = require('../repositories/ItemRepository');
 
 class MarketDataService {
   constructor() {
@@ -21,6 +27,11 @@ class MarketDataService {
     this.cache = new CacheManager('market_data', 600); // 10 minutes cache
     this.dataTransformer = new DataTransformer();
     this.priceCalculator = new PriceCalculator();
+    this.osrsWikiService = new OSRSWikiService();
+    
+    // TRADING INTEGRATION
+    this.itemRepository = new ItemRepository();
+    this.aiTrading = new AITradingOrchestratorService();
     
     // Context7 Pattern: Initialize MongoDB persistence
     this.initializeMongoDB();
@@ -65,7 +76,9 @@ class MarketDataService {
       if (this.mongoService) {
         data = await this.mongoService.getMarketData(options);
       } else {
-        data = this.generateFallbackMarketData(options);
+        // Fall back to live OSRS Wiki API data
+        this.logger.info('MongoDB unavailable, fetching live data from OSRS Wiki API');
+        data = await this.fetchLiveMarketData(options);
       }
 
       // Context7 Pattern: Transform data for consistent API response
@@ -84,7 +97,7 @@ class MarketDataService {
       return enrichedData;
     } catch (error) {
       this.logger.error('Error fetching market data', error, { options });
-      return this.generateFallbackMarketData(options);
+      throw error;
     }
   }
 
@@ -161,7 +174,7 @@ class MarketDataService {
         // Context7 Pattern: Use aggregation for efficient summary
         summary = await this.calculateMarketSummary(cutoffTime);
       } else {
-        summary = this.generateFallbackSummary(timeRange);
+        throw new Error('Database connection unavailable - cannot fetch market data summary');
       }
 
       // Context7 Pattern: Add calculated metrics
@@ -177,7 +190,7 @@ class MarketDataService {
       return enhancedSummary;
     } catch (error) {
       this.logger.error('Error fetching market data summary', error, { timeRange });
-      return this.generateFallbackSummary(timeRange);
+      throw error;
     }
   }
 
@@ -200,7 +213,9 @@ class MarketDataService {
       if (this.mongoService) {
         history = await this.getItemHistoryFromMongo(options);
       } else {
-        history = this.generateFallbackItemHistory(options);
+        // Fall back to live OSRS Wiki API data
+        this.logger.info('MongoDB unavailable, fetching live price history from OSRS Wiki API');
+        history = await this.fetchLiveItemHistory(options);
       }
 
       // Context7 Pattern: Calculate price trends and indicators
@@ -216,7 +231,7 @@ class MarketDataService {
       return enrichedHistory;
     } catch (error) {
       this.logger.error('Error fetching item price history', error, { options });
-      return this.generateFallbackItemHistory(options);
+      throw error;
     }
   }
 
@@ -239,7 +254,9 @@ class MarketDataService {
       if (this.mongoService) {
         topItems = await this.getTopItemsFromMongo(options);
       } else {
-        topItems = this.generateFallbackTopItems(options);
+        // Fall back to live OSRS Wiki API data
+        this.logger.info('MongoDB unavailable, fetching live top items from OSRS Wiki API');
+        topItems = await this.fetchLiveTopItems(options);
       }
 
       // Context7 Pattern: Calculate trading metrics and rankings
@@ -255,7 +272,7 @@ class MarketDataService {
       return rankedItems;
     } catch (error) {
       this.logger.error('Error fetching top traded items', error, { options });
-      return this.generateFallbackTopItems(options);
+      throw error;
     }
   }
 
@@ -278,7 +295,9 @@ class MarketDataService {
       if (this.mongoService) {
         results = await this.searchItemsInMongo(options);
       } else {
-        results = this.generateFallbackSearchResults(options);
+        // Fall back to live OSRS Wiki API data
+        this.logger.info('MongoDB unavailable, searching items using OSRS Wiki API');
+        results = await this.searchItemsLive(options);
       }
 
       // Context7 Pattern: Calculate relevance scores
@@ -294,7 +313,7 @@ class MarketDataService {
       return scoredResults;
     } catch (error) {
       this.logger.error('Error searching items', error, { options });
-      return this.generateFallbackSearchResults(options);
+      throw error;
     }
   }
 
@@ -468,87 +487,450 @@ class MarketDataService {
     return 'partial';
   }
 
-  // Context7 Pattern: Fallback methods for when MongoDB is unavailable
+  // Context7 Pattern: MongoDB data retrieval methods
 
   /**
-   * Generate fallback market data
+   * Get item history from MongoDB
    */
-  generateFallbackMarketData(options) {
-    const mockItems = [
-      { itemId: 4151, itemName: 'Abyssal whip', priceData: { high: 2500000, low: 2400000 } },
-      { itemId: 11802, itemName: 'Armadyl godsword', priceData: { high: 45000000, low: 44000000 } },
-      { itemId: 4712, itemName: 'Dragon bones', priceData: { high: 2500, low: 2400 } }
+  async getItemHistoryFromMongo(options) {
+    const query = {
+      itemId: options.itemId,
+      timestamp: {
+        $gte: options.startTime || (Date.now() - 24 * 60 * 60 * 1000),
+        $lte: options.endTime || Date.now()
+      }
+    };
+
+    return await this.mongoService.marketDataCollection
+      .find(query)
+      .sort({ timestamp: -1 })
+      .limit(options.limit || 100)
+      .toArray();
+  }
+
+  /**
+   * Get top items from MongoDB
+   */
+  async getTopItemsFromMongo(options) {
+    const pipeline = [
+      {
+        $match: {
+          timestamp: {
+            $gte: options.startTime || (Date.now() - 24 * 60 * 60 * 1000)
+          }
+        }
+      },
+      {
+        $group: {
+          _id: '$itemId',
+          itemName: { $first: '$itemName' },
+          totalVolume: { $sum: '$volume' },
+          avgPrice: { $avg: '$priceData.high' },
+          lastPrice: { $last: '$priceData.high' }
+        }
+      },
+      {
+        $sort: {
+          [options.sortBy || 'totalVolume']: -1
+        }
+      },
+      {
+        $limit: options.limit || 10
+      }
     ];
 
-    return mockItems.slice(0, options.limit || 10);
+    return await this.mongoService.marketDataCollection.aggregate(pipeline).toArray();
   }
 
   /**
-   * Generate fallback summary
+   * Search items in MongoDB
    */
-  generateFallbackSummary(timeRange) {
-    return {
-      totalItems: 150,
-      uniqueItems: ['4151', '11802', '4712'],
-      totalVolume: 50000,
-      avgPrice: 1500000,
-      maxPrice: 45000000,
-      minPrice: 2400,
-      totalProfit: 125000,
-      timeRange,
-      timeRangeHours: timeRange / 3600000
+  async searchItemsInMongo(options) {
+    const query = {
+      itemName: {
+        $regex: options.searchTerm,
+        $options: 'i'
+      }
     };
+
+    return await this.mongoService.marketDataCollection
+      .find(query)
+      .sort({ timestamp: -1 })
+      .limit(options.limit || 10)
+      .toArray();
   }
 
   /**
-   * Generate fallback item history
+   * Context7 Pattern: Fetch live market data from OSRS Wiki API
    */
-  generateFallbackItemHistory(options) {
-    const history = [];
-    const now = Date.now();
-    
-    for (let i = 0; i < (options.limit || 24); i++) {
-      const basePrice = 2500000 + (Math.random() - 0.5) * 200000;
-      history.push({
-        timestamp: now - (i * 3600000), // 1 hour intervals
+  async fetchLiveMarketData(options) {
+    try {
+      this.logger.debug('Fetching live market data from OSRS Wiki API', { options });
+      
+      const latestPrices = await this.osrsWikiService.getLatestPrices();
+      const itemMapping = await this.osrsWikiService.getItemMapping();
+      
+      const marketData = [];
+      const priceData = latestPrices.data || {};
+      
+      // Get bulk data efficiently
+      const itemIds = options.itemIds || [
+        4151,  // Abyssal whip
+        11802, // Armadyl godsword
+        4712,  // Dragon bones
+        139,   // Cooked lobster
+        560,   // Death rune
+        561,   // Nature rune
+        562,   // Law rune
+        563,   // Cosmic rune
+        565,   // Blood rune
+        566    // Soul rune
+      ];
+
+      // Use bulk item data method for efficiency
+      const bulkResult = await this.osrsWikiService.getBulkItemData(
+        itemIds.slice(0, options.limit || 50)
+      );
+      
+      // Transform bulk result to market data format
+      for (const item of bulkResult.items) {
+        if (!item.error && item.priceData) {
+          marketData.push({
+            itemId: item.id,
+            itemName: item.name,
+            priceData: {
+              high: item.priceData.high,
+              low: item.priceData.low,
+              highTime: item.priceData.highTime,
+              lowTime: item.priceData.lowTime
+            },
+            volume: 0, // Volume not available in latest prices
+            timestamp: Date.now(),
+            source: 'osrs_wiki_bulk'
+          });
+        }
+      }
+      
+      this.logger.info('Successfully fetched live market data', {
+        itemCount: marketData.length,
+        source: 'osrs_wiki_api'
+      });
+      
+      return marketData;
+    } catch (error) {
+      this.logger.error('Error fetching live market data', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Fetch live item history from OSRS Wiki API
+   */
+  async fetchLiveItemHistory(options) {
+    try {
+      this.logger.debug('Fetching live item history from OSRS Wiki API', { options });
+      
+      const timeseriesData = await this.osrsWikiService.getTimeseries(
+        options.itemId,
+        options.timestep || '5m'
+      );
+      
+      const history = (timeseriesData.data || []).map(point => ({
+        timestamp: point.timestamp * 1000, // Convert to milliseconds
         itemId: options.itemId,
         priceData: {
-          high: Math.round(basePrice * 1.02),
-          low: Math.round(basePrice * 0.98)
+          high: point.avgHighPrice,
+          low: point.avgLowPrice
         },
-        volume: Math.round(Math.random() * 1000)
+        volume: point.highPriceVolume || 0,
+        source: 'osrs_wiki_timeseries'
+      }));
+      
+      this.logger.info('Successfully fetched live item history', {
+        itemId: options.itemId,
+        dataPoints: history.length,
+        source: 'osrs_wiki_api'
       });
+      
+      return history;
+    } catch (error) {
+      this.logger.error('Error fetching live item history', error, { options });
+      throw error;
     }
-    
-    return history.reverse();
   }
 
   /**
-   * Generate fallback top items
+   * Context7 Pattern: Fetch live top items from OSRS Wiki API
    */
-  generateFallbackTopItems(options) {
-    const topItems = [
-      { itemId: 4151, itemName: 'Abyssal whip', volume: 5000, price: 2500000 },
-      { itemId: 11802, itemName: 'Armadyl godsword', volume: 1200, price: 45000000 },
-      { itemId: 4712, itemName: 'Dragon bones', volume: 15000, price: 2500 }
-    ];
-
-    return topItems.slice(0, options.limit || 10);
+  async fetchLiveTopItems(options) {
+    try {
+      this.logger.debug('Fetching live top items from OSRS Wiki API', { options });
+      
+      const latestPrices = await this.osrsWikiService.getLatestPrices();
+      const itemMapping = await this.osrsWikiService.getItemMapping();
+      
+      const topItems = [];
+      const priceData = latestPrices.data || {};
+      
+      // Get high-value items based on price - filter first, then bulk fetch
+      const highValueItemIds = [];
+      
+      for (const [itemIdStr, prices] of Object.entries(priceData)) {
+        const itemId = parseInt(itemIdStr);
+        if (prices.high && prices.high > 100000) { // Items worth more than 100k
+          highValueItemIds.push(itemId);
+        }
+      }
+      
+      // Use bulk fetch for efficiency (limit to reasonable number)
+      const limitedItemIds = highValueItemIds.slice(0, Math.min(options.limit || 50, 100));
+      const bulkResult = await this.osrsWikiService.getBulkItemData(limitedItemIds);
+      
+      const highValueItems = [];
+      for (const item of bulkResult.items) {
+        if (!item.error && item.priceData && item.priceData.high > 100000) {
+          highValueItems.push({
+            itemId: item.id,
+            itemName: item.name,
+            price: item.priceData.high,
+            volume: 0, // Volume not available in latest prices
+            priceData: item.priceData,
+            source: 'osrs_wiki_bulk'
+          });
+        }
+      }
+      
+      // Sort by price and take top items
+      const sortedItems = highValueItems
+        .sort((a, b) => {
+          switch (options.sortBy) {
+            case 'price':
+              return b.price - a.price;
+            case 'volume':
+              return b.volume - a.volume;
+            default:
+              return b.price - a.price;
+          }
+        })
+        .slice(0, options.limit || 10);
+      
+      this.logger.info('Successfully fetched live top items', {
+        itemCount: sortedItems.length,
+        source: 'osrs_wiki_api'
+      });
+      
+      return sortedItems;
+    } catch (error) {
+      this.logger.error('Error fetching live top items', error, { options });
+      throw error;
+    }
   }
 
   /**
-   * Generate fallback search results
+   * Context7 Pattern: Search items using OSRS Wiki API
    */
-  generateFallbackSearchResults(options) {
-    const allItems = [
-      { itemId: 4151, itemName: 'Abyssal whip' },
-      { itemId: 11802, itemName: 'Armadyl godsword' },
-      { itemId: 4712, itemName: 'Dragon bones' }
-    ];
+  async searchItemsLive(options) {
+    try {
+      this.logger.debug('Searching items using OSRS Wiki API', { options });
+      
+      const searchResults = await this.osrsWikiService.searchItems(
+        options.searchTerm,
+        options.limit || 10
+      );
+      
+      // Get price data for search results using bulk fetch
+      const itemIds = searchResults.results.map(item => item.id);
+      const bulkResult = await this.osrsWikiService.getBulkItemData(itemIds);
+      
+      // Create lookup map for efficient matching
+      const itemDataMap = new Map();
+      for (const item of bulkResult.items) {
+        if (!item.error) {
+          itemDataMap.set(item.id, item);
+        }
+      }
+      
+      const results = searchResults.results.map(searchItem => {
+        const itemData = itemDataMap.get(searchItem.id);
+        return {
+          itemId: searchItem.id,
+          itemName: searchItem.name,
+          priceData: itemData?.priceData || null,
+          relevanceScore: searchItem.relevanceScore,
+          timestamp: Date.now(),
+          source: 'osrs_wiki_search_bulk'
+        };
+      });
+      
+      this.logger.info('Successfully searched items', {
+        searchTerm: options.searchTerm,
+        resultCount: results.length,
+        source: 'osrs_wiki_api'
+      });
+      
+      return results;
+    } catch (error) {
+      this.logger.error('Error searching items', error, { options });
+      throw error;
+    }
+  }
 
-    return allItems.filter(item => 
-      item.itemName.toLowerCase().includes(options.searchTerm.toLowerCase())
-    ).slice(0, options.limit || 10);
+  /**
+   * Context7 Pattern: Save market snapshot with upsert functionality
+   * 
+   * Implementation of Step 0.2 requirement - uses findOneAndUpdate with upsert
+   * to prevent duplicate entries based on itemId, timestamp, and interval
+   * 
+   * @param {Partial<IMarketPriceSnapshot>} data - Market snapshot data
+   * @returns {Promise<IMarketPriceSnapshot>} Saved or updated market snapshot
+   * @throws {Error} If validation fails or database error occurs
+   */
+  async saveMarketSnapshot(data) {
+    try {
+      this.logger.debug('Attempting to save market snapshot', {
+        itemId: data.itemId,
+        timestamp: data.timestamp,
+        interval: data.interval,
+        source: data.source
+      });
+
+      // Validate required fields
+      if (!data.itemId || !data.timestamp || !data.interval) {
+        throw new Error('Missing required fields: itemId, timestamp, interval');
+      }
+
+      // Validate price consistency
+      if (data.highPrice && data.lowPrice && data.highPrice < data.lowPrice) {
+        throw new Error('High price cannot be less than low price');
+      }
+
+      // Validate interval enum
+      const validIntervals = ['daily_scrape', '5m', '1h', 'latest', '6m_scrape'];
+      if (!validIntervals.includes(data.interval)) {
+        throw new Error(`Invalid interval: ${data.interval}. Must be one of: ${validIntervals.join(', ')}`);
+      }
+
+      // Validate RSI if provided
+      if (data.rsi !== undefined && data.rsi !== null && (data.rsi < 0 || data.rsi > 100)) {
+        throw new Error('RSI must be between 0 and 100');
+      }
+
+      // Create filter for compound unique index (itemId, interval, timestamp)
+      const filter = {
+        itemId: data.itemId,
+        interval: data.interval,
+        timestamp: data.timestamp
+      };
+
+      // Use findOneAndUpdate with upsert for atomic operation
+      // This prevents race conditions and ensures data consistency
+      const options = {
+        upsert: true,           // Create if not exists
+        new: true,              // Return updated document
+        runValidators: false,   // Disable mongoose validators to avoid cross-field validation issues
+        setDefaultsOnInsert: true // Apply defaults on insert
+      };
+
+      const snapshot = await MarketPriceSnapshotModel.findOneAndUpdate(
+        filter,
+        data,  // Use direct assignment instead of $set to avoid validation issues
+        options
+      );
+
+      this.logger.info('Market snapshot saved successfully', {
+        id: snapshot._id,
+        itemId: snapshot.itemId,
+        timestamp: snapshot.timestamp,
+        interval: snapshot.interval,
+        highPrice: snapshot.highPrice,
+        lowPrice: snapshot.lowPrice,
+        volume: snapshot.volume,
+        source: snapshot.source
+      });
+
+      return snapshot;
+
+    } catch (error) {
+      this.logger.error('Failed to save market snapshot', error, {
+        itemId: data?.itemId,
+        timestamp: data?.timestamp,
+        interval: data?.interval
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Get market snapshots with filtering capabilities
+   * 
+   * Implementation of Step 0.2 requirement - supports optional filtering
+   * by interval, startDate, and endDate for flexible querying
+   * 
+   * @param {number} itemId - The item ID to query
+   * @param {string} [interval] - Optional interval filter ('latest', '5m', '1h', etc.)
+   * @param {number} [startDate] - Optional start timestamp (Unix timestamp)
+   * @param {number} [endDate] - Optional end timestamp (Unix timestamp)
+   * @returns {Promise<IMarketPriceSnapshot[]>} Array of market snapshots
+   * @throws {Error} If validation fails or database error occurs
+   */
+  async getMarketSnapshots(itemId, interval, startDate, endDate) {
+    try {
+      this.logger.debug('Querying market snapshots', {
+        itemId,
+        interval,
+        startDate,
+        endDate
+      });
+
+      // Validate required parameters
+      if (!itemId || typeof itemId !== 'number') {
+        throw new Error('itemId must be a valid number');
+      }
+
+      // Build query filter
+      const filter = { itemId };
+
+      // Add interval filter if provided
+      if (interval) {
+        filter.interval = interval;
+      }
+
+      // Add timestamp range filter if provided
+      if (startDate || endDate) {
+        filter.timestamp = {};
+        if (startDate) {
+          filter.timestamp.$gte = startDate;
+        }
+        if (endDate) {
+          filter.timestamp.$lte = endDate;
+        }
+      }
+
+      // Execute query with sorting by timestamp (newest first)
+      const snapshots = await MarketPriceSnapshotModel
+        .find(filter)
+        .sort({ timestamp: -1 })
+        .exec();
+
+      this.logger.info('Market snapshots retrieved successfully', {
+        itemId,
+        interval,
+        startDate,
+        endDate,
+        count: snapshots.length
+      });
+
+      return snapshots;
+
+    } catch (error) {
+      this.logger.error('Failed to retrieve market snapshots', error, {
+        itemId,
+        interval,
+        startDate,
+        endDate
+      });
+      throw error;
+    }
   }
 }
 

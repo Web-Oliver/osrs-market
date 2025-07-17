@@ -1,10 +1,6 @@
 export interface TechnicalIndicators {
   rsi: number
-  macd: {
-    line: number
-    signal: number
-    histogram: number
-  }
+  macd: number
   bollinger: {
     upper: number
     middle: number
@@ -12,7 +8,8 @@ export interface TechnicalIndicators {
   }
   ema12: number
   ema26: number
-  sma20: number
+  volumeProfile: number
+  momentum: number
 }
 
 export interface MarketSignal {
@@ -21,6 +18,10 @@ export interface MarketSignal {
   indicators: TechnicalIndicators
   confidence: number // 0-1
   timestamp: number
+  recommendation: 'BUY' | 'SELL' | 'HOLD'
+  priceTarget: number
+  stopLoss: number
+  volume: number
 }
 
 export interface FlippingOpportunity {
@@ -34,6 +35,7 @@ export interface FlippingOpportunity {
   volume: number
   timeToFlip: number // estimated minutes
   roi: number // return on investment percentage
+  lastUpdated: number
 }
 
 export interface TradingStrategy {

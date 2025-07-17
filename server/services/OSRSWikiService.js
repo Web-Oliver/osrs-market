@@ -16,19 +16,53 @@ const { RateLimiter } = require('../utils/RateLimiter');
 class OSRSWikiService {
   constructor() {
     this.logger = new Logger('OSRSWikiService');
-    this.cache = new CacheManager('osrs_wiki', 300000); // 5 minutes cache
+    this.cache = new CacheManager('osrs_wiki', 300000); // 5 minutes cache default
     this.rateLimiter = new RateLimiter();
+    
+    // Enhanced caching configuration
+    this.cacheConfig = {
+      latest_prices: 120000,    // 2 minutes for latest prices
+      item_mapping: 3600000,    // 1 hour for item mapping (stable data)
+      timeseries: 60000,        // 1 minute for timeseries
+      search_results: 600000,   // 10 minutes for search results
+      item_data: 300000,        // 5 minutes for individual item data
+      '5m_prices': 60000,       // 1 minute for 5-minute prices
+      '1h_prices': 300000       // 5 minutes for 1-hour prices
+    };
+    
+    // Circuit breaker for API downtime handling
+    this.circuitBreaker = {
+      failureCount: 0,
+      lastFailureTime: null,
+      state: 'CLOSED', // CLOSED, OPEN, HALF_OPEN
+      failureThreshold: 5,
+      timeoutThreshold: 60000, // 1 minute timeout
+      resetTimeout: 300000     // 5 minutes before retry
+    };
+    
+    // Per-item rate limiting - track last fetch time for each item
+    this.itemLastFetchTime = new Map();
+    this.ITEM_RATE_LIMIT_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
     
     // OSRS Wiki API configuration
     this.baseURL = 'https://prices.runescape.wiki/api/v1/osrs';
-    this.userAgent = 'OSRS-Market-Tracker/1.0 (Educational AI Trading Research)';
+    this.userAgent = 'OSRS-Market-Tracker/1.0 (Educational AI Trading Research; Contact: github.com/your-repo/issues)';
     this.timeout = 10000; // 10 seconds
     
     // Rate limiting configuration (respectful usage)
     this.rateLimitConfig = {
       windowMs: 60000, // 1 minute
-      max: 30, // 30 requests per minute (well under API limits)
+      max: 20, // 20 requests per minute (very conservative)
       key: 'osrs_wiki_api'
+    };
+    
+    // Enhanced rate limiting for different endpoint types
+    this.endpointLimits = {
+      latest: { windowMs: 60000, max: 10 },    // 10/min for latest prices
+      mapping: { windowMs: 300000, max: 2 },   // 2 per 5 minutes for mapping
+      timeseries: { windowMs: 60000, max: 5 }, // 5/min for timeseries
+      '5m': { windowMs: 60000, max: 10 },      // 10/min for 5-minute data
+      '1h': { windowMs: 60000, max: 10 }       // 10/min for 1-hour data
     };
     
     this.axiosConfig = {
@@ -42,11 +76,97 @@ class OSRSWikiService {
   }
 
   /**
+   * Context7 Pattern: Check circuit breaker state
+   */
+  checkCircuitBreaker() {
+    const now = Date.now();
+    
+    switch (this.circuitBreaker.state) {
+      case 'OPEN':
+        // Check if enough time has passed to try again
+        if (now - this.circuitBreaker.lastFailureTime >= this.circuitBreaker.resetTimeout) {
+          this.circuitBreaker.state = 'HALF_OPEN';
+          this.logger.info('Circuit breaker state changed to HALF_OPEN - attempting recovery');
+          return true;
+        }
+        this.logger.warn('Circuit breaker is OPEN - API calls blocked');
+        return false;
+        
+      case 'HALF_OPEN':
+      case 'CLOSED':
+        return true;
+        
+      default:
+        return true;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Record API failure
+   */
+  recordFailure(error) {
+    this.circuitBreaker.failureCount++;
+    this.circuitBreaker.lastFailureTime = Date.now();
+    
+    if (this.circuitBreaker.failureCount >= this.circuitBreaker.failureThreshold) {
+      this.circuitBreaker.state = 'OPEN';
+      this.logger.error('Circuit breaker opened due to repeated failures', {
+        failureCount: this.circuitBreaker.failureCount,
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Context7 Pattern: Record API success
+   */
+  recordSuccess() {
+    if (this.circuitBreaker.state === 'HALF_OPEN') {
+      this.circuitBreaker.state = 'CLOSED';
+      this.logger.info('Circuit breaker closed - API recovered');
+    }
+    this.circuitBreaker.failureCount = 0;
+    this.circuitBreaker.lastFailureTime = null;
+  }
+
+  /**
+   * Context7 Pattern: Get stale data with extended expiry for graceful degradation
+   */
+  getStaleData(cacheKey, maxAge = 3600000) { // 1 hour max stale age
+    const cache = this.cache.cache || new Map();
+    const entry = cache.get(cacheKey);
+    
+    if (entry) {
+      const age = Date.now() - entry.timestamp;
+      if (age <= maxAge) {
+        this.logger.info('Returning stale cached data due to API issues', {
+          cacheKey,
+          ageMinutes: Math.round(age / 60000),
+          maxAgeMinutes: Math.round(maxAge / 60000)
+        });
+        return entry.value;
+      }
+    }
+    
+    return null;
+  }
+
+  /**
    * Context7 Pattern: Get latest item prices
    */
   async getLatestPrices() {
     try {
       this.logger.debug('Fetching latest prices from OSRS Wiki API');
+
+      // Check circuit breaker first
+      if (!this.checkCircuitBreaker()) {
+        // Return stale data if API is down
+        const staleData = this.getStaleData('latest_prices');
+        if (staleData) {
+          return staleData;
+        }
+        throw new Error('API is unavailable and no cached data available');
+      }
 
       // Check rate limit
       const rateLimitResult = await this.rateLimiter.checkLimit(
@@ -80,8 +200,11 @@ class OSRSWikiService {
 
       const data = this.transformLatestPrices(response.data);
       
-      // Cache the response
-      this.cache.set(cacheKey, data);
+      // Cache the response with enhanced timeout
+      this.cache.set(cacheKey, data, this.cacheConfig.latest_prices);
+      
+      // Record success for circuit breaker
+      this.recordSuccess();
       
       this.logger.debug('Successfully fetched latest prices', {
         itemCount: Object.keys(data.data || {}).length,
@@ -92,11 +215,165 @@ class OSRSWikiService {
     } catch (error) {
       this.logger.error('Failed to fetch latest prices', error);
       
-      // Try to return cached data if available
-      const fallbackData = this.cache.get('latest_prices');
-      if (fallbackData) {
-        this.logger.info('Returning stale cached data due to API error');
-        return fallbackData;
+      // Record failure for circuit breaker
+      this.recordFailure(error);
+      
+      // Try to return stale cached data if available
+      const staleData = this.getStaleData('latest_prices');
+      if (staleData) {
+        return staleData;
+      }
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Get 5-minute average prices
+   */
+  async get5MinutePrices() {
+    try {
+      this.logger.debug('Fetching 5-minute average prices from OSRS Wiki API');
+
+      // Check circuit breaker first
+      if (!this.checkCircuitBreaker()) {
+        const staleData = this.getStaleData('5m_prices');
+        if (staleData) {
+          return staleData;
+        }
+        throw new Error('API is unavailable and no cached data available');
+      }
+
+      // Check rate limit
+      const rateLimitResult = await this.rateLimiter.checkLimit(
+        this.rateLimitConfig.key,
+        this.rateLimitConfig
+      );
+
+      if (rateLimitResult.exceeded) {
+        this.logger.warn('Rate limit exceeded for OSRS Wiki API', {
+          retryAfter: rateLimitResult.retryAfter,
+          remaining: rateLimitResult.remaining
+        });
+        throw new Error(`Rate limit exceeded. Retry after ${rateLimitResult.retryAfter} seconds`);
+      }
+
+      // Check cache first
+      const cacheKey = '5m_prices';
+      const cachedData = this.cache.get(cacheKey);
+      
+      if (cachedData) {
+        this.logger.debug('Returning cached 5-minute prices');
+        return cachedData;
+      }
+
+      // Fetch from API
+      const response = await axios.get(`${this.baseURL}/5m`, this.axiosConfig);
+      
+      if (response.status !== 200) {
+        throw new Error(`API returned status ${response.status}`);
+      }
+
+      const data = this.transform5MinutePrices(response.data);
+      
+      // Cache the response with enhanced timeout
+      this.cache.set(cacheKey, data, this.cacheConfig['5m_prices']);
+      
+      // Record success for circuit breaker
+      this.recordSuccess();
+      
+      this.logger.debug('Successfully fetched 5-minute prices', {
+        itemCount: Object.keys(data.data || {}).length,
+        timestamp: data.timestamp
+      });
+
+      return data;
+    } catch (error) {
+      this.logger.error('Failed to fetch 5-minute prices', error);
+      
+      // Record failure for circuit breaker
+      this.recordFailure(error);
+      
+      // Try to return stale cached data if available
+      const staleData = this.getStaleData('5m_prices');
+      if (staleData) {
+        return staleData;
+      }
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Get 1-hour average prices
+   */
+  async get1HourPrices() {
+    try {
+      this.logger.debug('Fetching 1-hour average prices from OSRS Wiki API');
+
+      // Check circuit breaker first
+      if (!this.checkCircuitBreaker()) {
+        const staleData = this.getStaleData('1h_prices');
+        if (staleData) {
+          return staleData;
+        }
+        throw new Error('API is unavailable and no cached data available');
+      }
+
+      // Check rate limit
+      const rateLimitResult = await this.rateLimiter.checkLimit(
+        this.rateLimitConfig.key,
+        this.rateLimitConfig
+      );
+
+      if (rateLimitResult.exceeded) {
+        this.logger.warn('Rate limit exceeded for OSRS Wiki API', {
+          retryAfter: rateLimitResult.retryAfter,
+          remaining: rateLimitResult.remaining
+        });
+        throw new Error(`Rate limit exceeded. Retry after ${rateLimitResult.retryAfter} seconds`);
+      }
+
+      // Check cache first
+      const cacheKey = '1h_prices';
+      const cachedData = this.cache.get(cacheKey);
+      
+      if (cachedData) {
+        this.logger.debug('Returning cached 1-hour prices');
+        return cachedData;
+      }
+
+      // Fetch from API
+      const response = await axios.get(`${this.baseURL}/1h`, this.axiosConfig);
+      
+      if (response.status !== 200) {
+        throw new Error(`API returned status ${response.status}`);
+      }
+
+      const data = this.transform1HourPrices(response.data);
+      
+      // Cache the response with enhanced timeout
+      this.cache.set(cacheKey, data, this.cacheConfig['1h_prices']);
+      
+      // Record success for circuit breaker
+      this.recordSuccess();
+      
+      this.logger.debug('Successfully fetched 1-hour prices', {
+        itemCount: Object.keys(data.data || {}).length,
+        timestamp: data.timestamp
+      });
+
+      return data;
+    } catch (error) {
+      this.logger.error('Failed to fetch 1-hour prices', error);
+      
+      // Record failure for circuit breaker
+      this.recordFailure(error);
+      
+      // Try to return stale cached data if available
+      const staleData = this.getStaleData('1h_prices');
+      if (staleData) {
+        return staleData;
       }
       
       throw error;
@@ -139,7 +416,7 @@ class OSRSWikiService {
       const data = this.transformItemMapping(response.data);
       
       // Cache for longer period (mapping changes less frequently)
-      this.cache.set(cacheKey, data, 3600000); // 1 hour cache
+      this.cache.set(cacheKey, data, this.cacheConfig.item_mapping);
       
       this.logger.debug('Successfully fetched item mapping', {
         itemCount: data.length
@@ -161,7 +438,7 @@ class OSRSWikiService {
   }
 
   /**
-   * Context7 Pattern: Get timeseries data for item
+   * Context7 Pattern: Get timeseries data for item with per-item rate limiting
    */
   async getTimeseries(itemId, timestep = '5m') {
     try {
@@ -177,7 +454,27 @@ class OSRSWikiService {
         throw new Error(`Invalid timestep. Must be one of: ${validTimesteps.join(', ')}`);
       }
 
-      // Check rate limit
+      // Check per-item rate limit first
+      if (!this.canFetchItem(itemId)) {
+        const cooldownTime = this.getItemCooldownTime(itemId);
+        this.logger.debug('Item rate limited for timeseries', { 
+          itemId, 
+          timestep,
+          cooldownRemaining: Math.ceil(cooldownTime / 1000) + 's' 
+        });
+        
+        // Return cached data if available
+        const cacheKey = `timeseries_${itemId}_${timestep}`;
+        const cachedData = this.cache.get(cacheKey);
+        if (cachedData) {
+          this.logger.debug('Returning cached timeseries data due to rate limit', { itemId, timestep });
+          return cachedData;
+        }
+        
+        throw new Error(`Item ${itemId} is rate limited for timeseries. Try again in ${Math.ceil(cooldownTime / 1000)} seconds.`);
+      }
+
+      // Check global rate limit
       const rateLimitResult = await this.rateLimiter.checkLimit(
         this.rateLimitConfig.key,
         this.rateLimitConfig
@@ -208,8 +505,11 @@ class OSRSWikiService {
 
       const data = this.transformTimeseriesData(response.data, itemId, timestep);
       
-      // Cache the response (shorter cache for timeseries)
-      this.cache.set(cacheKey, data, 60000); // 1 minute cache
+      // Cache the response with enhanced timeout
+      this.cache.set(cacheKey, data, this.cacheConfig.timeseries);
+      
+      // Mark item as fetched for rate limiting
+      this.markItemFetched(itemId);
       
       this.logger.debug('Successfully fetched timeseries data', {
         itemId,
@@ -259,11 +559,72 @@ class OSRSWikiService {
   }
 
   /**
-   * Context7 Pattern: Get specific item data
+   * Context7 Pattern: Check if item can be fetched (per-item rate limiting)
+   */
+  canFetchItem(itemId) {
+    const lastFetchTime = this.itemLastFetchTime.get(itemId);
+    if (!lastFetchTime) {
+      return true; // Never fetched before
+    }
+    
+    const timeSinceLastFetch = Date.now() - lastFetchTime;
+    return timeSinceLastFetch >= this.ITEM_RATE_LIMIT_MS;
+  }
+
+  /**
+   * Context7 Pattern: Mark item as fetched
+   */
+  markItemFetched(itemId) {
+    this.itemLastFetchTime.set(itemId, Date.now());
+  }
+
+  /**
+   * Context7 Pattern: Get remaining time until item can be fetched again
+   */
+  getItemCooldownTime(itemId) {
+    const lastFetchTime = this.itemLastFetchTime.get(itemId);
+    if (!lastFetchTime) {
+      return 0; // No cooldown
+    }
+    
+    const timeSinceLastFetch = Date.now() - lastFetchTime;
+    const remainingTime = this.ITEM_RATE_LIMIT_MS - timeSinceLastFetch;
+    return Math.max(0, remainingTime);
+  }
+
+  /**
+   * Context7 Pattern: Get specific item data with per-item rate limiting
    */
   async getItemData(itemId) {
     try {
       this.logger.debug('Fetching item data', { itemId });
+
+      // Check per-item rate limit first
+      if (!this.canFetchItem(itemId)) {
+        const cooldownTime = this.getItemCooldownTime(itemId);
+        this.logger.debug('Item rate limited', { 
+          itemId, 
+          cooldownRemaining: Math.ceil(cooldownTime / 1000) + 's' 
+        });
+        
+        // Return cached data if available
+        const cacheKey = `item_data_${itemId}`;
+        const cachedData = this.cache.get(cacheKey);
+        if (cachedData) {
+          this.logger.debug('Returning cached item data due to rate limit', { itemId });
+          return cachedData;
+        }
+        
+        throw new Error(`Item ${itemId} is rate limited. Try again in ${Math.ceil(cooldownTime / 1000)} seconds.`);
+      }
+
+      // Check cache first
+      const cacheKey = `item_data_${itemId}`;
+      const cachedData = this.cache.get(cacheKey);
+      if (cachedData) {
+        this.logger.debug('Returning cached item data', { itemId });
+        return cachedData;
+      }
 
       // Get both mapping and latest prices
       const [mapping, prices] = await Promise.all([
@@ -297,6 +658,12 @@ class OSRSWikiService {
         timestamp: Date.now()
       };
 
+      // Cache the result with enhanced timeout
+      this.cache.set(cacheKey, itemData, this.cacheConfig.item_data);
+      
+      // Mark item as fetched for rate limiting
+      this.markItemFetched(itemId);
+
       this.logger.debug('Successfully fetched item data', {
         itemId,
         itemName: itemData.name,
@@ -311,7 +678,7 @@ class OSRSWikiService {
   }
 
   /**
-   * Context7 Pattern: Get bulk item data
+   * Context7 Pattern: Get bulk item data with per-item rate limiting
    */
   async getBulkItemData(itemIds) {
     try {
@@ -330,7 +697,39 @@ class OSRSWikiService {
         throw new Error('No valid item IDs provided');
       }
 
-      // Get mapping and prices
+      // Filter out rate-limited items and get from cache if available
+      const allowedItemIds = [];
+      const rateLimitedItems = [];
+      const cachedItems = [];
+
+      for (const itemId of validItemIds) {
+        if (this.canFetchItem(itemId)) {
+          allowedItemIds.push(itemId);
+        } else {
+          // Try to get from cache first
+          const cacheKey = `item_data_${itemId}`;
+          const cachedData = this.cache.get(cacheKey);
+          if (cachedData) {
+            cachedItems.push(cachedData);
+          } else {
+            const cooldownTime = this.getItemCooldownTime(itemId);
+            rateLimitedItems.push({
+              id: itemId,
+              error: `Rate limited. Try again in ${Math.ceil(cooldownTime / 1000)} seconds.`,
+              cooldownRemaining: cooldownTime
+            });
+          }
+        }
+      }
+
+      this.logger.debug('Rate limiting analysis', {
+        total: validItemIds.length,
+        allowed: allowedItemIds.length,
+        rateLimited: rateLimitedItems.length,
+        cached: cachedItems.length
+      });
+
+      // Get mapping and prices for allowed items
       const [mapping, prices] = await Promise.all([
         this.getItemMapping(),
         this.getLatestPrices()
@@ -341,8 +740,8 @@ class OSRSWikiService {
         mapping.map(item => [item.id, item])
       );
 
-      // Process each item
-      const results = validItemIds.map(itemId => {
+      // Process allowed items (fresh data)
+      const freshResults = allowedItemIds.map(itemId => {
         const itemMapping = mappingLookup.get(itemId);
         const priceData = prices.data[itemId];
 
@@ -353,7 +752,7 @@ class OSRSWikiService {
           };
         }
 
-        return {
+        const itemData = {
           id: itemId,
           name: itemMapping.name,
           examine: itemMapping.examine,
@@ -366,24 +765,43 @@ class OSRSWikiService {
             highTime: priceData.highTime,
             low: priceData.low,
             lowTime: priceData.lowTime
-          } : null
+          } : null,
+          timestamp: Date.now()
         };
+
+        // Cache the result with enhanced timeout
+        const cacheKey = `item_data_${itemId}`;
+        this.cache.set(cacheKey, itemData, this.cacheConfig.item_data);
+
+        // Mark item as fetched for rate limiting
+        this.markItemFetched(itemId);
+
+        return itemData;
       });
+
+      // Combine all results
+      const allResults = [...freshResults, ...cachedItems, ...rateLimitedItems];
 
       this.logger.debug('Successfully fetched bulk item data', {
         requested: itemIds.length,
         valid: validItemIds.length,
-        successful: results.filter(r => !r.error).length
+        fresh: freshResults.length,
+        cached: cachedItems.length,
+        rateLimited: rateLimitedItems.length,
+        successful: allResults.filter(r => !r.error).length
       });
 
       return {
-        items: results,
+        items: allResults,
         timestamp: Date.now(),
         stats: {
           requested: itemIds.length,
           valid: validItemIds.length,
-          successful: results.filter(r => !r.error).length,
-          failed: results.filter(r => r.error).length
+          fresh: freshResults.length,
+          cached: cachedItems.length,
+          rateLimited: rateLimitedItems.length,
+          successful: allResults.filter(r => !r.error).length,
+          failed: allResults.filter(r => r.error).length
         }
       };
     } catch (error) {
@@ -432,6 +850,26 @@ class OSRSWikiService {
    * Transform latest prices data
    */
   transformLatestPrices(data) {
+    return {
+      data: data.data || {},
+      timestamp: data.timestamp || Date.now()
+    };
+  }
+
+  /**
+   * Transform 5-minute prices data
+   */
+  transform5MinutePrices(data) {
+    return {
+      data: data.data || {},
+      timestamp: data.timestamp || Date.now()
+    };
+  }
+
+  /**
+   * Transform 1-hour prices data
+   */
+  transform1HourPrices(data) {
     return {
       data: data.data || {},
       timestamp: data.timestamp || Date.now()
@@ -527,18 +965,112 @@ class OSRSWikiService {
   }
 
   /**
-   * Get service statistics
+   * Get service statistics including per-item rate limiting
    */
   getStatistics() {
+    const now = Date.now();
+    const itemRateLimitStats = {
+      totalItemsTracked: this.itemLastFetchTime.size,
+      itemsInCooldown: 0,
+      itemsReady: 0,
+      averageCooldownTime: 0,
+      oldestFetch: null,
+      newestFetch: null
+    };
+
+    let totalCooldownTime = 0;
+    let oldestTime = Infinity;
+    let newestTime = 0;
+
+    for (const [itemId, lastFetchTime] of this.itemLastFetchTime.entries()) {
+      const cooldownTime = this.getItemCooldownTime(itemId);
+      
+      if (cooldownTime > 0) {
+        itemRateLimitStats.itemsInCooldown++;
+        totalCooldownTime += cooldownTime;
+      } else {
+        itemRateLimitStats.itemsReady++;
+      }
+
+      if (lastFetchTime < oldestTime) {
+        oldestTime = lastFetchTime;
+        itemRateLimitStats.oldestFetch = new Date(lastFetchTime).toISOString();
+      }
+
+      if (lastFetchTime > newestTime) {
+        newestTime = lastFetchTime;
+        itemRateLimitStats.newestFetch = new Date(lastFetchTime).toISOString();
+      }
+    }
+
+    if (itemRateLimitStats.itemsInCooldown > 0) {
+      itemRateLimitStats.averageCooldownTime = Math.round(totalCooldownTime / itemRateLimitStats.itemsInCooldown);
+    }
+
     return {
       cache: this.cache.getStats(),
       rateLimit: this.rateLimiter.getStats(this.rateLimitConfig.key),
+      itemRateLimit: itemRateLimitStats,
       config: {
         baseURL: this.baseURL,
         timeout: this.timeout,
-        rateLimitConfig: this.rateLimitConfig
+        rateLimitConfig: this.rateLimitConfig,
+        itemRateLimitMs: this.ITEM_RATE_LIMIT_MS
       }
     };
+  }
+
+  /**
+   * Get per-item rate limiting status
+   */
+  getItemRateLimitStatus(itemIds = []) {
+    const now = Date.now();
+    const results = [];
+
+    for (const itemId of itemIds) {
+      const lastFetchTime = this.itemLastFetchTime.get(itemId);
+      const cooldownTime = this.getItemCooldownTime(itemId);
+      const canFetch = this.canFetchItem(itemId);
+
+      results.push({
+        itemId,
+        canFetch,
+        lastFetchTime: lastFetchTime ? new Date(lastFetchTime).toISOString() : null,
+        cooldownRemaining: cooldownTime,
+        cooldownRemainingFormatted: cooldownTime > 0 ? `${Math.ceil(cooldownTime / 1000)}s` : 'Ready',
+        nextAvailableTime: lastFetchTime ? new Date(lastFetchTime + this.ITEM_RATE_LIMIT_MS).toISOString() : 'Now'
+      });
+    }
+
+    return {
+      itemStatuses: results,
+      rateLimitMs: this.ITEM_RATE_LIMIT_MS,
+      timestamp: new Date(now).toISOString()
+    };
+  }
+
+  /**
+   * Clear per-item rate limiting for specific items or all items
+   */
+  clearItemRateLimit(itemIds = []) {
+    if (itemIds.length === 0) {
+      // Clear all items
+      const clearedCount = this.itemLastFetchTime.size;
+      this.itemLastFetchTime.clear();
+      this.logger.info('Cleared all per-item rate limits', { clearedCount });
+      return { clearedCount, clearedItems: 'all' };
+    } else {
+      // Clear specific items
+      const clearedItems = [];
+      for (const itemId of itemIds) {
+        if (this.itemLastFetchTime.has(itemId)) {
+          this.itemLastFetchTime.delete(itemId);
+          clearedItems.push(itemId);
+        }
+      }
+      this.logger.info('Cleared per-item rate limits for specific items', { clearedItems });
+      return { clearedCount: clearedItems.length, clearedItems };
+    }
   }
 }
 
