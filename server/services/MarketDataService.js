@@ -14,8 +14,16 @@ const { Logger } = require('../utils/Logger');
 const { CacheManager } = require('../utils/CacheManager');
 const { DataTransformer } = require('../utils/DataTransformer');
 const { PriceCalculator } = require('../utils/PriceCalculator');
+const { FinancialMetricsCalculator } = require('../utils/FinancialMetricsCalculator');
 const { OSRSWikiService } = require('./OSRSWikiService');
 const { MarketPriceSnapshotModel } = require('../models/MarketPriceSnapshotModel');
+const { 
+  calculateProfitAfterTax, 
+  calculateProfitPercentageAfterTax,
+  calculateGETax,
+  calculateNetSellPrice,
+  isTaxFree 
+} = require('../utils/marketConstants');
 
 // TRADING INTEGRATION
 const { AITradingOrchestratorService } = require('./AITradingOrchestratorService');
@@ -27,6 +35,7 @@ class MarketDataService {
     this.cache = new CacheManager('market_data', 600); // 10 minutes cache
     this.dataTransformer = new DataTransformer();
     this.priceCalculator = new PriceCalculator();
+    this.metricsCalculator = new FinancialMetricsCalculator();
     this.osrsWikiService = new OSRSWikiService();
     
     // TRADING INTEGRATION
@@ -822,6 +831,68 @@ class MarketDataService {
         timestamp: data.timestamp
       };
 
+      // Calculate all derived metrics using FinancialMetricsCalculator
+      if (data.highPrice && data.lowPrice) {
+        try {
+          // Get historical data for this item (last 30 data points for trend analysis)
+          const historicalData = await this.getHistoricalDataForCalculation(data.itemId, data.interval);
+          
+          // Use FinancialMetricsCalculator to calculate all metrics
+          const calculatedMetrics = this.metricsCalculator.calculateAllMetrics(data, historicalData);
+          
+          // Merge all calculated metrics into the data object
+          Object.assign(data, calculatedMetrics);
+          
+          this.logger.debug('All derived metrics calculated', {
+            itemId: data.itemId,
+            sellPrice: data.highPrice,
+            buyPrice: data.lowPrice,
+            geTaxAmount: data.geTaxAmount,
+            isTaxFree: data.isTaxFree,
+            grossProfitGp: data.grossProfitGp,
+            marginGp: data.marginGp,
+            marginPercent: data.marginPercent,
+            riskScore: data.riskScore,
+            expectedProfitPerHour: data.expectedProfitPerHour,
+            volatility: data.volatility,
+            velocity: data.velocity,
+            rsi: data.rsi,
+            momentumScore: data.momentumScore
+          });
+        } catch (metricsError) {
+          this.logger.error('Error calculating derived metrics, using fallback calculations', metricsError);
+          
+          // Fallback to basic calculations if FinancialMetricsCalculator fails
+          const buyPrice = data.lowPrice;
+          const sellPrice = data.highPrice;
+          
+          // Calculate GE tax details
+          data.geTaxAmount = calculateGETax(sellPrice);
+          data.isTaxFree = isTaxFree(sellPrice);
+          data.netSellPrice = calculateNetSellPrice(sellPrice);
+          
+          // Calculate profit margins
+          data.grossProfitGp = sellPrice - buyPrice;
+          data.grossProfitPercent = buyPrice > 0 ? ((sellPrice - buyPrice) / buyPrice) * 100 : 0;
+          data.marginGp = calculateProfitAfterTax(buyPrice, sellPrice);
+          data.marginPercent = calculateProfitPercentageAfterTax(buyPrice, sellPrice);
+          
+          // Calculate profit per GE slot (assuming 1 item per slot for now)
+          data.profitPerGeSlot = data.marginGp;
+          
+          this.logger.debug('Fallback GE tax calculations completed', {
+            itemId: data.itemId,
+            sellPrice,
+            buyPrice,
+            geTaxAmount: data.geTaxAmount,
+            isTaxFree: data.isTaxFree,
+            grossProfitGp: data.grossProfitGp,
+            marginGp: data.marginGp,
+            marginPercent: data.marginPercent
+          });
+        }
+      }
+
       // Use findOneAndUpdate with upsert for atomic operation
       // This prevents race conditions and ensures data consistency
       const options = {
@@ -845,7 +916,11 @@ class MarketDataService {
         highPrice: snapshot.highPrice,
         lowPrice: snapshot.lowPrice,
         volume: snapshot.volume,
-        source: snapshot.source
+        source: snapshot.source,
+        geTaxAmount: snapshot.geTaxAmount,
+        isTaxFree: snapshot.isTaxFree,
+        marginGp: snapshot.marginGp,
+        marginPercent: snapshot.marginPercent
       });
 
       return snapshot;
@@ -857,6 +932,47 @@ class MarketDataService {
         interval: data?.interval
       });
       throw error;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Get historical data for metric calculation
+   * 
+   * Helper method to retrieve recent historical data for an item
+   * to support trend analysis and technical indicators
+   */
+  async getHistoricalDataForCalculation(itemId, interval, limit = 30) {
+    try {
+      // Get recent snapshots for this item in the same interval
+      const recentSnapshots = await MarketPriceSnapshotModel
+        .find({ 
+          itemId, 
+          interval 
+        })
+        .sort({ timestamp: -1 })
+        .limit(limit)
+        .exec();
+
+      // Convert to price array for trend analysis
+      const historicalPrices = recentSnapshots
+        .reverse() // Oldest first for trend calculation
+        .map(snapshot => (snapshot.highPrice + snapshot.lowPrice) / 2);
+
+      this.logger.debug('Retrieved historical data for metrics calculation', {
+        itemId,
+        interval,
+        dataPoints: historicalPrices.length,
+        limit
+      });
+
+      return historicalPrices;
+    } catch (error) {
+      this.logger.error('Error retrieving historical data for calculation', error, {
+        itemId,
+        interval,
+        limit
+      });
+      return []; // Return empty array if unable to get historical data
     }
   }
 

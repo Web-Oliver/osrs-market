@@ -1,24 +1,71 @@
 /**
- * 💰 Price Calculator - Context7 Optimized
+ * 💰 Price Calculator - Context7 Optimized (Legacy Support)
  * 
- * Context7 Pattern: Advanced Price Analysis and Calculation System
- * - Profit margin calculations
+ * Context7 Pattern: Legacy Price Analysis and Calculation System
+ * - REFACTORED: Now uses FinancialMetricsCalculator for raw calculations
+ * - Provides backward compatibility for existing code
+ * - Maintains existing API while delegating to FinancialMetricsCalculator
+ * - Profit margin calculations (with GE tax integration)
  * - Market volatility analysis
  * - Trading volume analysis
  * - Price trend calculations
  * - Technical indicators
  */
 
+const { 
+  calculateProfitAfterTax, 
+  calculateProfitPercentageAfterTax, 
+  calculateGETax,
+  calculateNetSellPrice,
+  isTaxFree,
+  GE_TAX_RATE,
+  GE_TAX_THRESHOLD_GP 
+} = require('./marketConstants');
+
+const { FinancialMetricsCalculator } = require('./FinancialMetricsCalculator');
+
 class PriceCalculator {
   constructor() {
     this.cache = new Map();
     this.cacheTimeout = 300000; // 5 minutes cache
+    this.metricsCalculator = new FinancialMetricsCalculator();
   }
 
   /**
-   * Context7 Pattern: Calculate profit margin
+   * Context7 Pattern: Calculate profit margin (with GE tax) - Legacy wrapper
    */
   calculateProfitMargin(item) {
+    if (!item.priceData || !item.priceData.high || !item.priceData.low) {
+      return 0;
+    }
+    
+    // Convert item format to rawData format for FinancialMetricsCalculator
+    const rawData = {
+      itemId: item.itemId || 0,
+      highPrice: item.priceData.high,
+      lowPrice: item.priceData.low,
+      volume: item.volume || 0,
+      timestamp: Date.now(),
+      interval: 'latest',
+      source: 'legacy_price_calculator'
+    };
+    
+    try {
+      const metrics = this.metricsCalculator.calculateAllMetrics(rawData);
+      return metrics.marginPercent || 0;
+    } catch (error) {
+      // Fallback to original calculation
+      const buyPrice = item.priceData.low;
+      const sellPrice = item.priceData.high;
+      const profitAfterTax = calculateProfitAfterTax(buyPrice, sellPrice);
+      return buyPrice > 0 ? (profitAfterTax / buyPrice) * 100 : 0;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Calculate gross profit margin (before tax)
+   */
+  calculateGrossProfitMargin(item) {
     if (!item.priceData || !item.priceData.high || !item.priceData.low) {
       return 0;
     }
@@ -27,26 +74,80 @@ class PriceCalculator {
     const sellPrice = item.priceData.high;
     const grossProfit = sellPrice - buyPrice;
     
-    // Calculate margin as percentage of buy price
+    // Calculate gross margin as percentage of buy price
     return buyPrice > 0 ? (grossProfit / buyPrice) * 100 : 0;
   }
 
   /**
-   * Context7 Pattern: Calculate volatility
+   * Context7 Pattern: Calculate profit breakdown including tax details
+   */
+  calculateProfitBreakdown(item) {
+    if (!item.priceData || !item.priceData.high || !item.priceData.low) {
+      return {
+        buyPrice: 0,
+        sellPrice: 0,
+        grossProfit: 0,
+        taxAmount: 0,
+        netProfit: 0,
+        grossMarginPercent: 0,
+        netMarginPercent: 0,
+        isTaxFree: false
+      };
+    }
+    
+    const buyPrice = item.priceData.low;
+    const sellPrice = item.priceData.high;
+    const grossProfit = sellPrice - buyPrice;
+    const taxAmount = calculateGETax(sellPrice);
+    const netProfit = calculateProfitAfterTax(buyPrice, sellPrice);
+    const grossMarginPercent = buyPrice > 0 ? (grossProfit / buyPrice) * 100 : 0;
+    const netMarginPercent = buyPrice > 0 ? (netProfit / buyPrice) * 100 : 0;
+    
+    return {
+      buyPrice,
+      sellPrice,
+      grossProfit,
+      taxAmount,
+      netProfit,
+      grossMarginPercent: Math.round(grossMarginPercent * 100) / 100,
+      netMarginPercent: Math.round(netMarginPercent * 100) / 100,
+      isTaxFree: isTaxFree(sellPrice)
+    };
+  }
+
+  /**
+   * Context7 Pattern: Calculate volatility - Legacy wrapper
    */
   calculateVolatility(item) {
     if (!item.priceData || !item.priceData.high || !item.priceData.low) {
       return 0;
     }
     
-    const high = item.priceData.high;
-    const low = item.priceData.low;
-    const midPrice = (high + low) / 2;
+    // Convert item format to rawData format for FinancialMetricsCalculator
+    const rawData = {
+      itemId: item.itemId || 0,
+      highPrice: item.priceData.high,
+      lowPrice: item.priceData.low,
+      volume: item.volume || 0,
+      timestamp: Date.now(),
+      interval: 'latest',
+      source: 'legacy_price_calculator'
+    };
     
-    if (midPrice === 0) return 0;
-    
-    const volatility = ((high - low) / midPrice) * 100;
-    return Math.round(volatility * 100) / 100;
+    try {
+      const metrics = this.metricsCalculator.calculateAllMetrics(rawData);
+      return metrics.volatility || 0;
+    } catch (error) {
+      // Fallback to original calculation
+      const high = item.priceData.high;
+      const low = item.priceData.low;
+      const midPrice = (high + low) / 2;
+      
+      if (midPrice === 0) return 0;
+      
+      const volatility = ((high - low) / midPrice) * 100;
+      return Math.round(volatility * 100) / 100;
+    }
   }
 
   /**

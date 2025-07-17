@@ -70,36 +70,26 @@ This phase focuses on implementing backend API endpoints to support Phase 2 fron
 
 This phase focuses on consolidating metric calculations, implementing the MarketPriceSnapshotModel, and setting up the Python AI microservice integration.
 
-* \[ \] **Step 2.0: Implement GE Tax Constant**  
-  * \[ \] **Define Global Constants**:  
-    * Create a new utility file, e.g., src/utils/constants.ts or src/config/marketConfig.ts.  
-    * Define a constant for the GE tax rate: GE\_TAX\_RATE \= 0.02 (2%).  
-    * Define a constant for the tax threshold: GE\_TAX\_THRESHOLD\_GP \= 1000 (items over 1000 GP are taxed).  
-  * \[ \] **Integrate into Price Calculations**:  
-    * Ensure that all profit calculations (e.g., marginGp, marginPercent, expectedProfitPerHour, profitPerGeSlot) within PriceCalculator.js, TradingAnalysisService.js, and MarketDataService.ts explicitly apply this 2% rounded-down GE tax **only when an item's price is over 1000 GP**.  
-    * Prioritize logic for tax-free flipping of items under 100 GP, as mentioned in spec.md.  
-* \[ \] **Step 2.1: Implement MarketPriceSnapshotModel**  
-  * \[ \] **Create src/models/MarketPriceSnapshotModel.ts**:  
-    * Define Mongoose schema as outlined in spec.md.  
-      * itemId: { type: Number, ref: 'Item', required: true, index: true }  
-      * timestamp: { type: Date, required: true, index: true } (use JavaScript Date objects for consistency)  
-      * highPrice: { type: Number, required: true }  
-      * lowPrice: { type: Number, required: true }  
-      * volume: { type: Number, required: true }  
-      * interval: { type: String, enum: \['daily\_scrape', '5m', '1h', 'latest', '6m\_scrape'\], required: true }  
-      * **Derived Metrics**: Include all derived metrics from PriceCalculator.js, TradingAnalysisService.js, and MetricsCalculator.js.  
-        * marginGp: { type: Number }  
-        * marginPercent: { type: Number }  
-        * volatility: { type: Number }  
-        * velocity: { type: Number }  
-        * trendMovingAverage: { type: Number }  
-        * rsi: { type: Number }  
-        * macd: { type: Object } (e.g., { line: Number, signal: Number, histogram: Number })  
-        * momentumScore: { type: Number }  
-        * riskScore: { type: Number }  
-        * expectedProfitPerHour: { type: Number }  
-        * profitPerGeSlot: { type: Number }  
-      * Add a compound index on (itemId, timestamp, interval) for efficient querying.  
+* \[x\] **Step 2.0: Implement GE Tax Constant**  
+  * \[x\] **Define Global Constants**:  
+    * ✅ Created utils/marketConstants.js with GE tax rate (2%) and threshold (1000 GP)  
+    * ✅ Added comprehensive GE tax calculation functions  
+    * ✅ Included helper functions for profit calculations after tax  
+  * \[x\] **Integrate into Price Calculations**:  
+    * ✅ Updated PriceCalculator.js to use GE tax calculations  
+    * ✅ Modified MarketDataService.js saveMarketSnapshot to calculate GE tax  
+    * ✅ Added GE tax fields to MarketPriceSnapshotModel  
+    * ✅ Integrated tax-free logic for items under 1000 GP  
+* \[x\] **Step 2.1: Implement MarketPriceSnapshotModel**  
+  * \[x\] **Create src/models/MarketPriceSnapshotModel.ts**:  
+    * ✅ MarketPriceSnapshotModel.js already exists with complete schema  
+    * ✅ All core fields implemented: itemId, timestamp, highPrice, lowPrice, volume, interval  
+    * ✅ All derived metrics included: marginGp, marginPercent, volatility, velocity, etc.  
+    * ✅ Added GE tax fields: geTaxAmount, isTaxFree, netSellPrice, grossProfitGp, grossProfitPercent  
+    * ✅ Compound indexes implemented for efficient time-series queries  
+    * ✅ Instance methods for profit calculations with GE tax integration  
+    * ✅ Static methods for common queries (getLatestSnapshot, etc.)  
+    * ✅ Pre-save middleware for data validation  
 * \[ \] **Step 2.2: Refactor Metric Calculation and Persistence**  
   * \[ \] **Consolidate Metric Calculations**:  
     * Create a new utility service, e.g., src/services/FinancialMetricsCalculator.ts, or designate PriceCalculator.js as the sole raw calculation utility.  

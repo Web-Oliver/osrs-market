@@ -109,7 +109,7 @@ const MarketPriceSnapshotSchema = new Schema({
    * They represent key trading indicators and risk metrics for AI training.
    */
 
-  // Profit Margin Calculations
+  // Profit Margin Calculations (with GE tax integration)
   marginGp: {
     type: Number,
     default: null,
@@ -129,6 +129,64 @@ const MarketPriceSnapshotSchema = new Schema({
         return v === null || (v >= -100 && v <= 1000);
       },
       message: 'Margin percent must be between -100% and 1000%'
+    }
+  },
+
+  // GE Tax Information
+  geTaxAmount: {
+    type: Number,
+    default: null,
+    min: 0,
+    validate: {
+      validator: function(v) {
+        return v === null || v >= 0;
+      },
+      message: 'GE tax amount must be non-negative'
+    }
+  },
+
+  isTaxFree: {
+    type: Boolean,
+    default: false,
+    validate: {
+      validator: function(v) {
+        return typeof v === 'boolean';
+      },
+      message: 'isTaxFree must be a boolean'
+    }
+  },
+
+  netSellPrice: {
+    type: Number,
+    default: null,
+    min: 0,
+    validate: {
+      validator: function(v) {
+        return v === null || v >= 0;
+      },
+      message: 'Net sell price must be non-negative'
+    }
+  },
+
+  grossProfitGp: {
+    type: Number,
+    default: null,
+    validate: {
+      validator: function(v) {
+        return v === null || typeof v === 'number';
+      },
+      message: 'Gross profit GP must be a number or null'
+    }
+  },
+
+  grossProfitPercent: {
+    type: Number,
+    default: null,
+    validate: {
+      validator: function(v) {
+        return v === null || (v >= -100 && v <= 1000);
+      },
+      message: 'Gross profit percent must be between -100% and 1000%'
     }
   },
 
@@ -381,6 +439,77 @@ MarketPriceSnapshotSchema.methods.isActiveTrading = function() {
  */
 MarketPriceSnapshotSchema.methods.getFormattedTimestamp = function() {
   return new Date(this.timestamp).toISOString();
+};
+
+/**
+ * Calculate profit after GE tax
+ * @returns {number} Net profit after GE tax
+ */
+MarketPriceSnapshotSchema.methods.getNetProfitAfterTax = function() {
+  const { calculateProfitAfterTax } = require('../utils/marketConstants');
+  return calculateProfitAfterTax(this.lowPrice, this.highPrice);
+};
+
+/**
+ * Calculate gross profit before GE tax
+ * @returns {number} Gross profit before tax
+ */
+MarketPriceSnapshotSchema.methods.getGrossProfit = function() {
+  return this.highPrice - this.lowPrice;
+};
+
+/**
+ * Calculate GE tax amount
+ * @returns {number} GE tax amount in GP
+ */
+MarketPriceSnapshotSchema.methods.getGETaxAmount = function() {
+  const { calculateGETax } = require('../utils/marketConstants');
+  return calculateGETax(this.highPrice);
+};
+
+/**
+ * Check if this item is tax-free
+ * @returns {boolean} True if item is tax-free
+ */
+MarketPriceSnapshotSchema.methods.isItemTaxFree = function() {
+  const { isTaxFree } = require('../utils/marketConstants');
+  return isTaxFree(this.highPrice);
+};
+
+/**
+ * Get comprehensive profit breakdown
+ * @returns {Object} Detailed profit breakdown with tax information
+ */
+MarketPriceSnapshotSchema.methods.getProfitBreakdown = function() {
+  const { 
+    calculateProfitAfterTax, 
+    calculateGETax, 
+    calculateNetSellPrice,
+    isTaxFree 
+  } = require('../utils/marketConstants');
+
+  const buyPrice = this.lowPrice;
+  const sellPrice = this.highPrice;
+  const grossProfit = sellPrice - buyPrice;
+  const taxAmount = calculateGETax(sellPrice);
+  const netSellPrice = calculateNetSellPrice(sellPrice);
+  const netProfit = calculateProfitAfterTax(buyPrice, sellPrice);
+  const grossMarginPercent = buyPrice > 0 ? (grossProfit / buyPrice) * 100 : 0;
+  const netMarginPercent = buyPrice > 0 ? (netProfit / buyPrice) * 100 : 0;
+
+  return {
+    buyPrice,
+    sellPrice,
+    grossProfit,
+    taxAmount,
+    netSellPrice,
+    netProfit,
+    grossMarginPercent: Math.round(grossMarginPercent * 100) / 100,
+    netMarginPercent: Math.round(netMarginPercent * 100) / 100,
+    isTaxFree: isTaxFree(sellPrice),
+    profitPerSlot: netProfit, // Assuming 1 item per slot
+    expectedProfitPerHour: this.expectedProfitPerHour || null
+  };
 };
 
 /**
