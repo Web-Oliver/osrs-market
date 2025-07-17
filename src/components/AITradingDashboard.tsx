@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useAITrading } from '../hooks/useAITrading'
 import { useItemPrices } from '../hooks/useItemPrices'
+import { useNotifications } from '../hooks/useNotifications'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
+import { generateMockTrainingData, formatTimestamp, formatCurrency, formatPercentage } from '../utils/mockChartData'
 import type { AdaptiveLearningConfig } from '../types/aiTrading'
 import type { PerformanceAnalytics } from '../services/aiTradingApi'
 
@@ -27,6 +30,7 @@ export function AITradingDashboard() {
   } = useAITrading()
 
   const { items } = useItemPrices()
+  const { showSuccess, showError } = useNotifications()
   const [autoTradeEnabled, setAutoTradeEnabled] = useState(false)
   const [adaptiveConfig, setAdaptiveConfig] = useState<Partial<AdaptiveLearningConfig>>({
     enableOnlineLearning: true,
@@ -60,7 +64,7 @@ export function AITradingDashboard() {
   const handleSaveModel = async () => {
     const modelData = await saveModel()
     if (modelData) {
-      alert('Model saved successfully!')
+      showSuccess('Model saved successfully!')
     }
   }
 
@@ -75,7 +79,7 @@ export function AITradingDashboard() {
         reader.onload = async (event) => {
           const modelData = event.target?.result as string
           if (await loadModel(modelData)) {
-            alert('Model loaded successfully!')
+            showSuccess('Model loaded successfully!')
           }
         }
         reader.readAsText(file)
@@ -86,6 +90,7 @@ export function AITradingDashboard() {
 
   const recentMetrics = trainingMetrics.slice(-10)
   const [analytics, setAnalytics] = useState<PerformanceAnalytics | null>(null)
+  const [trainingData, setTrainingData] = useState(() => generateMockTrainingData())
   
   useEffect(() => {
     const fetchAnalytics = async () => {
@@ -94,6 +99,16 @@ export function AITradingDashboard() {
     }
     fetchAnalytics()
   }, [getPerformanceAnalytics])
+
+  // Update training data every 30 seconds when training is active
+  useEffect(() => {
+    if (isTraining) {
+      const interval = setInterval(() => {
+        setTrainingData(generateMockTrainingData())
+      }, 30000)
+      return () => clearInterval(interval)
+    }
+  }, [isTraining])
 
   return (
     <div className="space-y-6">
@@ -276,33 +291,139 @@ export function AITradingDashboard() {
         </div>
       )}
 
-      {/* Training Progress Chart */}
-      {recentMetrics.length > 0 && (
+      {/* Training Progress Charts */}
+      {trainingData.length > 0 && (
         <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Training Progress</h2>
+          <h2 className="text-xl font-semibold text-gray-900 mb-6">Training Progress</h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Loss Curve Chart */}
             <div>
-              <h3 className="font-medium text-gray-700 mb-2">Epsilon Decay</h3>
-              <div className="h-32 bg-gray-50 rounded flex items-end justify-center">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {(recentMetrics[recentMetrics.length - 1]?.epsilon * 100 || 0).toFixed(1)}%
-                  </div>
-                  <div className="text-xs text-gray-500">Exploration Rate</div>
-                </div>
+              <h3 className="font-medium text-gray-700 mb-3">Loss Curve</h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trainingData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="timestamp" 
+                      tickFormatter={formatTimestamp}
+                      fontSize={12}
+                    />
+                    <YAxis 
+                      domain={['dataMin', 'dataMax']}
+                      fontSize={12}
+                    />
+                    <Tooltip 
+                      labelFormatter={(label) => `Time: ${formatTimestamp(label)}`}
+                      formatter={(value: number) => [value.toFixed(3), 'Loss']}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="loss" 
+                      stroke="#ef4444" 
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
             </div>
-            
+
+            {/* Reward History Chart */}
             <div>
-              <h3 className="font-medium text-gray-700 mb-2">Portfolio Value</h3>
-              <div className="h-32 bg-gray-50 rounded flex items-end justify-center">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">
-                    {(recentMetrics[recentMetrics.length - 1]?.portfolioValue || 0).toLocaleString()}
-                  </div>
-                  <div className="text-xs text-gray-500">GP</div>
-                </div>
+              <h3 className="font-medium text-gray-700 mb-3">Reward History</h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trainingData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="timestamp" 
+                      tickFormatter={formatTimestamp}
+                      fontSize={12}
+                    />
+                    <YAxis 
+                      domain={['dataMin', 'dataMax']}
+                      fontSize={12}
+                    />
+                    <Tooltip 
+                      labelFormatter={(label) => `Time: ${formatTimestamp(label)}`}
+                      formatter={(value: number) => [value.toFixed(1), 'Reward']}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="reward" 
+                      stroke="#22c55e" 
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Epsilon Decay Chart */}
+            <div>
+              <h3 className="font-medium text-gray-700 mb-3">Epsilon Decay</h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trainingData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="timestamp" 
+                      tickFormatter={formatTimestamp}
+                      fontSize={12}
+                    />
+                    <YAxis 
+                      domain={[0, 1]}
+                      tickFormatter={formatPercentage}
+                      fontSize={12}
+                    />
+                    <Tooltip 
+                      labelFormatter={(label) => `Time: ${formatTimestamp(label)}`}
+                      formatter={(value: number) => [formatPercentage(value), 'Exploration Rate']}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="epsilon" 
+                      stroke="#3b82f6" 
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Portfolio Value Chart */}
+            <div>
+              <h3 className="font-medium text-gray-700 mb-3">Portfolio Value</h3>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trainingData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="timestamp" 
+                      tickFormatter={formatTimestamp}
+                      fontSize={12}
+                    />
+                    <YAxis 
+                      domain={['dataMin', 'dataMax']}
+                      tickFormatter={(value) => formatCurrency(value)}
+                      fontSize={12}
+                    />
+                    <Tooltip 
+                      labelFormatter={(label) => `Time: ${formatTimestamp(label)}`}
+                      formatter={(value: number) => [formatCurrency(value), 'Portfolio Value']}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="portfolioValue" 
+                      stroke="#8b5cf6" 
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
             </div>
           </div>

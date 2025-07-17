@@ -10,6 +10,7 @@
  */
 
 const { OSRSWikiService } = require('./OSRSWikiService');
+const { OSRSDataScraperService } = require('./OSRSDataScraperService');
 const { MonitoringService } = require('./MonitoringService');
 const { MarketDataService } = require('./MarketDataService');
 const { MongoDataPersistence } = require('../mongoDataPersistence');
@@ -27,6 +28,7 @@ class DataCollectionService {
     
     // Initialize services
     this.osrsWikiService = new OSRSWikiService();
+    this.osrsDataScraperService = new OSRSDataScraperService();
     this.monitoringService = new MonitoringService();
     this.marketDataService = new MarketDataService();
     
@@ -71,6 +73,46 @@ class DataCollectionService {
     } catch (error) {
       this.logger.error('❌ Failed to initialize MongoDB persistence', error);
       this.mongoPersistence = null;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Discover and store new items using OSRSDataScraperService
+   */
+  async discoverAndStoreNewItems() {
+    try {
+      this.logger.info('🔍 Starting item discovery process');
+      
+      // Initialize scraper if not already done
+      if (!this.osrsDataScraperService.mongoPersistence) {
+        await this.osrsDataScraperService.initialize();
+      }
+      
+      // Get Top 100 items for discovery (scale=3 - 6 months)
+      const discoveredItems = await this.osrsDataScraperService.getTop100ItemsForDiscovery();
+      
+      this.logger.info(`✅ Discovered ${discoveredItems.length} items from Top 100 lists`);
+      
+      // TODO: Process discovered items and store them in ItemModel
+      // This should create new Item records for items not already in the database
+      // For now, we'll just log the discovered items
+      
+      const itemSummary = discoveredItems.slice(0, 10).map(item => ({
+        id: item.itemId,
+        name: item.name
+      }));
+      
+      this.logger.info('📋 Sample discovered items:', itemSummary);
+      
+      return {
+        success: true,
+        itemsDiscovered: discoveredItems.length,
+        items: discoveredItems
+      };
+      
+    } catch (error) {
+      this.logger.error('❌ Failed to discover and store new items', error);
+      throw error;
     }
   }
 

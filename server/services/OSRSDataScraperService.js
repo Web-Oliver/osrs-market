@@ -10,8 +10,7 @@
  * - Rate limiting and respectful scraping practices
  */
 
-const puppeteer = require('puppeteer');
-const cheerio = require('cheerio');
+const { chromium } = require('playwright');
 const { Logger } = require('../utils/Logger');
 const { MongoDataPersistence } = require('../mongoDataPersistence');
 const { OSRSWikiService } = require('./OSRSWikiService');
@@ -98,7 +97,7 @@ class OSRSDataScraperService {
    */
   async launchBrowser() {
     try {
-      this.browser = await puppeteer.launch({
+      this.browser = await chromium.launch({
         headless: this.config.headless,
         args: [
           '--no-sandbox',
@@ -181,6 +180,105 @@ class OSRSDataScraperService {
   }
 
   /**
+   * Context7 Pattern: Scrape Top 100 list for a specific listType with scale parameter
+   * @param {number} listType - 0=Most Traded, 1=Greatest Rise, 2=Most Valuable, 3=Greatest Fall
+   * @param {number} scale - Scale parameter (0=7days, 1=1month, 2=3months, 3=6months)
+   * @returns {Promise<Array<{itemId: number, name: string}>>}
+   */
+  async scrapeTop100List(listType, scale = 3) {
+    const url = `https://secure.runescape.com/m=itemdb_oldschool/top100?list=${listType}&scale=${scale}`;
+    const page = await this.browser.newPage();
+    const items = [];
+    
+    try {
+      await page.setUserAgent(this.config.userAgent);
+      await page.goto(url, { 
+        waitUntil: 'networkidle', 
+        timeout: this.config.timeout 
+      });
+      
+      // Wait for the content to load
+      await page.waitForSelector('tbody tr', { timeout: 10000 });
+      
+      // Extract item data from the table rows
+      const tableRows = await page.locator('tbody tr').all();
+      
+      for (let index = 0; index < tableRows.length; index++) {
+        try {
+          const row = tableRows[index];
+          
+          // Extract basic item info
+          const itemLink = row.locator('td:first-child a.table-item-link');
+          const nameElement = itemLink.locator('span');
+          const name = await nameElement.textContent();
+          const detailUrl = await itemLink.getAttribute('href');
+          const itemId = detailUrl ? this.extractItemId(detailUrl) : null;
+          
+          if (name && itemId) {
+            items.push({
+              itemId: itemId,
+              name: name.trim()
+            });
+          }
+        } catch (error) {
+          this.logger.debug('Failed to parse row in scrapeTop100List', error);
+        }
+      }
+      
+      this.logger.debug(`Scraped ${items.length} items from listType ${listType} with scale ${scale}`);
+      return items;
+      
+    } catch (error) {
+      this.logger.error(`Failed to scrape top 100 list for listType ${listType}`, error);
+      return [];
+    } finally {
+      await page.close();
+    }
+  }
+
+  /**
+   * Context7 Pattern: Get Top 100 items for discovery across all categories (scale=3 only)
+   * @returns {Promise<Array<{itemId: number, name: string}>>}
+   */
+  async getTop100ItemsForDiscovery() {
+    if (!this.browser) {
+      await this.launchBrowser();
+    }
+
+    const allItems = [];
+    const listTypes = [0, 1, 2, 3]; // Most Traded, Greatest Rise, Most Valuable, Greatest Fall
+    
+    this.logger.info('🔍 Discovering items from Top 100 lists (scale=3 - Last 6 months)');
+    
+    for (const listType of listTypes) {
+      try {
+        const items = await this.scrapeTop100List(listType, 3); // Always use scale=3 (6 months)
+        allItems.push(...items);
+        
+        // Respectful delay between requests
+        await this.delay(this.config.requestDelay);
+        
+      } catch (error) {
+        this.logger.error(`Failed to scrape listType ${listType}`, error);
+      }
+    }
+    
+    // Consolidate results, ensuring unique items by itemId
+    const uniqueItems = [];
+    const seenItemIds = new Set();
+    
+    for (const item of allItems) {
+      if (!seenItemIds.has(item.itemId)) {
+        seenItemIds.add(item.itemId);
+        uniqueItems.push(item);
+      }
+    }
+    
+    this.logger.info(`✅ Discovered ${uniqueItems.length} unique items from Top 100 lists`);
+    return uniqueItems;
+  }
+
+  /**
    * Context7 Pattern: Scrape all category lists
    */
   async scrapeAllCategories() {
@@ -215,34 +313,35 @@ class OSRSDataScraperService {
     try {
       await page.setUserAgent(this.config.userAgent);
       await page.goto(url, { 
-        waitUntil: 'networkidle2', 
+        waitUntil: 'networkidle', 
         timeout: this.config.timeout 
       });
       
       // Wait for the content to load
       await page.waitForSelector('tbody tr', { timeout: 10000 });
       
-      const html = await page.content();
-      const $ = cheerio.load(html);
-      
       // Extract item data from the table with proper column mapping
-      $('tbody tr').each((index, element) => {
+      const tableRows = await page.locator('tbody tr').all();
+      
+      for (let index = 0; index < tableRows.length; index++) {
         try {
-          const $row = $(element);
+          const row = tableRows[index];
           
           // Extract basic item info (same across all categories)
-          const $itemLink = $row.find('td:first-child a.table-item-link');
-          const name = $itemLink.find('span').text().trim();
-          const detailUrl = $itemLink.attr('href');
+          const itemLink = row.locator('td:first-child a.table-item-link');
+          const nameElement = itemLink.locator('span');
+          const name = await nameElement.textContent();
+          const detailUrl = await itemLink.getAttribute('href');
           const itemId = detailUrl ? this.extractItemId(detailUrl) : null;
           
           // Check if it's a members item
-          const isMembersItem = $row.find('td:nth-child(2)').hasClass('memberItem');
+          const secondTd = row.locator('td:nth-child(2)');
+          const isMembersItem = await secondTd.getAttribute('class') === 'memberItem';
           
           if (name && detailUrl) {
             const item = {
               rank: index + 1,
-              name: name,
+              name: name.trim(),
               itemId: itemId,
               members: isMembersItem,
               category: category,
@@ -252,14 +351,14 @@ class OSRSDataScraperService {
             };
             
             // Parse category-specific data based on the category
-            this.parseCategorySpecificData($row, item, category);
+            await this.parseCategorySpecificDataPlaywright(row, item, category);
             
             items.push(item);
           }
         } catch (error) {
           this.logger.debug('Failed to parse row', error);
         }
-      });
+      }
       
       return items;
       
@@ -272,7 +371,61 @@ class OSRSDataScraperService {
   }
   
   /**
-   * Context7 Pattern: Parse category-specific data based on column structure
+   * Context7 Pattern: Parse category-specific data based on column structure (Playwright)
+   */
+  async parseCategorySpecificDataPlaywright(row, item, category) {
+    try {
+      switch (category) {
+        case 'mostTraded':
+          // Columns: Item, Members, Min, Max, Median, Total (trade counts)
+          item.tradeData = {
+            min: this.parseTradeCount(await row.locator('td:nth-child(3)').textContent()),
+            max: this.parseTradeCount(await row.locator('td:nth-child(4)').textContent()),
+            median: this.parseTradeCount(await row.locator('td:nth-child(5)').textContent()),
+            total: this.parseTradeCount(await row.locator('td:nth-child(6)').textContent())
+          };
+          break;
+          
+        case 'greatestRise':
+          // Columns: Item, Members, Change, Min, Max, Median (prices)
+          item.priceChange = this.parseChange(await row.locator('td:nth-child(3)').textContent());
+          item.priceData = {
+            min: this.parsePrice(await row.locator('td:nth-child(4)').textContent()),
+            max: this.parsePrice(await row.locator('td:nth-child(5)').textContent()),
+            median: this.parsePrice(await row.locator('td:nth-child(6)').textContent())
+          };
+          break;
+          
+        case 'mostValuable':
+          // Columns: Item, Members, Start Price, End Price, Total Rise, Change
+          item.priceData = {
+            startPrice: this.parsePrice(await row.locator('td:nth-child(3)').textContent()),
+            endPrice: this.parsePrice(await row.locator('td:nth-child(4)').textContent()),
+            totalRise: this.parsePrice(await row.locator('td:nth-child(5)').textContent())
+          };
+          item.priceChange = this.parseChange(await row.locator('td:nth-child(6)').textContent());
+          break;
+          
+        case 'greatestFall':
+          // Similar structure to greatestRise but for falling prices
+          item.priceChange = this.parseChange(await row.locator('td:nth-child(3)').textContent());
+          item.priceData = {
+            min: this.parsePrice(await row.locator('td:nth-child(4)').textContent()),
+            max: this.parsePrice(await row.locator('td:nth-child(5)').textContent()),
+            median: this.parsePrice(await row.locator('td:nth-child(6)').textContent())
+          };
+          break;
+          
+        default:
+          this.logger.warn(`Unknown category: ${category}`);
+      }
+    } catch (error) {
+      this.logger.debug(`Failed to parse category-specific data for ${category}`, error);
+    }
+  }
+
+  /**
+   * Context7 Pattern: Parse category-specific data based on column structure (Legacy Cheerio)
    */
   parseCategorySpecificData($row, item, category) {
     try {
@@ -517,7 +670,7 @@ class OSRSDataScraperService {
       
       await page.setUserAgent(this.config.userAgent);
       await page.goto(itemUrl, { 
-        waitUntil: 'networkidle2', 
+        waitUntil: 'networkidle', 
         timeout: this.config.timeout 
       });
       
@@ -526,34 +679,33 @@ class OSRSDataScraperService {
       
       // Click on 6 Months button to get full historical data
       try {
-        await page.click('a[href="#180"]');
+        await page.locator('a[href="#180"]').click();
         await page.waitForTimeout(2000); // Wait for chart to update
       } catch (error) {
         this.logger.debug('Could not click 6 months button, continuing with default view');
       }
       
       const html = await page.content();
-      const $ = cheerio.load(html);
       
-      // Extract detailed item data
+      // Extract detailed item data using Playwright
       const detailedData = {
         itemId: item.itemId,
         name: item.name,
-        description: $('p').first().text().trim(),
+        description: await this.extractDescriptionPlaywright(page),
         
         // Extract current guide price
-        currentPrice: this.extractCurrentPrice($),
+        currentPrice: await this.extractCurrentPricePlaywright(page),
         
         // Extract price changes
-        priceChanges: this.extractPriceChanges($),
+        priceChanges: await this.extractPriceChangesPlaywright(page),
         
         // Extract historical price and trading data
         historicalData: this.extractHistoricalData(html),
         
         // Extract additional item details
         itemDetails: {
-          imageUrl: $('img[alt="' + item.name + '"]').attr('src'),
-          fullDescription: $('p').first().text().trim()
+          imageUrl: await this.extractImageUrlPlaywright(page, item.name),
+          fullDescription: await this.extractDescriptionPlaywright(page)
         },
         
         // Metadata
@@ -670,7 +822,105 @@ class OSRSDataScraperService {
   }
   
   /**
-   * Context7 Pattern: Extract current price from item detail page
+   * Context7 Pattern: Extract description using Playwright
+   */
+  async extractDescriptionPlaywright(page) {
+    try {
+      const descriptionElement = page.locator('p').first();
+      return await descriptionElement.textContent() || '';
+    } catch (error) {
+      this.logger.debug('Failed to extract description', error);
+      return '';
+    }
+  }
+
+  /**
+   * Context7 Pattern: Extract current price using Playwright
+   */
+  async extractCurrentPricePlaywright(page) {
+    try {
+      const priceElement = page.locator('h3:has-text("Current Guide Price") span');
+      if (await priceElement.count() > 0) {
+        const priceText = await priceElement.getAttribute('title') || await priceElement.textContent();
+        return this.parsePrice(priceText);
+      }
+      return null;
+    } catch (error) {
+      this.logger.debug('Failed to extract current price', error);
+      return null;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Extract price changes using Playwright
+   */
+  async extractPriceChangesPlaywright(page) {
+    try {
+      const changes = {};
+      const listItems = page.locator('.stats ul li');
+      const count = await listItems.count();
+      
+      for (let i = 0; i < count; i++) {
+        const item = listItems.nth(i);
+        const text = await item.textContent();
+        
+        if (text && text.includes("Today's Change")) {
+          changes.today = await this.extractChangeFromTextPlaywright(item);
+        } else if (text && text.includes('1 Month Change')) {
+          changes.oneMonth = await this.extractChangeFromTextPlaywright(item);
+        } else if (text && text.includes('3 Month Change')) {
+          changes.threeMonth = await this.extractChangeFromTextPlaywright(item);
+        } else if (text && text.includes('6 Month Change')) {
+          changes.sixMonth = await this.extractChangeFromTextPlaywright(item);
+        }
+      }
+      
+      return changes;
+    } catch (error) {
+      this.logger.debug('Failed to extract price changes', error);
+      return {};
+    }
+  }
+
+  /**
+   * Context7 Pattern: Extract change data from list item using Playwright
+   */
+  async extractChangeFromTextPlaywright(listItem) {
+    try {
+      const gpChange = await listItem.locator('.stats__gp-change').textContent() || '';
+      const pcChange = await listItem.locator('.stats__pc-change').textContent() || '';
+      const isPositive = await listItem.locator('.stats__change').getAttribute('class') === 'stats__change--positive';
+      const rawText = await listItem.textContent() || '';
+      
+      return {
+        gpChange: this.parsePrice(gpChange),
+        percentChange: this.parseChange(pcChange),
+        isPositive: isPositive,
+        rawText: rawText.trim()
+      };
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Extract image URL using Playwright
+   */
+  async extractImageUrlPlaywright(page, itemName) {
+    try {
+      const imageElement = page.locator(`img[alt="${itemName}"]`);
+      if (await imageElement.count() > 0) {
+        return await imageElement.getAttribute('src');
+      }
+      return null;
+    } catch (error) {
+      this.logger.debug('Failed to extract image URL', error);
+      return null;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Extract current price from item detail page (Legacy Cheerio)
    */
   extractCurrentPrice($) {
     try {

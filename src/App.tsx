@@ -3,10 +3,13 @@ import { TradingDashboard } from './components/TradingDashboard'
 import { AITradingDashboard } from './components/AITradingDashboard'
 import { AutoTrainingDashboard } from './components/AutoTrainingDashboard'
 import LiveMonitoringDashboard from './components/LiveMonitoringDashboard'
+import { NotificationToast } from './components/NotificationToast'
+import { useNotifications } from './hooks/useNotifications'
 import './App.css'
 
 function App() {
   const [activeTab, setActiveTab] = useState<'manual' | 'ai' | 'auto' | 'monitoring'>('manual')
+  const { notifications, showSuccess, showError, showWarning, showInfo, dismissNotification } = useNotifications()
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -84,9 +87,57 @@ function App() {
             <p>Built for OSRS traders • Data provided by RuneScape Wiki • Not affiliated with Jagex</p>
             <p className="mt-1">⚠️ Use at your own risk • Always verify prices in-game before trading</p>
             <p className="mt-1">🤖 AI trading is experimental • Past performance doesn't guarantee future results</p>
+            
+            {/* Demo Notification Buttons */}
+            <div className="mt-4 flex justify-center gap-2">
+              <button
+                onClick={() => showSuccess('Operation completed successfully!')}
+                className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+              >
+                Success Toast
+              </button>
+              <button
+                onClick={() => showError('Something went wrong!')}
+                className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+              >
+                Error Toast
+              </button>
+              <button
+                onClick={() => showWarning('Please check your input!')}
+                className="px-3 py-1 bg-yellow-600 text-white text-xs rounded hover:bg-yellow-700"
+              >
+                Warning Toast
+              </button>
+              <button
+                onClick={() => showInfo('New data available!')}
+                className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+              >
+                Info Toast
+              </button>
+            </div>
           </div>
         </div>
       </footer>
+      
+      {/* Notification Container */}
+      <div className="fixed top-0 right-0 z-50 pointer-events-none">
+        {notifications.map((notification, index) => (
+          <div
+            key={notification.id}
+            className="pointer-events-auto"
+            style={{
+              marginTop: `${index * 80}px` // Stack notifications vertically
+            }}
+          >
+            <NotificationToast
+              id={notification.id}
+              message={notification.message}
+              type={notification.type}
+              onDismiss={dismissNotification}
+            />
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

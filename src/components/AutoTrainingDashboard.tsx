@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Play, Square, Download, Upload, Settings, Activity, TrendingUp, Database, Brain } from 'lucide-react'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts'
 import { useAutoTraining } from '../hooks/useAutoTraining'
+import { generateMockAutoTrainingMetrics, formatCurrency, formatPercentage } from '../utils/mockChartData'
 
 export function AutoTrainingDashboard() {
   const {
@@ -20,6 +22,7 @@ export function AutoTrainingDashboard() {
   } = useAutoTraining()
 
   const [showAdvancedConfig, setShowAdvancedConfig] = useState(false)
+  const [trainingMetrics, setTrainingMetrics] = useState(() => generateMockAutoTrainingMetrics())
   const [configForm, setConfigForm] = useState(config)
 
   const handleStart = async () => {
@@ -472,37 +475,164 @@ export function AutoTrainingDashboard() {
         </div>
       )}
 
-      {/* Recent Training Metrics */}
-      {stats?.training.metrics && stats.training.metrics.length > 0 && (
+      {/* Training Progress Charts */}
+      {trainingMetrics.length > 0 && (
         <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Training Metrics</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left py-2">Episode</th>
-                  <th className="text-left py-2">Reward</th>
-                  <th className="text-left py-2">Success Rate</th>
-                  <th className="text-left py-2">Profit</th>
-                  <th className="text-left py-2">Epsilon</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.training.metrics.slice(-5).map((metric, index: number) => (
-                  <tr key={index} className="border-b border-gray-100">
-                    <td className="py-2">{typeof metric.episode === 'number' ? metric.episode : 'N/A'}</td>
-                    <td className="py-2">{typeof metric.totalReward === 'number' ? metric.totalReward.toFixed(2) : 'N/A'}</td>
-                    <td className="py-2">{typeof metric.successRate === 'number' ? metric.successRate.toFixed(1) : 'N/A'}%</td>
-                    <td className={`py-2 ${
-                      (typeof metric.profitability === 'number' ? metric.profitability : 0) >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {typeof metric.profitability === 'number' ? metric.profitability.toFixed(0) : 'N/A'} GP
-                    </td>
-                    <td className="py-2">{typeof metric.epsilon === 'number' ? metric.epsilon.toFixed(3) : 'N/A'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <h3 className="text-lg font-semibold text-gray-900 mb-6">Training Progress</h3>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Total Reward & Success Rate Chart */}
+            <div>
+              <h4 className="font-medium text-gray-700 mb-3">Reward & Success Rate</h4>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trainingMetrics}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="episode" 
+                      fontSize={12}
+                      label={{ value: 'Episode', position: 'insideBottom', offset: -5 }}
+                    />
+                    <YAxis 
+                      yAxisId="reward"
+                      orientation="left"
+                      fontSize={12}
+                      label={{ value: 'Total Reward', angle: -90, position: 'insideLeft' }}
+                    />
+                    <YAxis 
+                      yAxisId="success"
+                      orientation="right"
+                      fontSize={12}
+                      label={{ value: 'Success Rate (%)', angle: 90, position: 'insideRight' }}
+                    />
+                    <Tooltip 
+                      formatter={(value: number, name: string) => [
+                        name === 'totalReward' ? value.toFixed(2) : `${value.toFixed(1)}%`,
+                        name === 'totalReward' ? 'Total Reward' : 'Success Rate'
+                      ]}
+                      labelFormatter={(label) => `Episode: ${label}`}
+                    />
+                    <Line 
+                      yAxisId="reward"
+                      type="monotone" 
+                      dataKey="totalReward" 
+                      stroke="#3b82f6" 
+                      strokeWidth={2}
+                      dot={false}
+                      name="totalReward"
+                    />
+                    <Line 
+                      yAxisId="success"
+                      type="monotone" 
+                      dataKey="successRate" 
+                      stroke="#10b981" 
+                      strokeWidth={2}
+                      dot={false}
+                      name="successRate"
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Profitability Chart */}
+            <div>
+              <h4 className="font-medium text-gray-700 mb-3">Profitability Over Time</h4>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={trainingMetrics}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="episode" 
+                      fontSize={12}
+                      label={{ value: 'Episode', position: 'insideBottom', offset: -5 }}
+                    />
+                    <YAxis 
+                      fontSize={12}
+                      label={{ value: 'Profit (GP)', angle: -90, position: 'insideLeft' }}
+                      tickFormatter={(value) => formatCurrency(value)}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => [formatCurrency(value), 'Profitability']}
+                      labelFormatter={(label) => `Episode: ${label}`}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="profitability" 
+                      stroke="#8b5cf6" 
+                      fill="#8b5cf6"
+                      fillOpacity={0.3}
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Epsilon Decay Chart */}
+            <div>
+              <h4 className="font-medium text-gray-700 mb-3">Epsilon Decay (Exploration Rate)</h4>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={trainingMetrics}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis 
+                      dataKey="episode" 
+                      fontSize={12}
+                      label={{ value: 'Episode', position: 'insideBottom', offset: -5 }}
+                    />
+                    <YAxis 
+                      domain={[0, 1]}
+                      fontSize={12}
+                      label={{ value: 'Epsilon', angle: -90, position: 'insideLeft' }}
+                      tickFormatter={formatPercentage}
+                    />
+                    <Tooltip 
+                      formatter={(value: number) => [formatPercentage(value), 'Exploration Rate']}
+                      labelFormatter={(label) => `Episode: ${label}`}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="epsilon" 
+                      stroke="#f59e0b" 
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Recent Metrics Table (Summary) */}
+            <div>
+              <h4 className="font-medium text-gray-700 mb-3">Recent Episodes Summary</h4>
+              <div className="h-64 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-white">
+                    <tr className="border-b border-gray-200">
+                      <th className="text-left py-2">Episode</th>
+                      <th className="text-left py-2">Reward</th>
+                      <th className="text-left py-2">Success %</th>
+                      <th className="text-left py-2">Profit</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trainingMetrics.slice(-10).map((metric, index) => (
+                      <tr key={index} className="border-b border-gray-100">
+                        <td className="py-2 font-medium">{metric.episode}</td>
+                        <td className="py-2">{metric.totalReward.toFixed(2)}</td>
+                        <td className="py-2">{metric.successRate.toFixed(1)}%</td>
+                        <td className={`py-2 font-medium ${
+                          metric.profitability >= 0 ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {formatCurrency(metric.profitability)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
       )}

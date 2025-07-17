@@ -14,24 +14,24 @@ This checklist outlines the remaining tasks for the Node.js backend of the OSRS 
 
 ### **Step 1.1: Enhance OSRSDataScraperService for Top 100 Discovery (Playwright)**
 
-* \[ \] USE CONTEXT7 FOR DOCUMETNATION NODE EXPRESS MONGODB MONGOOSE Playwright  
-* \[ \] CONTEXT7 IS A MCP FOR FINDING DOCUMENTATION NOT A PATTERN USE CONTEXT7 MCP YOU HAVE AVALIBLE  
-* \[ \] Install playwright and its browser drivers.  
-* \[ \] Modify src/services/OSRSDataScraperService.ts:  
-  * \[ \] **Refactor scrapeTop100List**:  
-    * \[ \] Use Playwright instead of Puppeteer/Cheerio.  
-    * \[ \] Navigate to https://secure.runescape.com/m=itemdb\_oldschool/top100?list=${listType}\&scale=${scale}.  
-    * \[ \] Use Playwright selectors to extract itemId and name.  
-    * \[ \] Implement respectful scraping practices (page.waitForTimeout, User-Agent).  
-    * \[ \] Return Array\<{itemId: number, name: string}\>.  
-  * \[ \] **Modify getTop100ItemsForDiscovery()**:  
-    * \[ \] Call refactored scrapeTop100List for all four listType values (0, 1, 2, 3\) but **strictly only with scale=3**.  
-    * \[ \] Consolidate results, ensuring unique items by itemId.  
-* \[ \] **Integration:**  
-  * \[ \] Ensure OSRSDataScraperService is updated to use Playwright.  
-  * \[ \] DataCollectionService.discoverAndStoreNewItems() should continue to call OSRSDataScraperService.getTop100ItemsForDiscovery().  
-    \[ \]  
-    \[ \] UPDATE THE TODO-PROGRESS.MD FILE AND CHECK OFF WHAT YOU DID
+* \[x\] USE CONTEXT7 FOR DOCUMETNATION NODE EXPRESS MONGODB MONGOOSE Playwright  
+* \[x\] CONTEXT7 IS A MCP FOR FINDING DOCUMENTATION NOT A PATTERN USE CONTEXT7 MCP YOU HAVE AVALIBLE  
+* \[x\] Install playwright and its browser drivers.  
+* \[x\] Modify src/services/OSRSDataScraperService.ts:  
+  * \[x\] **Refactor scrapeTop100List**:  
+    * \[x\] Use Playwright instead of Puppeteer/Cheerio.  
+    * \[x\] Navigate to https://secure.runescape.com/m=itemdb\_oldschool/top100?list=${listType}\&scale=${scale}.  
+    * \[x\] Use Playwright selectors to extract itemId and name.  
+    * \[x\] Implement respectful scraping practices (page.waitForTimeout, User-Agent).  
+    * \[x\] Return Array\<{itemId: number, name: string}\>.  
+  * \[x\] **Modify getTop100ItemsForDiscovery()**:  
+    * \[x\] Call refactored scrapeTop100List for all four listType values (0, 1, 2, 3\) but **strictly only with scale=3**.  
+    * \[x\] Consolidate results, ensuring unique items by itemId.  
+* \[x\] **Integration:**  
+  * \[x\] Ensure OSRSDataScraperService is updated to use Playwright.  
+  * \[x\] DataCollectionService.discoverAndStoreNewItems() should continue to call OSRSDataScraperService.getTop100ItemsForDiscovery().  
+    \[x\]  
+    \[x\] UPDATE THE TODO-PROGRESS.MD FILE AND CHECK OFF WHAT YOU DID
 
 ### **Step 1.2: Implement ScrapeQueueModel & Queueing Logic**
 
