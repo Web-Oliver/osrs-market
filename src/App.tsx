@@ -1,19 +1,80 @@
+import { useState } from 'react'
+import { TradingDashboard } from './components/TradingDashboard'
+import { AITradingDashboard } from './components/AITradingDashboard'
+import { AutoTrainingDashboard } from './components/AutoTrainingDashboard'
 import './App.css'
 
 function App() {
+  const [activeTab, setActiveTab] = useState<'manual' | 'ai' | 'auto'>('manual')
+
   return (
-    <div className="app">
-      <header>
-        <h1>OSRS Market</h1>
-        <p>Old School RuneScape Market Tracker</p>
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">OSRS Market Tracker</h1>
+              <p className="text-gray-600 mt-1">Advanced market analysis with AI-powered trading</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-500">Real-time data from</p>
+              <p className="text-sm font-medium text-blue-600">RuneScape Wiki API</p>
+            </div>
+          </div>
+          
+          {/* Navigation Tabs */}
+          <div className="mt-6 border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab('manual')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'manual'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                📊 Manual Trading
+              </button>
+              <button
+                onClick={() => setActiveTab('ai')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'ai'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                🤖 AI Trading
+              </button>
+              <button
+                onClick={() => setActiveTab('auto')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'auto'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                🔄 Auto Training
+              </button>
+            </nav>
+          </div>
+        </div>
       </header>
       
-      <main>
-        <div className="card">
-          <h2>Welcome to OSRS Market Tracker</h2>
-          <p>Track item prices, analyze market trends, and manage your portfolio.</p>
-        </div>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {activeTab === 'manual' && <TradingDashboard />}
+        {activeTab === 'ai' && <AITradingDashboard />}
+        {activeTab === 'auto' && <AutoTrainingDashboard />}
       </main>
+      
+      <footer className="bg-white border-t border-gray-200 mt-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="text-center text-sm text-gray-500">
+            <p>Built for OSRS traders • Data provided by RuneScape Wiki • Not affiliated with Jagex</p>
+            <p className="mt-1">⚠️ Use at your own risk • Always verify prices in-game before trading</p>
+            <p className="mt-1">🤖 AI trading is experimental • Past performance doesn't guarantee future results</p>
+          </div>
+        </div>
+      </footer>
     </div>
   )
 }

@@ -18,6 +18,7 @@ export interface PriceData {
   highTime?: number
   low: number | null
   lowTime?: number
+  timestamp?: number
 }
 
 export interface ItemPrice extends OSRSItem {
