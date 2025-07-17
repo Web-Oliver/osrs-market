@@ -52,7 +52,9 @@ describe('MarketDataService', () => {
     }
   });
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    // Ensure clean state before each test
+    await MarketPriceSnapshotModel.deleteMany({});
     // Create fresh instance for each test
     marketDataService = new MarketDataService();
   });
@@ -60,6 +62,8 @@ describe('MarketDataService', () => {
   afterEach(async () => {
     // Clean up test data after each test
     await MarketPriceSnapshotModel.deleteMany({});
+    // Wait a brief moment to ensure cleanup is complete
+    await new Promise(resolve => setTimeout(resolve, 50));
   });
 
   afterAll(async () => {
@@ -216,6 +220,9 @@ describe('MarketDataService', () => {
     let testSnapshots;
 
     beforeEach(async () => {
+      // Ensure clean state before creating test data
+      await MarketPriceSnapshotModel.deleteMany({});
+      
       // Create test data
       const baseTime = Date.now();
       testSnapshots = [

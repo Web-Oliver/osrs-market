@@ -196,6 +196,335 @@ class DataCollectionService {
   }
 
   /**
+   * Context7 Pattern: Process scrape queue with concurrency control
+   * @param {number} batchSize - Number of items to process in this batch (default: 10)
+   * @returns {Promise<Object>} Processing results
+   */
+  async processScrapeQueue(batchSize = 10) {
+    const pLimit = require('p-limit');
+    const { MarketDataService } = require('./MarketDataService');
+    
+    try {
+      this.logger.info('🔄 Starting scrape queue processing');
+      
+      if (!this.osrsDataScraperService.browser) {
+        await this.osrsDataScraperService.launchBrowser();
+      }
+      
+      // Get items ready for processing (pending + retry-ready failed)
+      const itemsToProcess = await ScrapeQueueModel.getItemsReadyForProcessing(batchSize);
+      
+      if (itemsToProcess.length === 0) {
+        this.logger.info('✅ No items in scrape queue to process');
+        return {
+          success: true,
+          itemsProcessed: 0,
+          itemsSuccessful: 0,
+          itemsFailed: 0,
+          message: 'No items to process'
+        };
+      }
+      
+      this.logger.info(`📊 Processing ${itemsToProcess.length} items from scrape queue`);
+      
+      // Set up concurrency limit (maximum 5 simultaneous scrapes)
+      const limit = pLimit(5);
+      let successfulItems = 0;
+      let failedItems = 0;
+      const results = [];
+      
+      // Process items with concurrency control
+      const processingPromises = itemsToProcess.map(queueItem => 
+        limit(async () => {
+          const itemId = queueItem.itemId;
+          
+          try {
+            // Mark item as processing
+            await queueItem.markAsProcessing();
+            
+            // Fetch item name from ItemModel
+            const item = await ItemModel.findOne({ itemId });
+            if (!item) {
+              throw new Error(`Item ${itemId} not found in ItemModel`);
+            }
+            
+            const itemName = item.name;
+            this.logger.info(`📈 Processing item: ${itemName} (ID: ${itemId})`);
+            
+            // Scrape individual item page for historical data
+            const historicalData = await this.osrsDataScraperService.scrapeIndividualItemPage(itemId, itemName);
+            
+            // Save historical data to MarketPriceSnapshotModel
+            const marketDataService = new MarketDataService();
+            let savedCount = 0;
+            
+            for (const dataPoint of historicalData) {
+              const snapshotData = {
+                itemId: itemId,
+                timestamp: dataPoint.timestamp,
+                interval: 'daily_scrape',
+                highPrice: dataPoint.price,
+                lowPrice: dataPoint.price, // For daily average, high and low are the same
+                volume: dataPoint.volume,
+                source: 'ge_scraper'
+              };
+              
+              try {
+                await marketDataService.saveMarketSnapshot(snapshotData);
+                savedCount++;
+              } catch (saveError) {
+                this.logger.warn(`⚠️ Failed to save data point for ${itemName} (ID: ${itemId})`, saveError);
+                // Continue with other data points
+              }
+            }
+            
+            // Mark item as having 6-month history scraped
+            await ItemModel.findOneAndUpdate(
+              { itemId },
+              { has6MonthHistoryScraped: true }
+            );
+            
+            // Mark queue item as completed
+            await queueItem.markAsCompleted();
+            
+            this.logger.info(`✅ Successfully processed ${itemName} (ID: ${itemId}): ${savedCount} data points saved`);
+            
+            successfulItems++;
+            results.push({
+              itemId,
+              itemName,
+              status: 'success',
+              dataPointsSaved: savedCount,
+              historicalDataCount: historicalData.length
+            });
+            
+          } catch (error) {
+            this.logger.error(`❌ Failed to process item ${itemId}`, error);
+            
+            // Mark queue item as failed
+            await queueItem.markAsFailed(error.message);
+            
+            failedItems++;
+            results.push({
+              itemId,
+              status: 'failed',
+              error: error.message,
+              retries: queueItem.retries + 1
+            });
+          }
+        })
+      );
+      
+      // Wait for all processing to complete
+      await Promise.all(processingPromises);
+      
+      // Get queue statistics
+      const queueStats = await ScrapeQueueModel.getQueueStats();
+      
+      this.logger.info(`✅ Scrape queue processing completed: ${successfulItems} successful, ${failedItems} failed`);
+      
+      return {
+        success: true,
+        itemsProcessed: itemsToProcess.length,
+        itemsSuccessful: successfulItems,
+        itemsFailed: failedItems,
+        results,
+        queueStats: queueStats[0] || {}
+      };
+      
+    } catch (error) {
+      this.logger.error('❌ Failed to process scrape queue', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Collect 5-minute market data from OSRS Wiki API
+   * @returns {Promise<Object>} Collection results
+   */
+  async collect5mMarketData() {
+    try {
+      this.logger.info('📊 Collecting 5-minute market data');
+      
+      // Fetch 5-minute prices from OSRS Wiki API
+      const fiveMinPrices = await this.osrsWikiService.get5MinutePrices();
+      
+      if (!fiveMinPrices || !fiveMinPrices.data) {
+        throw new Error('No 5-minute price data received');
+      }
+      
+      const marketDataService = new MarketDataService();
+      let savedCount = 0;
+      let errorCount = 0;
+      
+      // Process each item's price data
+      for (const [itemIdStr, priceData] of Object.entries(fiveMinPrices.data)) {
+        const itemId = parseInt(itemIdStr);
+        
+        if (!priceData || (!priceData.avgHighPrice && !priceData.avgLowPrice)) {
+          continue;
+        }
+        
+        try {
+          const snapshotData = {
+            itemId: itemId,
+            timestamp: fiveMinPrices.timestamp * 1000, // Convert to milliseconds
+            interval: '5m',
+            highPrice: priceData.avgHighPrice || priceData.avgLowPrice || 0,
+            lowPrice: priceData.avgLowPrice || priceData.avgHighPrice || 0,
+            volume: priceData.highPriceVolume || priceData.lowPriceVolume || 0,
+            source: 'osrs_wiki_api'
+          };
+          
+          await marketDataService.saveMarketSnapshot(snapshotData);
+          savedCount++;
+          
+        } catch (error) {
+          this.logger.warn(`⚠️ Failed to save 5-minute data for item ${itemId}`, error);
+          errorCount++;
+        }
+      }
+      
+      this.logger.info(`✅ 5-minute market data collection completed: ${savedCount} items saved, ${errorCount} errors`);
+      
+      return {
+        success: true,
+        itemsSaved: savedCount,
+        errors: errorCount,
+        totalItems: Object.keys(fiveMinPrices.data).length
+      };
+      
+    } catch (error) {
+      this.logger.error('❌ Failed to collect 5-minute market data', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Collect 1-hour market data from OSRS Wiki API
+   * @returns {Promise<Object>} Collection results
+   */
+  async collect1hMarketData() {
+    try {
+      this.logger.info('📊 Collecting 1-hour market data');
+      
+      // Fetch 1-hour prices from OSRS Wiki API
+      const oneHourPrices = await this.osrsWikiService.get1HourPrices();
+      
+      if (!oneHourPrices || !oneHourPrices.data) {
+        throw new Error('No 1-hour price data received');
+      }
+      
+      const marketDataService = new MarketDataService();
+      let savedCount = 0;
+      let errorCount = 0;
+      
+      // Process each item's price data
+      for (const [itemIdStr, priceData] of Object.entries(oneHourPrices.data)) {
+        const itemId = parseInt(itemIdStr);
+        
+        if (!priceData || (!priceData.avgHighPrice && !priceData.avgLowPrice)) {
+          continue;
+        }
+        
+        try {
+          const snapshotData = {
+            itemId: itemId,
+            timestamp: oneHourPrices.timestamp * 1000, // Convert to milliseconds
+            interval: '1h',
+            highPrice: priceData.avgHighPrice || priceData.avgLowPrice || 0,
+            lowPrice: priceData.avgLowPrice || priceData.avgHighPrice || 0,
+            volume: priceData.highPriceVolume || priceData.lowPriceVolume || 0,
+            source: 'osrs_wiki_api'
+          };
+          
+          await marketDataService.saveMarketSnapshot(snapshotData);
+          savedCount++;
+          
+        } catch (error) {
+          this.logger.warn(`⚠️ Failed to save 1-hour data for item ${itemId}`, error);
+          errorCount++;
+        }
+      }
+      
+      this.logger.info(`✅ 1-hour market data collection completed: ${savedCount} items saved, ${errorCount} errors`);
+      
+      return {
+        success: true,
+        itemsSaved: savedCount,
+        errors: errorCount,
+        totalItems: Object.keys(oneHourPrices.data).length
+      };
+      
+    } catch (error) {
+      this.logger.error('❌ Failed to collect 1-hour market data', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Collect latest market data from OSRS Wiki API (on-demand)
+   * @returns {Promise<Object>} Collection results
+   */
+  async collectLatestMarketData() {
+    try {
+      this.logger.info('📊 Collecting latest market data');
+      
+      // Fetch latest prices from OSRS Wiki API
+      const latestPrices = await this.osrsWikiService.getLatestPrices();
+      
+      if (!latestPrices || !latestPrices.data) {
+        throw new Error('No latest price data received');
+      }
+      
+      const marketDataService = new MarketDataService();
+      let savedCount = 0;
+      let errorCount = 0;
+      
+      // Process each item's price data
+      for (const [itemIdStr, priceData] of Object.entries(latestPrices.data)) {
+        const itemId = parseInt(itemIdStr);
+        
+        if (!priceData || (!priceData.high && !priceData.low)) {
+          continue;
+        }
+        
+        try {
+          const snapshotData = {
+            itemId: itemId,
+            timestamp: latestPrices.timestamp * 1000, // Convert to milliseconds
+            interval: 'latest',
+            highPrice: priceData.high || priceData.low || 0,
+            lowPrice: priceData.low || priceData.high || 0,
+            volume: 0, // Latest prices don't include volume
+            source: 'osrs_wiki_api'
+          };
+          
+          await marketDataService.saveMarketSnapshot(snapshotData);
+          savedCount++;
+          
+        } catch (error) {
+          this.logger.warn(`⚠️ Failed to save latest data for item ${itemId}`, error);
+          errorCount++;
+        }
+      }
+      
+      this.logger.info(`✅ Latest market data collection completed: ${savedCount} items saved, ${errorCount} errors`);
+      
+      return {
+        success: true,
+        itemsSaved: savedCount,
+        errors: errorCount,
+        totalItems: Object.keys(latestPrices.data).length
+      };
+      
+    } catch (error) {
+      this.logger.error('❌ Failed to collect latest market data', error);
+      throw error;
+    }
+  }
+
+  /**
    * Context7 Pattern: Initialize collection statistics
    */
   initializeStats() {

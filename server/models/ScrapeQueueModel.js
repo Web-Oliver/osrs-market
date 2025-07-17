@@ -1,15 +1,15 @@
 /**
- * 🔄 Scrape Queue Model - Context7 Optimized
+ * 🚀 Scrape Queue Model - Context7 Optimized
  * 
- * Context7 Pattern: Queue Management Model
- * - Single responsibility for managing scraping queue operations
- * - DRY principles with reusable queue status management
- * - Hierarchical architecture with clear separation of concerns
- * - Optimized for concurrent scraping operations
+ * Context7 Pattern: Queue Management for Scraping Operations
+ * - Manages scraping queue for individual item pages
+ * - Ensures deduplication and retry logic
+ * - Optimized for efficient batch processing
+ * - Supports concurrency control and status tracking
  * 
- * DRY: Centralized queue management structure
+ * DRY: Centralized scraping queue management
  * SOLID: Single responsibility for queue operations
- * Hierarchical: Foundation for scraping orchestration services
+ * Hierarchical: Foundation for scraping orchestration
  */
 
 const mongoose = require('mongoose');
@@ -19,11 +19,12 @@ const { Schema } = mongoose;
  * Context7 Pattern: Scrape Queue Schema Definition
  * 
  * This schema manages the queue for scraping individual item pages
- * for 6-month historical data as specified in the TODO-PROGRESS.md
+ * to collect 6-month historical data. It prevents duplicate scraping
+ * and provides retry logic for failed attempts.
  */
 const ScrapeQueueSchema = new Schema({
   /**
-   * Core Queue Fields
+   * Core Identification
    */
   itemId: {
     type: Number,
@@ -50,7 +51,7 @@ const ScrapeQueueSchema = new Schema({
   },
 
   /**
-   * Timestamp Fields for Queue Management
+   * Timestamp Tracking
    */
   createdAt: {
     type: Date,
@@ -65,7 +66,7 @@ const ScrapeQueueSchema = new Schema({
   },
 
   /**
-   * Error Handling and Retry Logic
+   * Retry Logic
    */
   retries: {
     type: Number,
@@ -74,16 +75,24 @@ const ScrapeQueueSchema = new Schema({
     max: 5,
     validate: {
       validator: function(v) {
-        return Number.isInteger(v) && v >= 0;
+        return v >= 0 && v <= 5;
       },
-      message: 'Retries must be a non-negative integer'
+      message: 'Retries must be between 0 and 5'
     }
   },
 
+  /**
+   * Error Information
+   */
   error: {
     type: String,
     default: null,
-    maxlength: 1000
+    validate: {
+      validator: function(v) {
+        return v === null || typeof v === 'string';
+      },
+      message: 'Error must be a string or null'
+    }
   },
 
   /**
@@ -94,24 +103,25 @@ const ScrapeQueueSchema = new Schema({
     default: null
   },
 
-  completedAt: {
+  processingCompletedAt: {
     type: Date,
     default: null
   },
 
   /**
-   * Data Quality Metadata
+   * Priority and Scheduling
    */
-  expectedDataPoints: {
+  priority: {
     type: Number,
-    default: null,
-    min: 0
-  },
-
-  actualDataPoints: {
-    type: Number,
-    default: null,
-    min: 0
+    default: 0,
+    min: 0,
+    max: 10,
+    validate: {
+      validator: function(v) {
+        return v >= 0 && v <= 10;
+      },
+      message: 'Priority must be between 0 and 10'
+    }
   },
 
   /**
@@ -139,34 +149,43 @@ const ScrapeQueueSchema = new Schema({
 });
 
 /**
- * Context7 Pattern: Indexes for Queue Performance
+ * Context7 Pattern: Indexes for Queue Optimization
  * 
- * These indexes optimize queue processing operations
+ * These indexes are crucial for efficient queue processing and status queries.
  */
 
-// Primary index for queue processing
+// Index for finding pending/failed items ready for processing
 ScrapeQueueSchema.index(
-  { status: 1, createdAt: 1 },
+  { status: 1, priority: -1, createdAt: 1 },
   { 
-    name: 'idx_status_created_queue',
+    name: 'idx_status_priority_created',
     background: true 
   }
 );
 
-// Index for retry management
+// Index for retry logic (failed items with retry attempts)
 ScrapeQueueSchema.index(
   { status: 1, retries: 1, lastAttemptedAt: 1 },
   { 
-    name: 'idx_status_retries_last_attempt',
+    name: 'idx_status_retries_attempted',
     background: true 
   }
 );
 
-// Index for failed items analysis
+// Index for processing tracking
 ScrapeQueueSchema.index(
-  { status: 1, error: 1 },
+  { status: 1, processingStartedAt: 1 },
   { 
-    name: 'idx_status_error',
+    name: 'idx_status_processing_started',
+    background: true 
+  }
+);
+
+// Index for cleanup operations
+ScrapeQueueSchema.index(
+  { status: 1, updatedAt: 1 },
+  { 
+    name: 'idx_status_updated',
     background: true 
   }
 );
@@ -174,23 +193,23 @@ ScrapeQueueSchema.index(
 /**
  * Context7 Pattern: Pre-save Middleware
  * 
- * Ensures data integrity and automatic field updates
+ * Ensures data integrity and performs automatic calculations before saving.
  */
 ScrapeQueueSchema.pre('save', function(next) {
   // Update the updatedAt timestamp
   this.updatedAt = new Date();
   
   // Set processingStartedAt when status changes to processing
-  if (this.isModified('status') && this.status === 'processing' && !this.processingStartedAt) {
+  if (this.status === 'processing' && !this.processingStartedAt) {
     this.processingStartedAt = new Date();
   }
   
-  // Set completedAt when status changes to completed
-  if (this.isModified('status') && this.status === 'completed' && !this.completedAt) {
-    this.completedAt = new Date();
+  // Set processingCompletedAt when status changes to completed or failed
+  if ((this.status === 'completed' || this.status === 'failed') && !this.processingCompletedAt) {
+    this.processingCompletedAt = new Date();
   }
   
-  // Update lastAttemptedAt when retries increase
+  // Update lastAttemptedAt when retries increment
   if (this.isModified('retries') && this.retries > 0) {
     this.lastAttemptedAt = new Date();
   }
@@ -199,26 +218,142 @@ ScrapeQueueSchema.pre('save', function(next) {
 });
 
 /**
- * Context7 Pattern: Static Methods
+ * Context7 Pattern: Instance Methods
  * 
- * Class-level methods for queue management operations
+ * Helper methods for common operations on scrape queue items.
  */
 
 /**
- * Get next batch of items ready for processing
- * @param {number} limit - Maximum number of items to fetch
- * @returns {Promise<ScrapeQueueItem[]>} Array of queue items
+ * Mark item as processing
+ * @returns {Promise<ScrapeQueueItem>} Updated queue item
  */
-ScrapeQueueSchema.statics.getNextBatch = function(limit = 20) {
-  return this.find({ 
-    status: { $in: ['pending', 'failed'] },
+ScrapeQueueSchema.methods.markAsProcessing = function() {
+  this.status = 'processing';
+  this.processingStartedAt = new Date();
+  return this.save();
+};
+
+/**
+ * Mark item as completed
+ * @returns {Promise<ScrapeQueueItem>} Updated queue item
+ */
+ScrapeQueueSchema.methods.markAsCompleted = function() {
+  this.status = 'completed';
+  this.processingCompletedAt = new Date();
+  return this.save();
+};
+
+/**
+ * Mark item as failed and increment retries
+ * @param {string} errorMessage - Error message to store
+ * @returns {Promise<ScrapeQueueItem>} Updated queue item
+ */
+ScrapeQueueSchema.methods.markAsFailed = function(errorMessage) {
+  this.status = 'failed';
+  this.error = errorMessage;
+  this.retries += 1;
+  this.lastAttemptedAt = new Date();
+  this.processingCompletedAt = new Date();
+  
+  // Reset to pending if retries haven't exceeded maximum
+  if (this.retries < 5) {
+    this.status = 'pending';
+  }
+  
+  return this.save();
+};
+
+/**
+ * Check if item is ready for retry
+ * @returns {boolean} True if ready for retry
+ */
+ScrapeQueueSchema.methods.isReadyForRetry = function() {
+  if (this.status !== 'pending' && this.status !== 'failed') {
+    return false;
+  }
+  
+  if (this.retries >= 5) {
+    return false;
+  }
+  
+  // If never attempted, it's ready
+  if (!this.lastAttemptedAt) {
+    return true;
+  }
+  
+  // Wait at least 1 hour between retry attempts
+  const hoursSinceLastAttempt = (Date.now() - this.lastAttemptedAt.getTime()) / (1000 * 60 * 60);
+  return hoursSinceLastAttempt >= 1;
+};
+
+/**
+ * Get processing duration in milliseconds
+ * @returns {number|null} Processing duration or null if not applicable
+ */
+ScrapeQueueSchema.methods.getProcessingDuration = function() {
+  if (!this.processingStartedAt) {
+    return null;
+  }
+  
+  const endTime = this.processingCompletedAt || new Date();
+  return endTime.getTime() - this.processingStartedAt.getTime();
+};
+
+/**
+ * Context7 Pattern: Static Methods
+ * 
+ * Class-level methods for common queries and operations.
+ */
+
+/**
+ * Get pending items ready for processing
+ * @param {number} limit - Maximum number of items to return
+ * @returns {Promise<ScrapeQueueItem[]>} Array of pending items
+ */
+ScrapeQueueSchema.statics.getPendingItems = function(limit = 20) {
+  return this.find({
+    status: 'pending'
+  })
+  .sort({ priority: -1, createdAt: 1 })
+  .limit(limit);
+};
+
+/**
+ * Get failed items ready for retry
+ * @param {number} limit - Maximum number of items to return
+ * @returns {Promise<ScrapeQueueItem[]>} Array of failed items ready for retry
+ */
+ScrapeQueueSchema.statics.getFailedItemsForRetry = function(limit = 10) {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  
+  return this.find({
+    status: 'failed',
+    retries: { $lt: 5 },
+    lastAttemptedAt: { $lt: oneHourAgo }
+  })
+  .sort({ priority: -1, lastAttemptedAt: 1 })
+  .limit(limit);
+};
+
+/**
+ * Get items ready for processing (pending + retry-ready failed)
+ * @param {number} limit - Maximum number of items to return
+ * @returns {Promise<ScrapeQueueItem[]>} Array of items ready for processing
+ */
+ScrapeQueueSchema.statics.getItemsReadyForProcessing = function(limit = 20) {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  
+  return this.find({
     $or: [
-      { lastAttemptedAt: { $exists: false } },
-      { lastAttemptedAt: null },
-      { lastAttemptedAt: { $lt: new Date(Date.now() - 15 * 60 * 1000) } } // 15 minutes ago
+      { status: 'pending' },
+      {
+        status: 'failed',
+        retries: { $lt: 5 },
+        lastAttemptedAt: { $lt: oneHourAgo }
+      }
     ]
   })
-  .sort({ createdAt: 1 })
+  .sort({ priority: -1, createdAt: 1 })
   .limit(limit);
 };
 
@@ -256,126 +391,30 @@ ScrapeQueueSchema.statics.getQueueStats = function() {
 };
 
 /**
- * Mark item as processing
- * @param {number} itemId - The item ID to mark as processing
- * @returns {Promise<ScrapeQueueItem>} Updated queue item
+ * Clean up old completed items
+ * @param {number} olderThanDays - Remove completed items older than this many days
+ * @returns {Promise<Object>} Deletion result
  */
-ScrapeQueueSchema.statics.markAsProcessing = function(itemId) {
-  return this.findOneAndUpdate(
-    { itemId, status: { $in: ['pending', 'failed'] } },
-    { 
-      status: 'processing',
-      processingStartedAt: new Date(),
-      updatedAt: new Date()
-    },
-    { new: true }
-  );
-};
-
-/**
- * Mark item as completed
- * @param {number} itemId - The item ID to mark as completed
- * @param {number} dataPoints - Number of data points collected
- * @returns {Promise<ScrapeQueueItem>} Updated queue item
- */
-ScrapeQueueSchema.statics.markAsCompleted = function(itemId, dataPoints = null) {
-  return this.findOneAndUpdate(
-    { itemId, status: 'processing' },
-    { 
-      status: 'completed',
-      completedAt: new Date(),
-      actualDataPoints: dataPoints,
-      updatedAt: new Date()
-    },
-    { new: true }
-  );
-};
-
-/**
- * Mark item as failed and increment retries
- * @param {number} itemId - The item ID to mark as failed
- * @param {string} error - Error message
- * @returns {Promise<ScrapeQueueItem>} Updated queue item
- */
-ScrapeQueueSchema.statics.markAsFailed = function(itemId, error) {
-  return this.findOneAndUpdate(
-    { itemId, status: 'processing' },
-    { 
-      $set: {
-        status: 'failed',
-        error: error,
-        lastAttemptedAt: new Date(),
-        updatedAt: new Date()
-      },
-      $inc: { retries: 1 }
-    },
-    { new: true }
-  );
-};
-
-/**
- * Context7 Pattern: Instance Methods
- * 
- * Helper methods for individual queue items
- */
-
-/**
- * Check if item is ready for retry
- * @returns {boolean} True if item is ready for retry
- */
-ScrapeQueueSchema.methods.isReadyForRetry = function() {
-  if (this.status !== 'failed' || this.retries >= 5) {
-    return false;
-  }
+ScrapeQueueSchema.statics.cleanupOldItems = function(olderThanDays = 30) {
+  const cutoffDate = new Date(Date.now() - (olderThanDays * 24 * 60 * 60 * 1000));
   
-  if (!this.lastAttemptedAt) {
-    return true;
-  }
-  
-  // Exponential backoff: 15 minutes * 2^retries
-  const backoffMs = 15 * 60 * 1000 * Math.pow(2, this.retries);
-  return Date.now() - this.lastAttemptedAt.getTime() > backoffMs;
-};
-
-/**
- * Get processing duration if currently processing
- * @returns {number|null} Processing duration in milliseconds or null
- */
-ScrapeQueueSchema.methods.getProcessingDuration = function() {
-  if (this.status !== 'processing' || !this.processingStartedAt) {
-    return null;
-  }
-  
-  return Date.now() - this.processingStartedAt.getTime();
-};
-
-/**
- * Get total time in queue
- * @returns {number} Total time in queue in milliseconds
- */
-ScrapeQueueSchema.methods.getTotalQueueTime = function() {
-  const endTime = this.completedAt || new Date();
-  return endTime.getTime() - this.createdAt.getTime();
+  return this.deleteMany({
+    status: 'completed',
+    updatedAt: { $lt: cutoffDate }
+  });
 };
 
 /**
  * Context7 Pattern: Virtual Properties
  * 
- * Computed properties for queue item analysis
+ * Computed properties that don't persist to the database.
  */
 
 /**
- * Virtual property for current processing duration
+ * Virtual property for processing duration
  */
 ScrapeQueueSchema.virtual('processingDuration').get(function() {
   return this.getProcessingDuration();
-});
-
-/**
- * Virtual property for total queue time
- */
-ScrapeQueueSchema.virtual('totalQueueTime').get(function() {
-  return this.getTotalQueueTime();
 });
 
 /**
@@ -383,6 +422,19 @@ ScrapeQueueSchema.virtual('totalQueueTime').get(function() {
  */
 ScrapeQueueSchema.virtual('readyForRetry').get(function() {
   return this.isReadyForRetry();
+});
+
+/**
+ * Virtual property for formatted status
+ */
+ScrapeQueueSchema.virtual('statusFormatted').get(function() {
+  const statusMap = {
+    pending: 'Pending',
+    processing: 'Processing',
+    completed: 'Completed',
+    failed: 'Failed'
+  };
+  return statusMap[this.status] || this.status;
 });
 
 /**
