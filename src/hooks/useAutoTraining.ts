@@ -1,5 +1,6 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
-import { AutoTrainingService, type AutoTrainingConfig } from '../services/autoTrainingService'
+import { useState, useCallback, useEffect } from 'react'
+import { useAutoTrainingBackend } from './useAutoTrainingBackend'
+import type { AutoTrainingConfig } from '../services/autoTrainingService'
 
 // Default comprehensive configuration with MongoDB persistence
 const DEFAULT_AUTO_TRAINING_CONFIG: AutoTrainingConfig = {
@@ -93,21 +94,19 @@ export interface AutoTrainingStats {
 
 export function useAutoTraining() {
   const [isInitialized, setIsInitialized] = useState(false)
-  const [isRunning, setIsRunning] = useState(false)
-  const [stats, setStats] = useState<AutoTrainingStats | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const [config, setConfig] = useState<AutoTrainingConfig>(DEFAULT_AUTO_TRAINING_CONFIG)
+  const [error, setError] = useState<string | null>(null)
 
-  const serviceRef = useRef<AutoTrainingService | null>(null)
+  // Use the backend API hook
+  const backend = useAutoTrainingBackend()
 
-  // Initialize the auto training service
-  const initialize = useCallback((customConfig?: Partial<AutoTrainingConfig>) => {
+  // Initialize the auto training service (now connects to backend)
+  const initialize = useCallback(async (customConfig?: Partial<AutoTrainingConfig>) => {
     try {
       const finalConfig = customConfig 
         ? { ...DEFAULT_AUTO_TRAINING_CONFIG, ...customConfig }
         : DEFAULT_AUTO_TRAINING_CONFIG
 
-      serviceRef.current = new AutoTrainingService(finalConfig)
       setConfig(finalConfig)
       setIsInitialized(true)
       setError(null)
@@ -119,124 +118,105 @@ export function useAutoTraining() {
 
   // Start the automated training process
   const start = useCallback(async () => {
-    if (!serviceRef.current) {
+    if (!isInitialized) {
       setError('Service not initialized')
       return
     }
 
     try {
-      await serviceRef.current.start()
-      setIsRunning(true)
-      setError(null)
-      console.log('Auto training started')
+      const success = await backend.startAutoTraining(config)
+      if (success) {
+        setError(null)
+        console.log('Auto training started')
+      } else {
+        setError('Failed to start auto training')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start auto training')
     }
-  }, [])
+  }, [isInitialized, config, backend])
 
   // Stop the automated training process
-  const stop = useCallback(() => {
-    if (!serviceRef.current) return
-
+  const stop = useCallback(async () => {
     try {
-      serviceRef.current.stop()
-      setIsRunning(false)
-      console.log('Auto training stopped')
+      const success = await backend.stopAutoTraining()
+      if (success) {
+        console.log('Auto training stopped')
+      } else {
+        setError('Failed to stop auto training')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to stop auto training')
     }
-  }, [])
+  }, [backend])
 
   // Manually trigger a training cycle
   const triggerTraining = useCallback(async () => {
-    if (!serviceRef.current) {
-      setError('Service not initialized')
-      return
-    }
-
     try {
-      await serviceRef.current.manualTriggerTraining()
-      setError(null)
-      console.log('Manual training cycle completed')
+      const success = await backend.triggerTrainingCycle()
+      if (success) {
+        setError(null)
+        console.log('Manual training cycle completed')
+      } else {
+        setError('Failed to trigger training')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to trigger training')
     }
-  }, [])
+  }, [backend])
 
   // Update configuration
-  const updateConfig = useCallback((newConfig: Partial<AutoTrainingConfig>) => {
-    if (!serviceRef.current) {
-      setError('Service not initialized')
-      return
-    }
-
+  const updateConfig = useCallback(async (newConfig: Partial<AutoTrainingConfig>) => {
     try {
-      serviceRef.current.updateConfig(newConfig)
-      setConfig(prev => ({ ...prev, ...newConfig }))
-      setError(null)
-      console.log('Configuration updated')
+      const success = await backend.updateAutoTrainingConfig(newConfig)
+      if (success) {
+        setConfig(prev => ({ ...prev, ...newConfig }))
+        setError(null)
+        console.log('Configuration updated')
+      } else {
+        setError('Failed to update configuration')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update configuration')
     }
-  }, [])
+  }, [backend])
 
   // Export full training report
   const exportReport = useCallback(async () => {
-    if (!serviceRef.current) {
-      setError('Service not initialized')
-      return null
-    }
-
     try {
-      const report = await serviceRef.current.exportFullReport()
-      
-      // Create downloadable file
-      const blob = new Blob([report], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `osrs-auto-training-report-${Date.now()}.json`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
-
-      console.log('Training report exported')
-      return report
+      const report = await backend.exportTrainingReport()
+      if (report) {
+        console.log('Training report exported')
+        return JSON.stringify(report, null, 2)
+      } else {
+        setError('Failed to export report')
+        return null
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to export report')
       return null
     }
-  }, [])
+  }, [backend])
 
   // Save model
-  const saveModel = useCallback(() => {
-    if (!serviceRef.current) {
-      setError('Service not initialized')
-      return null
-    }
-
+  const saveModel = useCallback(async () => {
     try {
-      const modelData = serviceRef.current.saveModel()
+      const modelData = await backend.saveModel()
       if (modelData) {
-        localStorage.setItem('osrs-auto-training-model', modelData)
-        localStorage.setItem('osrs-auto-training-model-timestamp', Date.now().toString())
         console.log('Model saved')
+        return modelData
+      } else {
+        setError('Failed to save model')
+        return null
       }
-      return modelData
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save model')
       return null
     }
-  }, [])
+  }, [backend])
 
   // Load model
-  const loadModel = useCallback((modelData?: string) => {
-    if (!serviceRef.current) {
-      setError('Service not initialized')
-      return false
-    }
-
+  const loadModel = useCallback(async (modelData?: string) => {
     try {
       let dataToLoad = modelData
 
@@ -249,57 +229,42 @@ export function useAutoTraining() {
         dataToLoad = saved
       }
 
-      serviceRef.current.loadModel(dataToLoad)
-      console.log('Model loaded')
-      setError(null)
-      return true
+      const success = await backend.loadModel(dataToLoad)
+      if (success) {
+        console.log('Model loaded')
+        setError(null)
+        return true
+      } else {
+        setError('Failed to load model')
+        return false
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load model')
       return false
     }
-  }, [])
+  }, [backend])
 
   // Get historical data for specific item
-  const getHistoricalData = useCallback((itemId?: number, timeRange?: number) => {
-    if (!serviceRef.current) return []
-    
+  const getHistoricalData = useCallback(async (itemId?: number, timeRange?: number) => {
     try {
-      return serviceRef.current.getHistoricalData(itemId, timeRange)
+      const data = await backend.getHistoricalData(itemId, timeRange)
+      return data || []
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get historical data')
       return []
     }
-  }, [])
+  }, [backend])
 
   // Get item timeseries data
-  const getItemTimeseries = useCallback((itemId: number) => {
-    if (!serviceRef.current) return []
-    
+  const getItemTimeseries = useCallback(async (itemId: number) => {
     try {
-      return serviceRef.current.getItemTimeseries(itemId)
+      const data = await backend.getItemTimeseries(itemId)
+      return data || []
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get item timeseries')
       return []
     }
-  }, [])
-
-  // Periodically update stats when running
-  useEffect(() => {
-    if (!isRunning || !serviceRef.current) return
-
-    const interval = setInterval(() => {
-      try {
-        const currentStats = serviceRef.current?.getStatus()
-        if (currentStats) {
-          setStats(currentStats)
-        }
-      } catch (err) {
-        console.error('Failed to update stats:', err)
-      }
-    }, 10000) // Update every 10 seconds
-
-    return () => clearInterval(interval)
-  }, [isRunning])
+  }, [backend])
 
   // Auto-initialize on mount
   useEffect(() => {
@@ -310,22 +275,22 @@ export function useAutoTraining() {
 
   // Auto-load saved model on initialization
   useEffect(() => {
-    if (isInitialized && !isRunning) {
+    if (isInitialized && !backend.isRunning) {
       const savedModel = localStorage.getItem('osrs-auto-training-model')
       if (savedModel) {
         console.log('Auto-loading saved model...')
         loadModel(savedModel)
       }
     }
-  }, [isInitialized, isRunning, loadModel])
+  }, [isInitialized, backend.isRunning, loadModel])
 
   return {
     // State
     isInitialized,
-    isRunning,
-    stats,
-    error,
-    config,
+    isRunning: backend.isRunning,
+    stats: backend.stats,
+    error: error || backend.error,
+    config: backend.config || config,
 
     // Actions
     initialize,
@@ -342,16 +307,14 @@ export function useAutoTraining() {
     getItemTimeseries,
 
     // Utilities
-    clearError: () => setError(null),
-    resetService: () => {
-      if (serviceRef.current && isRunning) {
-        serviceRef.current.stop()
-      }
-      setIsInitialized(false)
-      setIsRunning(false)
-      setStats(null)
+    clearError: () => {
       setError(null)
-      serviceRef.current = null
+      backend.clearError()
+    },
+    resetService: () => {
+      setIsInitialized(false)
+      setError(null)
+      backend.clearError()
     }
   }
 }

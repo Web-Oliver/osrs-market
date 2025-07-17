@@ -7,7 +7,7 @@ import type {
   TradingAction
 } from '../types/aiTrading'
 import type { ItemPrice } from '../types'
-import { AITradingOrchestrator } from '../services/aiTradingOrchestrator'
+import { useAITradingBackend } from './useAITradingBackend'
 
 // Default neural network configuration
 const DEFAULT_NETWORK_CONFIG: NeuralNetworkConfig = {
@@ -36,17 +36,14 @@ const DEFAULT_ADAPTIVE_CONFIG: AdaptiveLearningConfig = {
 
 export function useAITrading() {
   const [isInitialized, setIsInitialized] = useState(false)
-  const [isTraining, setIsTraining] = useState(false)
-  const [currentSession, setCurrentSession] = useState<LearningSession | null>(null)
-  const [trainingMetrics, setTrainingMetrics] = useState<TrainingMetrics[]>([])
-  const [tradingActions, setTradingActions] = useState<TradingAction[]>([])
-  const [performance, setPerformance] = useState<any>(null)
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const orchestratorRef = useRef<AITradingOrchestrator | null>(null)
+  // Use the backend API hook
+  const backend = useAITradingBackend()
 
-  // Initialize AI trading system
-  const initializeAI = useCallback((
+  // Initialize AI trading system (now connects to backend)
+  const initializeAI = useCallback(async (
     networkConfig: Partial<NeuralNetworkConfig> = {},
     adaptiveConfig: Partial<AdaptiveLearningConfig> = {}
   ) => {
@@ -54,140 +51,168 @@ export function useAITrading() {
       const finalNetworkConfig = { ...DEFAULT_NETWORK_CONFIG, ...networkConfig }
       const finalAdaptiveConfig = { ...DEFAULT_ADAPTIVE_CONFIG, ...adaptiveConfig }
 
-      orchestratorRef.current = new AITradingOrchestrator(
+      const session = await backend.startTradingSession(
+        'AI Trading Session',
         finalNetworkConfig,
         finalAdaptiveConfig
       )
 
-      setIsInitialized(true)
-      setError(null)
-      console.log('AI Trading system initialized successfully')
+      if (session) {
+        setCurrentSessionId(session.sessionId)
+        setIsInitialized(true)
+        setError(null)
+        console.log('AI Trading system initialized successfully')
+      } else {
+        setError('Failed to initialize AI trading session')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to initialize AI')
       console.error('Failed to initialize AI trading:', err)
     }
-  }, [])
+  }, [backend])
 
-  // Start a new training session
-  const startTraining = useCallback(() => {
-    if (!orchestratorRef.current) {
+  // Start a new training session (already handled by initializeAI)
+  const startTraining = useCallback(async () => {
+    if (!currentSessionId) {
       setError('AI system not initialized')
       return
     }
 
     try {
-      const sessionId = orchestratorRef.current.startLearningSession()
-      setIsTraining(true)
-      setError(null)
-      console.log(`Started training session: ${sessionId}`)
+      const success = await backend.resumeTradingSession(currentSessionId)
+      if (success) {
+        setError(null)
+        console.log(`Started training session: ${currentSessionId}`)
+      } else {
+        setError('Failed to start training')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to start training')
     }
-  }, [])
+  }, [currentSessionId, backend])
 
   // Stop the current training session
-  const stopTraining = useCallback(() => {
-    if (!orchestratorRef.current) return
+  const stopTraining = useCallback(async () => {
+    if (!currentSessionId) return
 
     try {
-      orchestratorRef.current.finishLearningSession()
-      setIsTraining(false)
-      console.log('Training session stopped')
+      const success = await backend.stopTradingSession(currentSessionId)
+      if (success) {
+        setCurrentSessionId(null)
+        setIsInitialized(false)
+        console.log('Training session stopped')
+      } else {
+        setError('Failed to stop training')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to stop training')
     }
-  }, [])
+  }, [currentSessionId, backend])
 
   // Pause/resume training
-  const pauseTraining = useCallback(() => {
-    if (!orchestratorRef.current) return
+  const pauseTraining = useCallback(async () => {
+    if (!currentSessionId) return
 
     try {
-      orchestratorRef.current.pauseLearningSession()
-      console.log('Training paused')
+      const success = await backend.pauseTradingSession(currentSessionId)
+      if (success) {
+        console.log('Training paused')
+      } else {
+        setError('Failed to pause training')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to pause training')
     }
-  }, [])
+  }, [currentSessionId, backend])
 
-  const resumeTraining = useCallback(() => {
-    if (!orchestratorRef.current) return
+  const resumeTraining = useCallback(async () => {
+    if (!currentSessionId) return
 
     try {
-      orchestratorRef.current.resumeLearningSession()
-      console.log('Training resumed')
+      const success = await backend.resumeTradingSession(currentSessionId)
+      if (success) {
+        console.log('Training resumed')
+      } else {
+        setError('Failed to resume training')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to resume training')
     }
-  }, [])
+  }, [currentSessionId, backend])
 
   // Process market data and get trading actions
   const processMarketData = useCallback(async (items: ItemPrice[]) => {
-    if (!orchestratorRef.current) {
+    if (!currentSessionId) {
       setError('AI system not initialized')
       return []
     }
 
     try {
-      const actions = await orchestratorRef.current.processMarketData(items)
-      setTradingActions(actions)
+      const actions = await backend.processMarketData(currentSessionId, items)
       setError(null)
       return actions
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to process market data')
       return []
     }
-  }, [])
+  }, [currentSessionId, backend])
 
   // Get current training progress
-  const getTrainingProgress = useCallback(() => {
-    if (!orchestratorRef.current) return null
+  const getTrainingProgress = useCallback(async () => {
+    if (!currentSessionId) return null
 
     try {
-      return orchestratorRef.current.getTrainingProgress()
+      await backend.getTrainingProgress(currentSessionId)
+      return backend.trainingProgress
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get training progress')
       return null
     }
-  }, [])
+  }, [currentSessionId, backend])
 
   // Get performance analytics
-  const getPerformanceAnalytics = useCallback(() => {
-    if (!orchestratorRef.current) return null
+  const getPerformanceAnalytics = useCallback(async () => {
+    if (!currentSessionId) return null
 
     try {
-      return orchestratorRef.current.getPerformanceAnalytics()
+      await backend.getPerformanceAnalytics(currentSessionId)
+      return backend.analytics
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get performance analytics')
       return null
     }
-  }, [])
+  }, [currentSessionId, backend])
 
   // Save the current model
-  const saveModel = useCallback(() => {
-    if (!orchestratorRef.current) {
+  const saveModel = useCallback(async () => {
+    if (!currentSessionId) {
       setError('AI system not initialized')
       return null
     }
 
     try {
-      const modelData = orchestratorRef.current.saveModel()
+      const modelData = await backend.saveModel(currentSessionId)
       
-      // Save to localStorage
-      localStorage.setItem('osrs-ai-model', modelData)
-      localStorage.setItem('osrs-ai-model-timestamp', Date.now().toString())
-      
-      console.log('Model saved successfully')
-      return modelData
+      if (modelData) {
+        // Save to localStorage
+        localStorage.setItem('osrs-ai-model', modelData)
+        localStorage.setItem('osrs-ai-model-timestamp', Date.now().toString())
+        
+        console.log('Model saved successfully')
+        return modelData
+      } else {
+        setError('Failed to save model')
+        return null
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save model')
       return null
     }
-  }, [])
+  }, [currentSessionId, backend])
 
   // Load a previously saved model
-  const loadModel = useCallback((modelData?: string) => {
-    if (!orchestratorRef.current) {
+  const loadModel = useCallback(async (modelData?: string) => {
+    if (!currentSessionId) {
       setError('AI system not initialized')
       return false
     }
@@ -205,76 +230,74 @@ export function useAITrading() {
         dataToLoad = saved
       }
 
-      orchestratorRef.current.loadModel(dataToLoad)
-      console.log('Model loaded successfully')
-      setError(null)
-      return true
+      const success = await backend.loadModel(currentSessionId, dataToLoad)
+      if (success) {
+        console.log('Model loaded successfully')
+        setError(null)
+        return true
+      } else {
+        setError('Failed to load model')
+        return false
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load model')
       return false
     }
-  }, [])
+  }, [currentSessionId, backend])
 
   // Export training data
-  const exportTrainingData = useCallback(() => {
-    if (!orchestratorRef.current) {
+  const exportTrainingData = useCallback(async () => {
+    if (!currentSessionId) {
       setError('AI system not initialized')
       return null
     }
 
     try {
-      const data = orchestratorRef.current.exportTrainingData()
+      const data = await backend.exportTrainingData(currentSessionId)
       
-      // Create downloadable file
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `osrs-ai-training-data-${Date.now()}.json`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      URL.revokeObjectURL(url)
+      if (data) {
+        // Create downloadable file
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `osrs-ai-training-data-${Date.now()}.json`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
 
-      console.log('Training data exported successfully')
-      return data
+        console.log('Training data exported successfully')
+        return data
+      } else {
+        setError('Failed to export training data')
+        return null
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to export training data')
       return null
     }
-  }, [])
+  }, [currentSessionId, backend])
 
   // Update adaptive learning configuration
-  const updateAdaptiveConfig = useCallback((config: Partial<AdaptiveLearningConfig>) => {
-    if (!orchestratorRef.current) {
+  const updateAdaptiveConfig = useCallback(async (config: Partial<AdaptiveLearningConfig>) => {
+    if (!currentSessionId) {
       setError('AI system not initialized')
       return
     }
 
     try {
-      orchestratorRef.current.setAdaptiveConfig(config)
-      console.log('Adaptive configuration updated')
-      setError(null)
+      const success = await backend.updateAdaptiveConfig(currentSessionId, config)
+      if (success) {
+        console.log('Adaptive configuration updated')
+        setError(null)
+      } else {
+        setError('Failed to update adaptive config')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update adaptive config')
     }
-  }, [])
-
-  // Periodically update training progress when training
-  useEffect(() => {
-    if (!isTraining || !orchestratorRef.current) return
-
-    const interval = setInterval(() => {
-      const progress = getTrainingProgress()
-      if (progress) {
-        setCurrentSession(progress.session)
-        setTrainingMetrics(progress.recentMetrics)
-        setPerformance(progress.performance)
-      }
-    }, 5000) // Update every 5 seconds
-
-    return () => clearInterval(interval)
-  }, [isTraining, getTrainingProgress])
+  }, [currentSessionId, backend])
 
   // Auto-initialize on mount
   useEffect(() => {
@@ -285,24 +308,24 @@ export function useAITrading() {
 
   // Auto-load saved model on initialization
   useEffect(() => {
-    if (isInitialized && !isTraining) {
+    if (isInitialized && currentSessionId && !backend.isLoading) {
       const savedModel = localStorage.getItem('osrs-ai-model')
       if (savedModel) {
         console.log('Auto-loading saved model...')
         loadModel(savedModel)
       }
     }
-  }, [isInitialized, isTraining, loadModel])
+  }, [isInitialized, currentSessionId, backend.isLoading, loadModel])
 
   return {
     // State
     isInitialized,
-    isTraining,
-    currentSession,
-    trainingMetrics,
-    tradingActions,
-    performance,
-    error,
+    isTraining: backend.currentSession?.status === 'TRAINING',
+    currentSession: backend.currentSession,
+    trainingMetrics: backend.trainingProgress?.recentMetrics || [],
+    tradingActions: backend.actions,
+    performance: backend.analytics,
+    error: error || backend.error,
 
     // Actions
     initializeAI,
@@ -321,16 +344,15 @@ export function useAITrading() {
     getPerformanceAnalytics,
 
     // Utilities
-    clearError: () => setError(null),
+    clearError: () => {
+      setError(null)
+      backend.clearError()
+    },
     resetSystem: () => {
       setIsInitialized(false)
-      setIsTraining(false)
-      setCurrentSession(null)
-      setTrainingMetrics([])
-      setTradingActions([])
-      setPerformance(null)
+      setCurrentSessionId(null)
       setError(null)
-      orchestratorRef.current = null
+      backend.clearError()
     }
   }
 }

@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import type { FlippingOpportunity, MarketSignal, TradingPerformance } from '../types/trading'
 import type { ItemPrice } from '../types'
-import { TradingAnalysisService } from '../services/tradingAnalysis'
+import { useAITradingBackend } from './useAITradingBackend'
 
 export function useMarketAnalysis() {
   const [opportunities, setOpportunities] = useState<FlippingOpportunity[]>([])
@@ -9,55 +9,74 @@ export function useMarketAnalysis() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Use the backend API hook
+  const backend = useAITradingBackend()
+
   const analyzeItems = useCallback(async (items: ItemPrice[]) => {
     setLoading(true)
     setError(null)
     
     try {
-      const newOpportunities: FlippingOpportunity[] = []
-      const newSignals = new Map<number, MarketSignal>()
+      // Generate trading signals using the backend
+      const tradingSignals = await backend.generateTradingSignals(items)
       
-      for (const item of items) {
-        // Identify flipping opportunities
-        const opportunity = TradingAnalysisService.identifyFlippingOpportunity(
-          item.id,
-          item.name,
-          item.priceData,
-          1000, // mock volume
-          5 // min profit margin
-        )
+      if (tradingSignals.length > 0) {
+        const newOpportunities: FlippingOpportunity[] = []
+        const newSignals = new Map<number, MarketSignal>()
         
-        if (opportunity) {
-          newOpportunities.push(opportunity)
+        for (const signal of tradingSignals) {
+          // Convert backend trading signal to frontend format
+          const marketSignal: MarketSignal = {
+            type: signal.signal.type,
+            strength: signal.signal.strength,
+            confidence: signal.signal.confidence,
+            timestamp: signal.signal.timestamp,
+            indicators: signal.indicators,
+            recommendation: signal.signal.type === 'BUY' ? 'BUY' : 
+                           signal.signal.type === 'SELL' ? 'SELL' : 'HOLD',
+            priceTarget: signal.flippingOpportunity?.buyPrice || 0,
+            stopLoss: signal.flippingOpportunity?.sellPrice || 0,
+            volume: signal.flippingOpportunity?.expectedVolume || 0
+          }
+          
+          newSignals.set(signal.itemId, marketSignal)
+          
+          // Convert flipping opportunity if available
+          if (signal.flippingOpportunity) {
+            const opportunity: FlippingOpportunity = {
+              itemId: signal.itemId,
+              itemName: signal.itemName,
+              buyPrice: signal.flippingOpportunity.buyPrice,
+              sellPrice: signal.flippingOpportunity.sellPrice,
+              potentialProfit: signal.flippingOpportunity.potentialProfit,
+              roi: signal.flippingOpportunity.roi,
+              riskLevel: signal.flippingOpportunity.riskLevel,
+              marketCap: signal.flippingOpportunity.marketCap,
+              volume: signal.flippingOpportunity.expectedVolume,
+              spread: signal.flippingOpportunity.spread,
+              volatility: signal.analysis.volatility,
+              trendStrength: signal.analysis.trendStrength,
+              timeToFlip: signal.flippingOpportunity.timeToFlip,
+              competition: signal.flippingOpportunity.competition,
+              lastUpdated: signal.signal.timestamp
+            }
+            
+            newOpportunities.push(opportunity)
+          }
         }
         
-        // Generate market signals (simplified - would need historical data)
-        const low = item.priceData.low || 0
-        const high = item.priceData.high || 0
-        const mockPrices = [
-          low,
-          (low + high) / 2,
-          high
-        ].filter(price => price > 0)
+        // Sort opportunities by profit potential
+        newOpportunities.sort((a, b) => b.roi - a.roi)
         
-        if (mockPrices.length > 0) {
-          const indicators = TradingAnalysisService.calculateTechnicalIndicators(mockPrices)
-          const signal = TradingAnalysisService.generateMarketSignal(indicators, item.priceData)
-          newSignals.set(item.id, signal)
-        }
+        setOpportunities(newOpportunities)
+        setSignals(newSignals)
       }
-      
-      // Sort opportunities by profit potential
-      newOpportunities.sort((a, b) => b.roi - a.roi)
-      
-      setOpportunities(newOpportunities)
-      setSignals(newSignals)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [backend])
 
   const getTopOpportunities = useCallback((limit: number = 10) => {
     return opportunities
@@ -94,12 +113,18 @@ export function useMarketAnalysis() {
   return {
     opportunities,
     signals,
-    loading,
-    error,
+    loading: loading || backend.isLoading,
+    error: error || backend.error,
     analyzeItems,
     getTopOpportunities,
     getSignalForItem,
     filterOpportunitiesByRisk,
-    calculatePortfolioMetrics
+    calculatePortfolioMetrics,
+    
+    // Additional methods from backend
+    clearError: () => {
+      setError(null)
+      backend.clearError()
+    }
   }
 }

@@ -24,6 +24,8 @@ const logger = new Logger('RouteIndex');
 // Context7 Pattern: Import route modules
 const monitoringRoutes = require('./monitoringRoutes');
 const marketDataRoutes = require('./marketDataRoutes');
+const aiTradingRoutes = require('./aiTradingRoutes');
+const autoTrainingRoutes = require('./autoTrainingRoutes');
 
 // Context7 Pattern: Apply global middleware
 router.use(requestMiddleware.cors());
@@ -46,7 +48,13 @@ router.get('/', (req, res) => {
       'Advanced analytics and insights',
       'Intelligent item selection',
       'Performance monitoring',
-      'Robust error handling'
+      'Robust error handling',
+      'AI-powered trading system',
+      'Neural network-based predictions',
+      'Adaptive learning algorithms',
+      'Technical analysis integration',
+      'Automated training orchestration',
+      'Smart item selection algorithms'
     ],
     endpoints: {
       monitoring: {
@@ -74,6 +82,42 @@ router.get('/', (req, res) => {
           'GET /analytics - Get market analytics',
           'GET /recommendations - Get trading recommendations',
           'GET /export - Export market data'
+        ]
+      },
+      aiTrading: {
+        baseUrl: '/api/ai-trading',
+        routes: [
+          'GET / - API documentation',
+          'POST /sessions - Start AI trading session',
+          'GET /sessions - Get active sessions',
+          'GET /system-status - Get system status',
+          'DELETE /sessions/:id - Stop trading session',
+          'POST /sessions/:id/pause - Pause session',
+          'POST /sessions/:id/resume - Resume session',
+          'POST /sessions/:id/process-market-data - Process market data',
+          'GET /sessions/:id/progress - Get training progress',
+          'GET /sessions/:id/analytics - Get performance analytics',
+          'POST /sessions/:id/save-model - Save AI model',
+          'POST /sessions/:id/load-model - Load AI model',
+          'GET /sessions/:id/export - Export training data',
+          'POST /signals - Generate trading signals'
+        ]
+      },
+      autoTraining: {
+        baseUrl: '/api/auto-training',
+        routes: [
+          'POST /start - Start auto training service',
+          'POST /stop - Stop auto training service',
+          'GET /status - Get auto training status',
+          'PUT /config - Update auto training configuration',
+          'POST /trigger - Manually trigger training cycle',
+          'GET /report - Export full training report',
+          'POST /model/save - Save AI model',
+          'POST /model/load - Load AI model',
+          'GET /data/historical - Get historical data',
+          'GET /data/timeseries/:itemId - Get item timeseries',
+          'GET /services - Get all active training services',
+          'GET /health - Get system health'
         ]
       }
     },
@@ -216,6 +260,8 @@ router.get('/metrics', requestMiddleware.rateLimit({ windowMs: 60000, max: 30 })
  */
 router.use('/', monitoringRoutes);
 router.use('/market-data', marketDataRoutes);
+router.use('/ai-trading', aiTradingRoutes);
+router.use('/auto-training', autoTrainingRoutes);
 
 /**
  * Context7 Pattern: Health check endpoint (simplified)
