@@ -251,6 +251,40 @@ router.get(
 );
 
 /**
+ * Context7 Pattern: GET /api/market-data/popular-items
+ * Get popular/relevant items from smart selection
+ */
+router.get(
+  '/popular-items',
+  requestMiddleware.validateRequest({
+    query: {
+      limit: { type: 'number', min: 1, max: 100, optional: true },
+      timeRange: { type: 'number', min: 1, optional: true },
+      sortBy: { type: 'string', enum: ['volume', 'profit', 'price'], optional: true }
+    }
+  }),
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
+  errorMiddleware.handleAsyncError(marketDataController.getPopularItems)
+);
+
+/**
+ * Context7 Pattern: GET /api/market-data/top-flips
+ * Get top flips leaderboard based on profitability score
+ */
+router.get(
+  '/top-flips',
+  requestMiddleware.validateRequest({
+    query: {
+      limit: { type: 'number', min: 1, max: 50, optional: true },
+      timeRange: { type: 'number', min: 1, optional: true },
+      sortBy: { type: 'string', enum: ['profitability', 'margin', 'volume'], optional: true }
+    }
+  }),
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
+  errorMiddleware.handleAsyncError(marketDataController.getTopFlips)
+);
+
+/**
  * Context7 Pattern: GET /api/market-data/search
  * Search items by name with relevance scoring
  */
@@ -495,6 +529,37 @@ router.get(
 );
 
 /**
+ * Context7 Pattern: POST /api/market-data/collect-latest
+ * Collect latest market data from OSRS Wiki API (on-demand)
+ * Implementation of Step 1.5 requirement
+ */
+router.post(
+  '/collect-latest',
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 10 }), // 10 requests per minute
+  async (req, res) => {
+    try {
+      const { DataCollectionService } = require('../services/DataCollectionService');
+      const dataCollectionService = new DataCollectionService();
+      
+      const result = await dataCollectionService.collectLatestMarketData();
+      
+      res.json({
+        success: true,
+        message: 'Latest market data collection completed',
+        data: result,
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        timestamp: Date.now()
+      });
+    }
+  }
+);
+
+/**
  * Context7 Pattern: POST /api/market-data/validate
  * Validate market data before saving
  */
@@ -508,6 +573,41 @@ router.post(
   }),
   requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.validateData)
+);
+
+/**
+ * Context7 Pattern: POST /api/market-data/manual-test
+ * Manual test mode for AI trading recommendations
+ */
+router.post(
+  '/manual-test',
+  requestMiddleware.validateRequest({
+    body: {
+      itemId: { type: 'number', required: true, min: 1 },
+      action: { type: 'string', required: true, enum: ['buy', 'sell', 'hold'] },
+      price: { type: 'number', required: true, min: 0 },
+      quantity: { type: 'number', required: true, min: 1 },
+      testMode: { type: 'boolean', optional: true }
+    }
+  }),
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 20 }), // 20 requests per minute
+  errorMiddleware.handleAsyncError(marketDataController.manualTest)
+);
+
+/**
+ * Context7 Pattern: GET /api/market-data/manual-test/results
+ * Get manual test results and performance metrics
+ */
+router.get(
+  '/manual-test/results',
+  requestMiddleware.validateRequest({
+    query: {
+      testId: { type: 'string', optional: true },
+      limit: { type: 'number', min: 1, max: 100, optional: true }
+    }
+  }),
+  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
+  errorMiddleware.handleAsyncError(marketDataController.getManualTestResults)
 );
 
 /**

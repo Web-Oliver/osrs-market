@@ -28,6 +28,7 @@ const aiTradingRoutes = require('./aiTradingRoutes');
 const autoTrainingRoutes = require('./autoTrainingRoutes');
 const itemMappingRoutes = require('./itemMappingRoutes');
 const osrsScraperRoutes = require('./osrsScraperRoutes');
+const watchlistRoutes = require('./watchlistRoutes');
 
 // Context7 Pattern: Apply global middleware
 router.use(requestMiddleware.cors());
@@ -148,6 +149,18 @@ router.get('/', (req, res) => {
           'GET /search - Search for specific item data',
           'GET /health - Get scraper service health status',
           'GET / - API documentation and endpoints'
+        ]
+      },
+      watchlist: {
+        baseUrl: '/api/watchlist',
+        routes: [
+          'GET / - Get user watchlist',
+          'POST / - Add item to watchlist',
+          'DELETE /:itemId - Remove item from watchlist',
+          'PUT /:itemId - Update watchlist item',
+          'GET /stats - Get watchlist statistics',
+          'GET /health - Health check for watchlist service',
+          'GET /docs - API documentation'
         ]
       }
     },
@@ -294,6 +307,7 @@ router.use('/ai-trading', aiTradingRoutes);
 router.use('/auto-training', autoTrainingRoutes);
 router.use('/items', itemMappingRoutes);
 router.use('/osrs-scraper', osrsScraperRoutes);
+router.use('/watchlist', watchlistRoutes);
 
 /**
  * Context7 Pattern: Health check endpoint (simplified)
