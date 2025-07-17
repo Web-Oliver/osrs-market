@@ -84,12 +84,12 @@ export interface AutoTrainingStats {
     memoryUsage: string
   }
   training: {
-    session: any
-    metrics: any[]
-    performance: any
-    modelStats: any
+    session: Record<string, unknown> | null
+    metrics: Record<string, unknown>[]
+    performance: Record<string, unknown> | null
+    modelStats: Record<string, unknown> | null
   }
-  analytics: any
+  analytics: Record<string, unknown> | null
 }
 
 export function useAutoTraining() {

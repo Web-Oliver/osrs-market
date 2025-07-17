@@ -488,7 +488,13 @@ export function AutoTrainingDashboard() {
                 </tr>
               </thead>
               <tbody>
-                {stats.training.metrics.slice(-5).map((metric: any, index: number) => (
+                {stats.training.metrics.slice(-5).map((metric: {
+                  episode: number;
+                  totalReward?: number;
+                  successRate?: number;
+                  profitability?: number;
+                  epsilon?: number;
+                }, index: number) => (
                   <tr key={index} className="border-b border-gray-100">
                     <td className="py-2">{metric.episode}</td>
                     <td className="py-2">{metric.totalReward?.toFixed(2) || 'N/A'}</td>

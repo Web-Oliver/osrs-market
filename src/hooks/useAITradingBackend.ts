@@ -345,7 +345,7 @@ export const useAITradingBackend = () => {
   /**
    * Export training data
    */
-  const exportTrainingData = useCallback(async (sessionId: string): Promise<any> => {
+  const exportTrainingData = useCallback(async (sessionId: string): Promise<Record<string, unknown> | null> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }))
     
     try {
@@ -481,7 +481,7 @@ export const useAITradingBackend = () => {
     const interval = setInterval(async () => {
       try {
         await getTrainingProgress(state.currentSession!.sessionId)
-      } catch (error) {
+      } catch {
         // Silently fail for auto-refresh
       }
     }, 5000) // Refresh every 5 seconds

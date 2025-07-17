@@ -92,7 +92,10 @@ export function useMarketAnalysis() {
     return opportunities.filter(opp => opp.riskLevel === riskLevel)
   }, [opportunities])
 
-  const calculatePortfolioMetrics = useCallback((positions: any[]): TradingPerformance => {
+  const calculatePortfolioMetrics = useCallback((positions: Array<{
+    unrealizedPnL: number;
+    [key: string]: unknown;
+  }>): TradingPerformance => {
     // Simplified calculation - would need real trade history
     const totalTrades = positions.length
     const profitableTrades = positions.filter(p => p.unrealizedPnL > 0).length

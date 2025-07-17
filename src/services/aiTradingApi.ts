@@ -4,8 +4,6 @@ import type {
   TradingAction,
   TrainingMetrics,
   LearningSession,
-  MarketState,
-  TradeOutcome,
   NeuralNetworkConfig,
   AdaptiveLearningConfig 
 } from '../types'
@@ -25,15 +23,19 @@ export interface AITradingSession {
 export interface TrainingProgress {
   session: LearningSession | null
   recentMetrics: TrainingMetrics[]
-  performance: any
-  modelStats: any
+  performance: Record<string, unknown>
+  modelStats: Record<string, unknown>
 }
 
 export interface PerformanceAnalytics {
-  overall: any
-  byMarketCondition: any
+  overall: Record<string, unknown>
+  byMarketCondition: Array<{
+    condition: string;
+    successRate: number;
+    totalProfit: number;
+  }>
   recentTrends: TrainingMetrics[]
-  modelEvolution: any
+  modelEvolution: Record<string, unknown>
 }
 
 export interface TradingSignal {
@@ -45,12 +47,12 @@ export interface TradingSignal {
     confidence: number
     timestamp: number
   }
-  indicators: any
-  flippingOpportunity: any
+  indicators: Record<string, unknown>
+  flippingOpportunity: Record<string, unknown>
   analysis: {
     volatility: number
     trendStrength: number
-    supportResistance: any
+    supportResistance: Record<string, unknown>
   }
 }
 
@@ -63,7 +65,7 @@ export interface SystemStatus {
   }
   systemHealth: {
     uptime: number
-    memory: any
+    memory: Record<string, unknown>
     timestamp: number
   }
 }
@@ -111,7 +113,7 @@ export class AITradingApi {
   /**
    * Stop an AI trading session
    */
-  static async stopTradingSession(sessionId: string): Promise<ApiResponse<{ sessionId: string, status: string, finalPerformance: any }>> {
+  static async stopTradingSession(sessionId: string): Promise<ApiResponse<{ sessionId: string, status: string, finalPerformance: Record<string, unknown> }>> {
     try {
       const response = await fetch(`${BASE_URL}/sessions/${sessionId}`, {
         method: 'DELETE'
@@ -368,7 +370,7 @@ export class AITradingApi {
   /**
    * Export training data
    */
-  static async exportTrainingData(sessionId: string): Promise<ApiResponse<{ sessionId: string, exportData: any, exportedAt: number }>> {
+  static async exportTrainingData(sessionId: string): Promise<ApiResponse<{ sessionId: string, exportData: Record<string, unknown>, exportedAt: number }>> {
     try {
       const response = await fetch(`${BASE_URL}/sessions/${sessionId}/export`)
 

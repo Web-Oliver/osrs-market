@@ -13,12 +13,12 @@ export interface AutoTrainingStats {
     memoryUsage: string
   }
   training: {
-    session: any
-    metrics: any[]
-    performance: any
-    modelStats: any
+    session: Record<string, unknown> | null
+    metrics: Record<string, unknown>[]
+    performance: Record<string, unknown> | null
+    modelStats: Record<string, unknown> | null
   }
-  analytics: any
+  analytics: Record<string, unknown> | null
 }
 
 export interface AutoTrainingBackendState {
@@ -27,7 +27,7 @@ export interface AutoTrainingBackendState {
   isRunning: boolean
   stats: AutoTrainingStats | null
   config: AutoTrainingConfig | null
-  healthStatus: any
+  healthStatus: Record<string, unknown> | null
 }
 
 export const useAutoTrainingBackend = () => {
@@ -241,7 +241,7 @@ export const useAutoTrainingBackend = () => {
   /**
    * Export training report
    */
-  const exportTrainingReport = useCallback(async (): Promise<any> => {
+  const exportTrainingReport = useCallback(async (): Promise<Record<string, unknown> | null> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }))
     
     try {
@@ -359,7 +359,7 @@ export const useAutoTrainingBackend = () => {
   /**
    * Get historical data
    */
-  const getHistoricalData = useCallback(async (itemId?: number, timeRange?: number): Promise<any> => {
+  const getHistoricalData = useCallback(async (itemId?: number, timeRange?: number): Promise<Record<string, unknown>[] | null> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }))
     
     try {
@@ -394,7 +394,7 @@ export const useAutoTrainingBackend = () => {
   /**
    * Get item timeseries
    */
-  const getItemTimeseries = useCallback(async (itemId: number): Promise<any> => {
+  const getItemTimeseries = useCallback(async (itemId: number): Promise<Record<string, unknown>[] | null> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }))
     
     try {
@@ -471,7 +471,7 @@ export const useAutoTrainingBackend = () => {
     const interval = setInterval(async () => {
       try {
         await getAutoTrainingStatus()
-      } catch (error) {
+      } catch {
         // Silently fail for auto-refresh
       }
     }, 10000) // Refresh every 10 seconds

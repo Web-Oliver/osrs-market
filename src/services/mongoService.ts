@@ -100,7 +100,7 @@ export class MongoService {
   /**
    * Get aggregated statistics from MongoDB
    */
-  async getAggregatedStats(timeRange: number = 3600000): Promise<any> {
+  async getAggregatedStats(timeRange: number = 3600000): Promise<Record<string, unknown>> {
     try {
       const response = await fetch(`${this.baseUrl}/aggregated-stats?timeRange=${timeRange}`)
       if (!response.ok) {
@@ -214,7 +214,7 @@ export class MongoService {
     }, 2000) // Poll every 2 seconds
 
     // Store interval ID for cleanup
-    ;(this as any).pollInterval = pollInterval
+    ;(this as { pollInterval?: NodeJS.Timeout }).pollInterval = pollInterval
     console.log('🔄 Fallback to polling for real-time updates')
   }
 
@@ -228,9 +228,9 @@ export class MongoService {
       console.log('🛑 Real-time updates stopped')
     }
 
-    if ((this as any).pollInterval) {
-      clearInterval((this as any).pollInterval)
-      ;(this as any).pollInterval = null
+    if ((this as { pollInterval?: NodeJS.Timeout }).pollInterval) {
+      clearInterval((this as { pollInterval?: NodeJS.Timeout }).pollInterval)
+      ;(this as { pollInterval?: NodeJS.Timeout }).pollInterval = undefined
       console.log('🛑 Polling stopped')
     }
   }
@@ -270,7 +270,7 @@ export class MongoService {
   /**
    * Generate fallback aggregated stats
    */
-  private generateFallbackStats(): any {
+  private generateFallbackStats(): Record<string, unknown> {
     return {
       totalApiRequests: 1247 + Math.floor(Math.random() * 100),
       avgSuccessRate: 95.3 + Math.random() * 2,

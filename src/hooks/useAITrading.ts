@@ -1,10 +1,7 @@
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import type { 
-  TrainingMetrics, 
-  LearningSession, 
   NeuralNetworkConfig,
-  AdaptiveLearningConfig,
-  TradingAction
+  AdaptiveLearningConfig
 } from '../types/aiTrading'
 import type { ItemPrice } from '../types'
 import { useAITradingBackend } from './useAITradingBackend'

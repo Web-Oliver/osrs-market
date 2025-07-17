@@ -220,7 +220,11 @@ export function AITradingDashboard() {
             <div className="mt-6">
               <h3 className="font-medium text-gray-900 mb-3">Market Condition Performance</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {analytics.byMarketCondition.map((condition: any) => (
+                {analytics.byMarketCondition.map((condition: {
+                  condition: string;
+                  successRate: number;
+                  totalProfit: number;
+                }) => (
                   <div key={condition.condition} className="bg-gray-50 rounded-lg p-3">
                     <div className="text-sm font-medium text-gray-700">{condition.condition}</div>
                     <div className="text-sm text-gray-600">

@@ -28,7 +28,10 @@ const LiveMonitoringDashboard: React.FC = () => {
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
   const [isConnectedToMongo, setIsConnectedToMongo] = useState(false)
-  const [aggregatedStats, setAggregatedStats] = useState<any>(null)
+  const [aggregatedStats, setAggregatedStats] = useState<{
+    marketData?: Record<string, unknown>;
+    monitoring?: Record<string, unknown>;
+  } | null>(null)
 
   // Colors for charts following Context7 design patterns
   const chartColors = {
@@ -126,7 +129,7 @@ const LiveMonitoringDashboard: React.FC = () => {
         clearInterval(intervalRef.current)
       }
     }
-  }, [])
+  }, [isMonitoring, refreshInterval])
 
   // Handle monitoring toggle
   useEffect(() => {
@@ -212,12 +215,16 @@ const LiveMonitoringDashboard: React.FC = () => {
   }
 
   // Custom tooltip for charts
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload, label }: {
+    active?: boolean;
+    payload?: Array<{ color: string; dataKey: string; value: number | string }>;
+    label?: number;
+  }) => {
     if (active && payload && payload.length) {
       return (
         <div className={`bg-white p-3 border border-gray-200 rounded-lg shadow-lg`}>
           <p className={`text-sm font-medium text-gray-900 mb-2`}>{formatTime(label)}</p>
-          {payload.map((entry: any, index: number) => (
+          {payload.map((entry, index: number) => (
             <div key={index} className={`flex items-center space-x-2 text-sm`}>
               <div 
                 className={`w-3 h-3 rounded-full`}
@@ -490,7 +497,7 @@ const LiveMonitoringDashboard: React.FC = () => {
             <div className={`space-y-3`}>
               <div className={`flex justify-between items-center`}>
                 <span className={`text-sm text-gray-600`}>Status</span>
-                <StatusIndicator status={systemStatus.apiRateLimiting.status as any} />
+                <StatusIndicator status={systemStatus.apiRateLimiting.status as 'HEALTHY' | 'THROTTLED' | 'COOLDOWN' | 'OVERLOADED' | 'ACTIVE' | 'INACTIVE'} />
               </div>
               <div className={`flex justify-between items-center`}>
                 <span className={`text-sm text-gray-600`}>Requests/min</span>
