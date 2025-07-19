@@ -261,29 +261,140 @@ class AITradingController {
       const { sessionId } = req.params;
       const { items } = req.body;
       
-      this.logger.info('📊 Processing market data for trading decisions', {
+      // EXTENSIVE DEBUGGING: Log everything we can about the request
+      this.logger.info('🔍 [DETAILED DEBUG] processMarketData called', {
         sessionId,
-        itemCount: items?.length,
+        requestMethod: req.method,
+        requestUrl: req.originalUrl,
+        requestHeaders: req.headers,
+        requestBody: req.body,
+        requestParams: req.params,
+        requestQuery: req.query,
+        hasBody: !!req.body,
+        bodyType: typeof req.body,
+        bodyKeys: req.body ? Object.keys(req.body) : null,
+        itemsProperty: req.body?.items,
+        itemsType: typeof req.body?.items,
+        itemsIsArray: Array.isArray(req.body?.items),
+        itemsLength: req.body?.items?.length,
+        firstItem: req.body?.items?.[0],
         requestId: req.id
       });
 
+      this.logger.info('📊 Processing market data for trading decisions', {
+        sessionId,
+        itemCount: items?.length,
+        requestId: req.id,
+        requestBody: JSON.stringify(req.body, null, 2),
+        hasItems: !!items,
+        itemsIsArray: Array.isArray(items),
+        firstItem: items?.[0] ? JSON.stringify(items[0], null, 2) : null
+      });
+
       // Context7 Pattern: Validate request
-      const validation = validateRequest.processMarketData(req.body);
+      this.logger.info('🔍 [DEBUG] About to validate request', {
+        sessionId,
+        validateFunction: typeof validateRequest.processMarketData,
+        requestBody: req.body,
+        requestId: req.id
+      });
+
+      let validation;
+      try {
+        validation = validateRequest.processMarketData(req.body);
+        this.logger.info('🔍 [DEBUG] Validation completed', {
+          sessionId,
+          validationResult: validation,
+          requestId: req.id
+        });
+      } catch (validationError) {
+        this.logger.error('💥 [CRITICAL] Validation function threw error', {
+          sessionId,
+          validationError: validationError.message,
+          validationStack: validationError.stack,
+          requestBody: req.body,
+          requestId: req.id
+        });
+        return ApiResponse.error(res, 'Validation error occurred', validationError.message, 500);
+      }
+
       if (!validation.isValid) {
+        this.logger.error('❌ Market data validation failed', {
+          sessionId,
+          validationErrors: validation.errors,
+          requestBody: JSON.stringify(req.body, null, 2),
+          requestId: req.id
+        });
         return ApiResponse.badRequest(res, 'Invalid market data', validation.errors);
       }
 
+      this.logger.info('🔍 [DEBUG] Checking session instance', {
+        sessionId,
+        hasSessionInstance: this.orchestratorInstances.has(sessionId),
+        totalSessions: this.orchestratorInstances.size,
+        allSessionIds: Array.from(this.orchestratorInstances.keys()),
+        requestId: req.id
+      });
+
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
+        this.logger.error('❌ Trading session not found', {
+          sessionId,
+          availableSessions: Array.from(this.orchestratorInstances.keys()),
+          requestId: req.id
+        });
         return ApiResponse.notFound(res, 'Trading session not found');
       }
 
+      this.logger.info('🔍 [DEBUG] Session instance found', {
+        sessionId,
+        sessionInstanceType: typeof sessionInstance,
+        hasOrchestrator: !!sessionInstance.orchestrator,
+        orchestratorType: typeof sessionInstance.orchestrator,
+        sessionCreatedAt: sessionInstance.createdAt,
+        requestId: req.id
+      });
+
       if (!items || !Array.isArray(items) || items.length === 0) {
+        this.logger.error('❌ Invalid items array', {
+          sessionId,
+          hasItems: !!items,
+          itemsType: typeof items,
+          itemsIsArray: Array.isArray(items),
+          itemsLength: items?.length,
+          requestId: req.id
+        });
         return ApiResponse.badRequest(res, 'Items array is required and cannot be empty');
       }
 
+      this.logger.info('🔍 [DEBUG] About to call orchestrator.processMarketData', {
+        sessionId,
+        itemsCount: items.length,
+        orchestratorExists: !!sessionInstance.orchestrator,
+        orchestratorMethods: sessionInstance.orchestrator ? Object.getOwnPropertyNames(Object.getPrototypeOf(sessionInstance.orchestrator)) : null,
+        requestId: req.id
+      });
+
       // Process market data through orchestrator
-      const actions = await sessionInstance.orchestrator.processMarketData(items);
+      let actions;
+      try {
+        actions = await sessionInstance.orchestrator.processMarketData(items);
+        this.logger.info('🔍 [DEBUG] Orchestrator processMarketData completed', {
+          sessionId,
+          actionsType: typeof actions,
+          actionsIsArray: Array.isArray(actions),
+          actionsLength: actions?.length,
+          requestId: req.id
+        });
+      } catch (orchestratorError) {
+        this.logger.error('💥 [CRITICAL] Orchestrator processMarketData threw error', {
+          sessionId,
+          orchestratorError: orchestratorError.message,
+          orchestratorStack: orchestratorError.stack,
+          requestId: req.id
+        });
+        throw orchestratorError;
+      }
 
       this.logger.info('✅ Market data processed successfully', {
         sessionId,
@@ -559,13 +670,25 @@ class AITradingController {
       const { items } = req.body;
       
       this.logger.info('🎯 Generating trading signals', {
+        requestBody: req.body,
+        hasItems: !!items,
         itemCount: items?.length,
+        itemsIsArray: Array.isArray(items),
         requestId: req.id
       });
 
       // Context7 Pattern: Validate request
       const validation = validateRequest.generateTradingSignals(req.body);
       if (!validation.isValid) {
+        this.logger.error('❌ Trading signals validation failed', {
+          validationErrors: validation.errors,
+          requestBody: JSON.stringify(req.body, null, 2),
+          hasItems: !!items,
+          itemCount: items?.length,
+          itemsIsArray: Array.isArray(items),
+          firstItem: items?.[0] ? JSON.stringify(items[0], null, 2) : null,
+          requestId: req.id
+        });
         return ApiResponse.badRequest(res, 'Invalid request data', validation.errors);
       }
 

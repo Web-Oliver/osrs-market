@@ -66,6 +66,51 @@ class RequestMiddleware {
   }
 
   /**
+   * Context7 Pattern: Request logger with service context
+   */
+  requestLogger(serviceName) {
+    return (req, res, next) => {
+      // Context7 Pattern: Add unique request ID
+      req.id = uuidv4();
+      req.startTime = Date.now();
+      req.serviceName = serviceName;
+      
+      // Context7 Pattern: Enhanced request logging with service context
+      this.logger.info(`[${serviceName}] Incoming request`, {
+        requestId: req.id,
+        service: serviceName,
+        method: req.method,
+        url: req.originalUrl,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+        contentType: req.get('Content-Type'),
+        contentLength: req.get('Content-Length'),
+        timestamp: new Date().toISOString()
+      });
+
+      // Context7 Pattern: Response logging
+      const originalSend = res.send;
+      const logger = this.logger;
+      res.send = function(data) {
+        const duration = Date.now() - req.startTime;
+        
+        logger.info(`[${serviceName}] Response sent`, {
+          requestId: req.id,
+          service: serviceName,
+          statusCode: res.statusCode,
+          duration: `${duration}ms`,
+          contentLength: data ? data.length : 0,
+          timestamp: new Date().toISOString()
+        });
+
+        return originalSend.call(this, data);
+      };
+
+      next();
+    };
+  }
+
+  /**
    * Context7 Pattern: Security headers middleware
    */
   securityHeaders() {
@@ -289,22 +334,24 @@ class RequestMiddleware {
       res.send = function(data) {
         const metrics = monitor.finish();
         
-        logger.info('Performance metrics', {
-          requestId: req.id,
-          duration: metrics.duration,
-          memoryUsage: metrics.memoryUsage,
-          cpuUsage: metrics.cpuUsage,
-          method: req.method,
-          url: req.originalUrl,
-          statusCode: res.statusCode
-        });
+        if (metrics) {
+          logger.info('Performance metrics', {
+            requestId: req.id,
+            duration: metrics.duration,
+            memoryUsage: metrics.memoryUsage,
+            cpuUsage: metrics.cpuUsage,
+            method: req.method,
+            url: req.originalUrl,
+            statusCode: res.statusCode
+          });
 
-        // Context7 Pattern: Add performance headers
-        res.set({
-          'X-Response-Time': `${metrics.duration}ms`,
+          // Context7 Pattern: Add performance headers
+          res.set({
+            'X-Response-Time': `${metrics.duration}ms`,
           'X-Memory-Usage': `${metrics.memoryUsage}MB`,
           'X-Request-ID': req.id
         });
+        }
 
         return originalSend.call(this, data);
       };
@@ -430,6 +477,13 @@ class RequestMiddleware {
       
       if (data[field] && rules.maxLength && data[field].length > rules.maxLength) {
         errors.push(`${location}.${field} must not exceed ${rules.maxLength} characters`);
+      }
+      
+      if (data[field] && rules.pattern && typeof data[field] === 'string') {
+        const regex = new RegExp(rules.pattern);
+        if (!regex.test(data[field])) {
+          errors.push(`${location}.${field} must match pattern ${rules.pattern}`);
+        }
       }
     }
     

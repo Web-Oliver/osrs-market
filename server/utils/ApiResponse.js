@@ -60,7 +60,7 @@ class ApiResponse {
    * Context7 Pattern: Bad request response (400)
    */
   static badRequest(res, message = 'Bad request', details = null, meta = {}) {
-    return ApiResponse.send(res, {
+    const response = {
       success: false,
       error: {
         type: 'BAD_REQUEST',
@@ -71,7 +71,14 @@ class ApiResponse {
         timestamp: new Date().toISOString(),
         ...meta
       }
-    }, 400);
+    };
+    
+    // Add debugging info in development mode
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('🔍 [ApiResponse] Bad Request Debug:', JSON.stringify(response, null, 2));
+    }
+    
+    return ApiResponse.send(res, response, 400);
   }
 
   /**

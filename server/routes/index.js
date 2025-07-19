@@ -30,10 +30,7 @@ const itemMappingRoutes = require('./itemMappingRoutes');
 const osrsScraperRoutes = require('./osrsScraperRoutes');
 const watchlistRoutes = require('./watchlistRoutes');
 
-// Context7 Pattern: Apply global middleware
-router.use(requestMiddleware.cors());
-router.use(requestMiddleware.securityHeaders());
-router.use(requestMiddleware.sanitizeRequest());
+// Context7 Pattern: Apply API-specific middleware only
 router.use(requestMiddleware.apiVersioning());
 
 /**
@@ -222,6 +219,8 @@ router.get('/status', async (req, res) => {
  * Context7 Pattern: API Documentation endpoint
  */
 router.get('/docs', (req, res) => {
+  // Set caching headers for documentation
+  res.set('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
   const documentation = {
     title: 'OSRS Market Tracker API Documentation',
     version: '1.0.0',
@@ -273,7 +272,7 @@ router.get('/docs', (req, res) => {
 /**
  * Context7 Pattern: API Metrics endpoint
  */
-router.get('/metrics', requestMiddleware.rateLimit({ windowMs: 60000, max: 30 }), (req, res) => {
+router.get('/metrics', (req, res) => {
   const metrics = {
     requests: {
       total: 'Not implemented - would track total requests',
@@ -299,15 +298,16 @@ router.get('/metrics', requestMiddleware.rateLimit({ windowMs: 60000, max: 30 })
 });
 
 /**
- * Context7 Pattern: Mount route modules
+ * Context7 Pattern: Mount route modules (specific routes first)
  */
-router.use('/', monitoringRoutes);
 router.use('/market-data', marketDataRoutes);
 router.use('/ai-trading', aiTradingRoutes);
 router.use('/auto-training', autoTrainingRoutes);
 router.use('/items', itemMappingRoutes);
 router.use('/osrs-scraper', osrsScraperRoutes);
 router.use('/watchlist', watchlistRoutes);
+// Mount monitoring routes last to avoid conflicts
+router.use('/', monitoringRoutes);
 
 /**
  * Context7 Pattern: Health check endpoint (simplified)
@@ -324,6 +324,8 @@ router.get('/ping', (req, res) => {
  * Context7 Pattern: API Version endpoint
  */
 router.get('/version', (req, res) => {
+  // Set caching headers for version info
+  res.set('Cache-Control', 'public, max-age=1800'); // Cache for 30 minutes
   return ApiResponse.success(res, {
     version: '1.0.0',
     apiVersion: 'v1',
@@ -356,6 +358,8 @@ router.get('/request-info', (req, res) => {
  * Context7 Pattern: Environment info endpoint
  */
 router.get('/environment', (req, res) => {
+  // Set caching headers for environment info
+  res.set('Cache-Control', 'public, max-age=1800'); // Cache for 30 minutes
   const environment = {
     nodeVersion: process.version,
     platform: process.platform,

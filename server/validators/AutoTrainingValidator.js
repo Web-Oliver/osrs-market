@@ -126,12 +126,23 @@ class AutoTrainingValidator {
       }
     }
 
-    // Validate hiddenSize
-    if (config.hiddenSize !== undefined) {
-      if (typeof config.hiddenSize !== 'number' || config.hiddenSize <= 0) {
-        errors.push('hiddenSize must be a positive number');
-      } else if (config.hiddenSize > 1000) {
-        errors.push('hiddenSize must not exceed 1000');
+    // Validate hiddenLayers
+    if (config.hiddenLayers !== undefined) {
+      if (!Array.isArray(config.hiddenLayers)) {
+        errors.push('hiddenLayers must be an array of positive numbers');
+      } else {
+        for (let i = 0; i < config.hiddenLayers.length; i++) {
+          if (typeof config.hiddenLayers[i] !== 'number' || config.hiddenLayers[i] <= 0) {
+            errors.push(`hiddenLayers[${i}] must be a positive number`);
+          } else if (config.hiddenLayers[i] > 1000) {
+            errors.push(`hiddenLayers[${i}] must not exceed 1000`);
+          }
+        }
+        if (config.hiddenLayers.length === 0) {
+          errors.push('hiddenLayers must contain at least one layer');
+        } else if (config.hiddenLayers.length > 10) {
+          errors.push('hiddenLayers must not exceed 10 layers');
+        }
       }
     }
 

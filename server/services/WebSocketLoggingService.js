@@ -17,7 +17,7 @@ class WebSocketLoggingService {
     this.logger = new Logger('WebSocketLogging');
     this.server = server;
     this.options = {
-      port: options.port || 3001,
+      port: options.port || 3002,
       path: options.path || '/logs',
       maxClients: options.maxClients || 50,
       heartbeatInterval: options.heartbeatInterval || 30000, // 30 seconds
@@ -44,18 +44,29 @@ class WebSocketLoggingService {
   }
 
   /**
-   * Context7 Pattern: Initialize WebSocket server
+   * Context7 Pattern: Initialize WebSocket server with proper error handling
    */
   initializeWebSocketServer() {
     try {
+      // Context7 Pattern: Create separate WebSocket server on different port
       this.wss = new WebSocket.Server({
-        server: this.server,
         port: this.options.port,
         path: this.options.path,
         maxPayload: this.options.maxMessageSize
       });
 
       this.wss.on('connection', (ws, request) => {
+        // Context7 Pattern: Proper error handling and heartbeat for connections
+        ws.isAlive = true;
+        ws.on('error', (error) => {
+          this.logger.error('WebSocket client error', error);
+        });
+        
+        // Context7 Pattern: Heartbeat pong handler
+        ws.on('pong', () => {
+          ws.isAlive = true;
+        });
+        
         this.handleConnection(ws, request);
       });
 

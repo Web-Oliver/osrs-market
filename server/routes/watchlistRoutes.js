@@ -12,6 +12,7 @@
 const express = require('express');
 const WatchlistController = require('../controllers/WatchlistController');
 const { RequestMiddleware } = require('../middleware/RequestMiddleware');
+const { ErrorMiddleware } = require('../middleware/ErrorMiddleware');
 const { Logger } = require('../utils/Logger');
 
 const router = express.Router();
@@ -19,12 +20,12 @@ const router = express.Router();
 // Context7 Pattern: Initialize dependencies
 const watchlistController = new WatchlistController();
 const requestMiddleware = new RequestMiddleware();
+const errorMiddleware = new ErrorMiddleware();
 const logger = new Logger('WatchlistRoutes');
 
 /**
  * Context7 Pattern: Apply route-specific middleware
  */
-router.use(requestMiddleware.rateLimit({ windowMs: 60000, max: 100 })); // 100 requests per minute
 router.use(requestMiddleware.requestLogger('watchlist'));
 
 /**
@@ -32,34 +33,22 @@ router.use(requestMiddleware.requestLogger('watchlist'));
  */
 
 // GET /api/watchlist - Get user's watchlist
-router.get('/', async (req, res) => {
-  await watchlistController.getUserWatchlist(req, res);
-});
+router.get('/', errorMiddleware.handleAsyncError(watchlistController.getUserWatchlist));
 
 // POST /api/watchlist - Add item to watchlist
-router.post('/', async (req, res) => {
-  await watchlistController.addItemToWatchlist(req, res);
-});
+router.post('/', errorMiddleware.handleAsyncError(watchlistController.addItemToWatchlist));
 
 // DELETE /api/watchlist/:itemId - Remove item from watchlist
-router.delete('/:itemId', async (req, res) => {
-  await watchlistController.removeItemFromWatchlist(req, res);
-});
+router.delete('/:itemId', errorMiddleware.handleAsyncError(watchlistController.removeItemFromWatchlist));
 
 // PUT /api/watchlist/:itemId - Update watchlist item
-router.put('/:itemId', async (req, res) => {
-  await watchlistController.updateWatchlistItem(req, res);
-});
+router.put('/:itemId', errorMiddleware.handleAsyncError(watchlistController.updateWatchlistItem));
 
 // GET /api/watchlist/stats - Get watchlist statistics
-router.get('/stats', async (req, res) => {
-  await watchlistController.getWatchlistStats(req, res);
-});
+router.get('/stats', errorMiddleware.handleAsyncError(watchlistController.getWatchlistStats));
 
 // GET /api/watchlist/health - Health check for watchlist service
-router.get('/health', async (req, res) => {
-  await watchlistController.healthCheck(req, res);
-});
+router.get('/health', errorMiddleware.handleAsyncError(watchlistController.healthCheck));
 
 /**
  * Context7 Pattern: Route documentation endpoint

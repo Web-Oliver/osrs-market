@@ -264,8 +264,8 @@ class ItemRepository {
             update: {
               $set: data,
               $setOnInsert: {
-                createdAt: new Date(),
-                version: 1
+                createdAt: new Date()
+                // Remove version from $setOnInsert to avoid conflict with domain entity version
               }
             },
             upsert: true

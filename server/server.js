@@ -22,6 +22,9 @@ const app = express();
 const PORT = process.env.PORT || 3001;
 const logger = new Logger('Server');
 
+// Global scheduler instance for cleanup
+let marketDataScheduler = null;
+
 // Context7 Pattern: Initialize middleware
 const requestMiddleware = new RequestMiddleware();
 const errorMiddleware = new ErrorMiddleware();
@@ -32,7 +35,7 @@ const config = {
   environment: process.env.NODE_ENV || 'development',
   mongodb: {
     connectionString: process.env.MONGODB_CONNECTION_STRING || 'mongodb://localhost:27017',
-    databaseName: process.env.MONGODB_DATABASE || 'osrs_market_tracker'
+    databaseName: process.env.MONGODB_DATABASE || 'osrs_market_data'
   },
   cors: {
     origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
@@ -135,6 +138,16 @@ async function startServer() {
       console.log(`   - Request validation and sanitization`);
       console.log(`   - Rate limiting and security headers`);
       console.log(`   - Graceful shutdown handling`);
+      
+      // Start the OSRS market data scheduler (5m + 1h data)
+      try {
+        const { MarketDataScheduler } = require('./services/MarketDataScheduler');
+        marketDataScheduler = new MarketDataScheduler();
+        marketDataScheduler.start();
+        console.log(`📅 Market data scheduler started - collecting 5m + 1h data every 5 minutes`);
+      } catch (schedulerError) {
+        logger.error('Failed to start market data scheduler', schedulerError);
+      }
     });
 
     // Context7 Pattern: Server error handling
@@ -203,6 +216,13 @@ async function performCleanup() {
   logger.info('Performing application cleanup');
   
   try {
+    // Stop the market data scheduler
+    if (marketDataScheduler) {
+      logger.info('Stopping market data scheduler');
+      marketDataScheduler.stop();
+      marketDataScheduler = null;
+    }
+    
     // Cleanup operations would go here
     // For example: close database connections, clear caches, etc.
     logger.info('Application cleanup completed');

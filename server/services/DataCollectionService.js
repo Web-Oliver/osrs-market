@@ -1115,6 +1115,24 @@ class DataCollectionService {
   }
 
   /**
+   * Get stats for auto training service compatibility
+   */
+  getStats() {
+    return {
+      isCollecting: this.isCollecting,
+      totalCollections: this.collectionStats.totalCollections || 0,
+      lastCollection: this.collectionStats.lastCollectionTime || null,
+      memoryUsage: this.getMemoryUsage(),
+      successfulCollections: this.collectionStats.successfulCollections || 0,
+      failedCollections: this.collectionStats.failedCollections || 0,
+      totalItemsProcessed: this.collectionStats.totalItemsProcessed || 0,
+      averageResponseTime: this.collectionStats.averageResponseTime || 0,
+      uptime: this.collectionStats.startTime ? 
+        Date.now() - this.collectionStats.startTime : 0
+    };
+  }
+
+  /**
    * Context7 Pattern: Update configuration
    */
   updateConfig(newConfig) {
@@ -1213,6 +1231,46 @@ class DataCollectionService {
   clearCache() {
     this.cache.clear();
     this.logger.info('Data collection cache cleared');
+  }
+
+  /**
+   * Get latest collected data for reporting
+   */
+  getLatestData() {
+    // Return a mock structure since we don't store latest data in memory
+    // In a real implementation, this could return the most recent cache entry
+    return {
+      timestamp: Date.now(),
+      items: [], // Empty items array as placeholder
+      metadata: {
+        totalItems: this.selectedItems?.size || 0,
+        collectionTime: this.collectionStats.lastCollectionTime
+      }
+    };
+  }
+
+  /**
+   * Get market metrics for reporting
+   */
+  getMarketMetrics() {
+    const stats = this.getCollectionStats();
+    const recentData = this.getLatestData();
+    
+    return {
+      totalCollections: stats.totalCollections || 0,
+      successRate: stats.totalCollections > 0 ? 
+        ((stats.successfulCollections || 0) / stats.totalCollections * 100).toFixed(1) + '%' : '0%',
+      averageResponseTime: stats.averageResponseTime || 0,
+      itemsProcessed: stats.totalItemsProcessed || 0,
+      dataQuality: recentData?.items ? 
+        (recentData.items.length > 0 ? '100%' : '0%') : '0%',
+      collectionFrequency: this.config.collectionInterval,
+      selectedItemsCount: this.selectedItems?.size || 0,
+      memoryUsage: this.getMemoryUsage(),
+      uptime: stats.startTime ? Date.now() - stats.startTime : 0,
+      lastCollectionTime: stats.lastCollectionTime,
+      errors: stats.errors?.length || 0
+    };
   }
 
   /**

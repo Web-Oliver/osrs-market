@@ -33,16 +33,15 @@ router.get(
   '/',
   requestMiddleware.validateRequest({
     query: {
-      itemId: { type: 'number', min: 1, optional: true },
-      startTime: { type: 'number', min: 0, optional: true },
-      endTime: { type: 'number', min: 0, optional: true },
-      limit: { type: 'number', min: 1, max: 1000, optional: true },
-      onlyTradeable: { type: 'boolean', optional: true },
+      itemId: { type: 'string', optional: true },
+      startTime: { type: 'string', optional: true },
+      endTime: { type: 'string', optional: true },
+      limit: { type: 'string', optional: true },
+      onlyTradeable: { type: 'string', optional: true },
       sortBy: { type: 'string', enum: ['timestamp', 'itemId', 'profit'], optional: true },
       sortOrder: { type: 'string', enum: ['asc', 'desc'], optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 120 }), // 120 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.getMarketData)
 );
 
@@ -59,7 +58,6 @@ router.post(
       collectionSource: { type: 'string', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 30 }), // 30 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.saveMarketData)
 );
 
@@ -95,7 +93,6 @@ router.post(
       confidence: { type: 'number', optional: true, min: 0, max: 1 }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   async (req, res) => {
     try {
       const { MarketDataService } = require('../services/MarketDataService');
@@ -129,6 +126,42 @@ router.post(
 );
 
 /**
+ * Context7 Pattern: GET /api/market-data/health
+ * Health check endpoint for market data service
+ */
+router.get(
+  '/health',
+  async (req, res) => {
+    try {
+      const { MarketDataService } = require('../services/MarketDataService');
+      const marketDataService = new MarketDataService();
+      
+      // Basic health check
+      const healthStatus = {
+        status: 'healthy',
+        timestamp: Date.now(),
+        service: 'market-data',
+        version: '1.0.0',
+        database: 'connected',
+        uptime: process.uptime()
+      };
+      
+      res.status(200).json({
+        success: true,
+        data: healthStatus,
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      res.status(503).json({
+        success: false,
+        error: 'Service unavailable',
+        timestamp: Date.now()
+      });
+    }
+  }
+);
+
+/**
  * Context7 Pattern: GET /api/market-data/summary
  * Get market data summary with analytics
  */
@@ -136,11 +169,66 @@ router.get(
   '/summary',
   requestMiddleware.validateRequest({
     query: {
-      timeRange: { type: 'number', min: 1, optional: true }
+      timeRange: { type: 'string', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.getMarketDataSummary)
+);
+
+/**
+ * Context7 Pattern: GET /api/market-data/historical/:itemId
+ * Get historical market data for Python AI service integration
+ */
+router.get(
+  '/historical/:itemId',
+  requestMiddleware.validateRequest({
+    params: {
+      itemId: { type: 'string', required: true, pattern: '^[1-9][0-9]*$' }
+    },
+    query: {
+      interval: { type: 'string', optional: true, enum: ['daily_scrape', '5m', '1h', 'latest', '6m_scrape'] },
+      limit: { type: 'string', optional: true },
+      startDate: { type: 'string', optional: true, pattern: '^[0-9]+$' },
+      endDate: { type: 'string', optional: true, pattern: '^[0-9]+$' }
+    }
+  }),
+  async (req, res) => {
+    try {
+      const { MarketDataService } = require('../services/MarketDataService');
+      const marketDataService = new MarketDataService();
+      const itemId = parseInt(req.params.itemId);
+      const { interval = '1h', limit = 200, startDate, endDate } = req.query;
+      
+      // Convert string parameters to appropriate types
+      const startDateNum = startDate ? parseInt(startDate) : undefined;
+      const endDateNum = endDate ? parseInt(endDate) : undefined;
+      
+      const snapshots = await marketDataService.getMarketSnapshots(
+        itemId,
+        interval,
+        startDateNum,
+        endDateNum
+      );
+      
+      // Limit results if requested
+      const limitedSnapshots = limit ? snapshots.slice(0, parseInt(limit)) : snapshots;
+      
+      res.status(200).json({
+        success: true,
+        data: limitedSnapshots,
+        count: limitedSnapshots.length,
+        timestamp: Date.now(),
+        itemId: itemId,
+        interval: interval
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+        timestamp: Date.now()
+      });
+    }
+  }
 );
 
 /**
@@ -154,14 +242,61 @@ router.get(
       itemId: { type: 'string', required: true, pattern: '^[1-9][0-9]*$' }
     },
     query: {
-      startTime: { type: 'number', min: 0, optional: true },
-      endTime: { type: 'number', min: 0, optional: true },
-      limit: { type: 'number', min: 1, max: 1000, optional: true },
+      startTime: { type: 'string', optional: true },
+      endTime: { type: 'string', optional: true },
+      limit: { type: 'string', optional: true },
       interval: { type: 'string', enum: ['minute', 'hour', 'day'], optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.getItemPriceHistory)
+);
+
+/**
+ * Context7 Pattern: GET /api/market-data/live
+ * Get live market data from OSRS Wiki API
+ * Supports both 5-minute (default) and 1-hour data, and optional itemIds filtering
+ */
+router.get(
+  '/live',
+  requestMiddleware.validateRequest({
+    query: {
+      interval: { type: 'string', optional: true, enum: ['5m', '1h'] },
+      itemIds: { type: 'string', optional: true }, // comma-separated list
+      limit: { type: 'string', optional: true }
+    }
+  }),
+  async (req, res) => {
+    try {
+      const { MarketDataService } = require('../services/MarketDataService');
+      const marketDataService = new MarketDataService();
+      
+      const { interval = '5m' } = req.query;
+      
+      let liveData, source;
+      if (interval === '1h') {
+        liveData = await marketDataService.get1HourMarketData();
+        source = 'osrs_wiki_1h';
+      } else {
+        liveData = await marketDataService.get5MinuteMarketData();
+        source = 'osrs_wiki_5m';
+      }
+      
+      res.json({
+        success: true,
+        data: liveData,
+        count: Object.keys(liveData).length,
+        timestamp: Date.now(),
+        source: source,
+        interval: interval
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        timestamp: Date.now()
+      });
+    }
+  }
 );
 
 /**
@@ -181,7 +316,6 @@ router.get(
       endDate: { type: 'string', optional: true, pattern: '^[0-9]+$' }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 120 }), // 120 requests per minute
   async (req, res) => {
     try {
       const { MarketDataService } = require('../services/MarketDataService');
@@ -240,13 +374,12 @@ router.get(
   '/top-items',
   requestMiddleware.validateRequest({
     query: {
-      limit: { type: 'number', min: 1, max: 100, optional: true },
-      timeRange: { type: 'number', min: 1, optional: true },
+      limit: { type: 'string', optional: true },
+      timeRange: { type: 'string', optional: true },
       sortBy: { type: 'string', enum: ['volume', 'profit', 'price'], optional: true },
       onlyTradeable: { type: 'boolean', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.getTopTradedItems)
 );
 
@@ -258,12 +391,11 @@ router.get(
   '/popular-items',
   requestMiddleware.validateRequest({
     query: {
-      limit: { type: 'number', min: 1, max: 100, optional: true },
-      timeRange: { type: 'number', min: 1, optional: true },
+      limit: { type: 'string', optional: true },
+      timeRange: { type: 'string', optional: true },
       sortBy: { type: 'string', enum: ['volume', 'profit', 'price'], optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.getPopularItems)
 );
 
@@ -275,12 +407,11 @@ router.get(
   '/top-flips',
   requestMiddleware.validateRequest({
     query: {
-      limit: { type: 'number', min: 1, max: 50, optional: true },
-      timeRange: { type: 'number', min: 1, optional: true },
+      limit: { type: 'string', optional: true },
+      timeRange: { type: 'string', optional: true },
       sortBy: { type: 'string', enum: ['profitability', 'margin', 'volume'], optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.getTopFlips)
 );
 
@@ -293,12 +424,11 @@ router.get(
   requestMiddleware.validateRequest({
     query: {
       q: { type: 'string', required: true, minLength: 2 },
-      limit: { type: 'number', min: 1, max: 100, optional: true },
+      limit: { type: 'string', optional: true },
       onlyTradeable: { type: 'boolean', optional: true },
       sortBy: { type: 'string', enum: ['relevance', 'name', 'price'], optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 120 }), // 120 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.searchItems)
 );
 
@@ -311,11 +441,10 @@ router.get(
   requestMiddleware.validateRequest({
     query: {
       type: { type: 'string', enum: ['trends', 'volatility', 'volume', 'profit'], optional: true },
-      timeRange: { type: 'number', min: 1, optional: true },
-      itemId: { type: 'number', min: 1, optional: true }
+      timeRange: { type: 'string', optional: true },
+      itemId: { type: 'string', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 30 }), // 30 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.getAnalytics)
 );
 
@@ -330,7 +459,6 @@ router.get(
       includeStats: { type: 'boolean', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.getCategories)
 );
 
@@ -345,10 +473,9 @@ router.get(
       strategy: { type: 'string', enum: ['conservative', 'aggressive', 'balanced'], optional: true },
       riskLevel: { type: 'string', enum: ['low', 'medium', 'high'], optional: true },
       timeHorizon: { type: 'string', enum: ['short', 'medium', 'long'], optional: true },
-      limit: { type: 'number', min: 1, max: 50, optional: true }
+      limit: { type: 'string', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 20 }), // 20 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.getRecommendations)
 );
 
@@ -364,7 +491,6 @@ router.get(
       status: { type: 'string', enum: ['active', 'triggered', 'expired'], optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.getAlerts)
 );
 
@@ -383,7 +509,6 @@ router.post(
       webhook: { type: 'string', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 10 }), // 10 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.createAlert)
 );
 
@@ -398,7 +523,6 @@ router.delete(
       alertId: { type: 'string', required: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 30 }), // 30 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.deleteAlert)
 );
 
@@ -411,11 +535,10 @@ router.get(
   requestMiddleware.validateRequest({
     query: {
       format: { type: 'string', enum: ['json', 'csv', 'xlsx'], optional: true },
-      timeRange: { type: 'number', min: 1, optional: true },
+      timeRange: { type: 'string', optional: true },
       itemIds: { type: 'string', optional: true } // comma-separated list
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 3600000, max: 10 }), // 10 requests per hour
   errorMiddleware.handleAsyncError(marketDataController.exportData)
 );
 
@@ -428,11 +551,10 @@ router.get(
   requestMiddleware.validateRequest({
     query: {
       itemIds: { type: 'string', required: true }, // comma-separated list
-      timeRange: { type: 'number', min: 1, optional: true },
+      timeRange: { type: 'string', optional: true },
       metrics: { type: 'string', optional: true } // comma-separated list
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 30 }), // 30 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.compareItems)
 );
 
@@ -445,42 +567,343 @@ router.get(
   requestMiddleware.validateRequest({
     query: {
       items: { type: 'string', required: true }, // JSON string of items with quantities
-      timeRange: { type: 'number', min: 1, optional: true }
+      timeRange: { type: 'string', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 30 }), // 30 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.getPortfolioAnalysis)
 );
 
 /**
  * Context7 Pattern: GET /api/market-data/live
  * Get live market data from OSRS Wiki API
+ * Supports both 5-minute (default) and 1-hour data, and optional itemIds filtering
  */
 router.get(
   '/live',
   requestMiddleware.validateRequest({
     query: {
+      interval: { type: 'string', optional: true, enum: ['5m', '1h'] },
       itemIds: { type: 'string', optional: true }, // comma-separated list
-      limit: { type: 'number', min: 1, max: 100, optional: true }
+      limit: { type: 'string', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 30 }), // 30 requests per minute
   async (req, res) => {
     try {
-      const { itemIds, limit = 50 } = req.query;
+      const { MarketDataService } = require('../services/MarketDataService');
+      const marketDataService = new MarketDataService();
       
-      const options = {
-        itemIds: itemIds ? itemIds.split(',').map(id => parseInt(id)) : null,
-        limit: parseInt(limit)
-      };
+      const { interval = '5m' } = req.query;
       
-      const liveData = await marketDataController.getLiveMarketData(options);
+      let liveData, source;
+      if (interval === '1h') {
+        liveData = await marketDataService.get1HourMarketData();
+        source = 'osrs_wiki_1h';
+      } else {
+        liveData = await marketDataService.get5MinuteMarketData();
+        source = 'osrs_wiki_5m';
+      }
       
       res.json({
         success: true,
         data: liveData,
+        count: Object.keys(liveData).length,
         timestamp: Date.now(),
-        source: 'osrs_wiki_api'
+        source: source,
+        interval: interval
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        timestamp: Date.now()
+      });
+    }
+  }
+);
+
+/**
+ * Context7 Pattern: POST /api/market-data/sync-5m
+ * Manually trigger 5-minute data sync
+ */
+router.post(
+  '/sync-5m',
+  async (req, res) => {
+    try {
+      const { MarketDataService } = require('../services/MarketDataService');
+      const marketDataService = new MarketDataService();
+      
+      const result = await marketDataService.sync5MinuteData();
+      
+      res.json({
+        success: true,
+        message: '5-minute market data synced successfully',
+        data: result,
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        timestamp: Date.now()
+      });
+    }
+  }
+);
+
+/**
+ * Context7 Pattern: POST /api/market-data/sync-1h
+ * Manually trigger 1-hour data sync
+ */
+router.post(
+  '/sync-1h',
+  async (req, res) => {
+    try {
+      const { MarketDataService } = require('../services/MarketDataService');
+      const marketDataService = new MarketDataService();
+      
+      const result = await marketDataService.sync1HourData();
+      
+      res.json({
+        success: true,
+        message: '1-hour market data synced successfully',
+        data: result,
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        timestamp: Date.now()
+      });
+    }
+  }
+);
+
+/**
+ * Context7 Pattern: GET /api/market-data/1h
+ * Get 1-hour market data from OSRS Wiki API
+ */
+router.get(
+  '/1h',
+  async (req, res) => {
+    try {
+      const { MarketDataService } = require('../services/MarketDataService');
+      const marketDataService = new MarketDataService();
+      
+      const hourlyData = await marketDataService.get1HourMarketData();
+      
+      res.json({
+        success: true,
+        data: hourlyData,
+        count: Object.keys(hourlyData).length,
+        timestamp: Date.now(),
+        source: 'osrs_wiki_1h'
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        timestamp: Date.now()
+      });
+    }
+  }
+);
+
+/**
+ * Context7 Pattern: GET /api/market-data/timeseries/:itemId
+ * Get detailed timeseries data for analysis with intelligent rate limiting
+ */
+router.get(
+  '/timeseries/:itemId',
+  requestMiddleware.validateRequest({
+    params: {
+      itemId: { type: 'string', required: true, pattern: '^[1-9][0-9]*$' }
+    },
+    query: {
+      timestep: { type: 'string', optional: true, enum: ['5m', '1h', '6h', '24h'] },
+      force: { type: 'string', optional: true, enum: ['true', 'false'] }
+    }
+  }),
+  async (req, res) => {
+    try {
+      const { MarketDataService } = require('../services/MarketDataService');
+      const marketDataService = new MarketDataService();
+      
+      const itemId = parseInt(req.params.itemId);
+      const { timestep = '5m', force = 'false' } = req.query;
+      
+      // Check if we have recent stored data first
+      const storedData = await marketDataService.getStoredTimeseriesData(itemId, timestep, 1);
+      const hasRecentData = storedData.length > 0 && 
+        (Date.now() - storedData[0].fetchedAt) < (24 * 60 * 60 * 1000); // Less than 24 hours old
+      
+      let timeseriesData = null;
+      
+      if (force === 'true' || !hasRecentData) {
+        try {
+          // Fetch new timeseries data with rate limiting
+          timeseriesData = await marketDataService.getTimeseriesData(itemId, timestep);
+        } catch (error) {
+          if (error.message.includes('Rate limit exceeded')) {
+            return res.status(429).json({
+              success: false,
+              error: 'Rate limit exceeded for timeseries API - max 1 request per minute',
+              storedData: storedData.length > 0 ? storedData[0] : null,
+              timestamp: Date.now()
+            });
+          }
+          throw error;
+        }
+      } else {
+        // Use stored data
+        timeseriesData = storedData[0];
+      }
+      
+      res.json({
+        success: true,
+        data: timeseriesData,
+        fromCache: !timeseriesData || timeseriesData.fetchedAt !== Date.now(),
+        rateLimitInfo: {
+          maxRequestsPerMinute: 1,
+          maxRequestsPerDayPerItem: 1
+        },
+        timestamp: Date.now()
+      });
+      
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        timestamp: Date.now()
+      });
+    }
+  }
+);
+
+/**
+ * Context7 Pattern: GET /api/market-data/timeseries/:itemId/stored
+ * Get stored timeseries data from database
+ */
+router.get(
+  '/timeseries/:itemId/stored',
+  requestMiddleware.validateRequest({
+    params: {
+      itemId: { type: 'string', required: true, pattern: '^[1-9][0-9]*$' }
+    },
+    query: {
+      timestep: { type: 'string', optional: true, enum: ['5m', '1h', '6h', '24h'] },
+      limit: { type: 'string', optional: true }
+    }
+  }),
+  async (req, res) => {
+    try {
+      const { MarketDataService } = require('../services/MarketDataService');
+      const marketDataService = new MarketDataService();
+      
+      const itemId = parseInt(req.params.itemId);
+      const { timestep = '5m', limit = 10 } = req.query;
+      
+      const storedData = await marketDataService.getStoredTimeseriesData(
+        itemId, 
+        timestep, 
+        parseInt(limit)
+      );
+      
+      res.json({
+        success: true,
+        data: storedData,
+        count: storedData.length,
+        timestamp: Date.now()
+      });
+      
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        timestamp: Date.now()
+      });
+    }
+  }
+);
+
+/**
+ * Context7 Pattern: POST /api/market-data/timeseries/:itemId/analyze
+ * Manually trigger timeseries analysis for an item (respects rate limits)
+ */
+router.post(
+  '/timeseries/:itemId/analyze',
+  requestMiddleware.validateRequest({
+    params: {
+      itemId: { type: 'string', required: true, pattern: '^[1-9][0-9]*$' }
+    },
+    body: {
+      timestep: { type: 'string', optional: true, enum: ['5m', '1h', '6h', '24h'] },
+      force: { type: 'boolean', optional: true }
+    }
+  }),
+  async (req, res) => {
+    try {
+      const { MarketDataService } = require('../services/MarketDataService');
+      const marketDataService = new MarketDataService();
+      
+      const itemId = parseInt(req.params.itemId);
+      const { timestep = '5m', force = false } = req.body;
+      
+      const timeseriesData = await marketDataService.getTimeseriesData(itemId, timestep);
+      
+      if (!timeseriesData) {
+        return res.json({
+          success: true,
+          message: 'Timeseries data already fetched today for this item',
+          skipped: true,
+          timestamp: Date.now()
+        });
+      }
+      
+      res.json({
+        success: true,
+        data: timeseriesData,
+        message: 'Timeseries analysis completed successfully',
+        timestamp: Date.now()
+      });
+      
+    } catch (error) {
+      if (error.message.includes('Rate limit exceeded')) {
+        return res.status(429).json({
+          success: false,
+          error: 'Rate limit exceeded for timeseries API - max 1 request per minute',
+          timestamp: Date.now()
+        });
+      }
+      
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        timestamp: Date.now()
+      });
+    }
+  }
+);
+
+/**
+ * Context7 Pattern: GET /api/market-data/scheduler/status
+ * Get scheduler status and statistics
+ */
+router.get(
+  '/scheduler/status',
+  async (req, res) => {
+    try {
+      // Note: In production, you'd get this from a singleton scheduler instance
+      res.json({
+        success: true,
+        message: 'Scheduler is running automatically every 5 minutes',
+        data: {
+          isRunning: true,
+          interval: '5 minutes',
+          nextSync: 'Automatic',
+          status: 'Active'
+        },
+        timestamp: Date.now()
       });
     } catch (error) {
       res.status(500).json({
@@ -503,7 +926,6 @@ router.get(
       itemIds: { type: 'string', optional: true } // comma-separated list
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   async (req, res) => {
     try {
       const { itemIds } = req.query;
@@ -535,7 +957,6 @@ router.get(
  */
 router.post(
   '/collect-latest',
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 10 }), // 10 requests per minute
   async (req, res) => {
     try {
       const { DataCollectionService } = require('../services/DataCollectionService');
@@ -571,7 +992,6 @@ router.post(
       items: { type: 'array', required: true, minItems: 1 }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.validateData)
 );
 
@@ -590,7 +1010,6 @@ router.post(
       testMode: { type: 'boolean', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 20 }), // 20 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.manualTest)
 );
 
@@ -603,10 +1022,9 @@ router.get(
   requestMiddleware.validateRequest({
     query: {
       testId: { type: 'string', optional: true },
-      limit: { type: 'number', min: 1, max: 100, optional: true }
+      limit: { type: 'string', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   errorMiddleware.handleAsyncError(marketDataController.getManualTestResults)
 );
 

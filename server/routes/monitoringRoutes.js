@@ -33,10 +33,9 @@ router.get(
   '/live-monitoring',
   requestMiddleware.validateRequest({
     query: {
-      limit: { type: 'number', min: 1, max: 500, optional: true }
+      limit: { type: 'string', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 120 }), // 120 requests per minute
   errorMiddleware.handleAsyncError(monitoringController.getLiveData)
 );
 
@@ -65,7 +64,6 @@ router.post(
       dataQuality: { type: 'number', required: true, min: 0, max: 100 }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   errorMiddleware.handleAsyncError(monitoringController.saveLiveData)
 );
 
@@ -75,8 +73,21 @@ router.post(
  */
 router.get(
   '/live-monitoring/stream',
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 10 }), // 10 connections per minute
   errorMiddleware.handleAsyncError(monitoringController.getStreamData)
+);
+
+/**
+ * Context7 Pattern: GET /api/live-activity
+ * Retrieve live activity data (alias for live-monitoring for frontend compatibility)
+ */
+router.get(
+  '/live-activity',
+  requestMiddleware.validateRequest({
+    query: {
+      limit: { type: 'string', optional: true }
+    }
+  }),
+  errorMiddleware.handleAsyncError(monitoringController.getLiveData)
 );
 
 /**
@@ -87,10 +98,9 @@ router.get(
   '/aggregated-stats',
   requestMiddleware.validateRequest({
     query: {
-      timeRange: { type: 'number', min: 1, optional: true }
+      timeRange: { type: 'string', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   errorMiddleware.handleAsyncError(monitoringController.getAggregatedStats)
 );
 
@@ -100,7 +110,6 @@ router.get(
  */
 router.get(
   '/system-status',
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 30 }), // 30 requests per minute
   errorMiddleware.handleAsyncError(monitoringController.getSystemStatus)
 );
 
@@ -110,7 +119,6 @@ router.get(
  */
 router.get(
   '/efficiency-metrics',
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 30 }), // 30 requests per minute
   errorMiddleware.handleAsyncError(monitoringController.getEfficiencyMetrics)
 );
 
@@ -120,8 +128,7 @@ router.get(
  */
 router.get(
   '/health',
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 120 }), // 120 requests per minute
-  errorMiddleware.handleAsyncError(monitoringController.getHealth)
+  errorMiddleware.handleAsyncError(monitoringController.getHealthStatus)
 );
 
 /**
@@ -132,10 +139,9 @@ router.post(
   '/cleanup',
   requestMiddleware.validateRequest({
     body: {
-      maxAge: { type: 'number', min: 1, optional: true }
+      maxAge: { type: 'string', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 3600000, max: 5 }), // 5 requests per hour
   errorMiddleware.handleAsyncError(monitoringController.performCleanup)
 );
 
@@ -145,7 +151,6 @@ router.post(
  */
 router.get(
   '/dashboard',
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 30 }), // 30 requests per minute
   errorMiddleware.handleAsyncError(monitoringController.getDashboardData)
 );
 
@@ -155,7 +160,6 @@ router.get(
  */
 router.get(
   '/alerts',
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   errorMiddleware.handleAsyncError(monitoringController.getAlerts)
 );
 
@@ -171,7 +175,6 @@ router.post(
       acknowledgedBy: { type: 'string', required: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 30 }), // 30 requests per minute
   errorMiddleware.handleAsyncError(monitoringController.acknowledgeAlert)
 );
 
@@ -184,10 +187,9 @@ router.get(
   requestMiddleware.validateRequest({
     query: {
       format: { type: 'string', enum: ['json', 'csv', 'prometheus'], optional: true },
-      timeRange: { type: 'number', min: 1, optional: true }
+      timeRange: { type: 'string', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 3600000, max: 10 }), // 10 requests per hour
   errorMiddleware.handleAsyncError(monitoringController.exportMetrics)
 );
 
@@ -200,10 +202,9 @@ router.get(
   requestMiddleware.validateRequest({
     query: {
       metric: { type: 'string', enum: ['cpu', 'memory', 'database', 'api'], optional: true },
-      timeRange: { type: 'number', min: 1, optional: true }
+      timeRange: { type: 'string', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   errorMiddleware.handleAsyncError(monitoringController.getPerformanceMetrics)
 );
 
@@ -219,7 +220,6 @@ router.post(
       parameters: { type: 'object', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 3600000, max: 20 }), // 20 requests per hour
   errorMiddleware.handleAsyncError(monitoringController.runTest)
 );
 

@@ -92,8 +92,8 @@ export class MongoService {
       return await response.json()
     } catch (error) {
       console.error('Failed to fetch live monitoring data:', error)
-      // Return simulated data if MongoDB is not available
-      return this.generateFallbackLiveData(limit)
+      // Return empty array instead of mock data
+      return []
     }
   }
 
@@ -109,7 +109,7 @@ export class MongoService {
       return await response.json()
     } catch (error) {
       console.error('Failed to fetch aggregated stats:', error)
-      return this.generateFallbackStats()
+      return {}
     }
   }
 
@@ -118,14 +118,23 @@ export class MongoService {
    */
   async getSystemStatus(): Promise<SystemStatus> {
     try {
+      console.log(`🔌 [MongoService.getSystemStatus] Making HTTP request to ${this.baseUrl}/system-status`)
+      const startTime = Date.now()
       const response = await fetch(`${this.baseUrl}/system-status`)
+      const duration = Date.now() - startTime
+      
+      console.log(`🔌 [MongoService.getSystemStatus] HTTP response received in ${duration}ms, status: ${response.status}`)
+      
       if (!response.ok) {
+        console.error(`🔌 [MongoService.getSystemStatus] HTTP error! status: ${response.status}`)
         throw new Error(`HTTP error! status: ${response.status}`)
       }
-      return await response.json()
+      const result = await response.json()
+      console.log(`🔌 [MongoService.getSystemStatus] JSON parsed successfully, returning data`)
+      return result
     } catch (error) {
-      console.error('Failed to fetch system status:', error)
-      return this.generateFallbackSystemStatus()
+      console.error('❌ [MongoService.getSystemStatus] Failed to fetch system status:', error)
+      throw error
     }
   }
 
@@ -141,7 +150,7 @@ export class MongoService {
       return await response.json()
     } catch (error) {
       console.error('Failed to fetch efficiency metrics:', error)
-      return this.generateFallbackEfficiencyMetrics()
+      throw error
     }
   }
 
@@ -211,7 +220,7 @@ export class MongoService {
       } catch (error) {
         console.error('Polling failed:', error)
       }
-    }, 2000) // Poll every 2 seconds
+    }, 10000) // Poll every 10 seconds to reduce resource usage
 
     // Store interval ID for cleanup
     ;(this as { pollInterval?: NodeJS.Timeout }).pollInterval = pollInterval
@@ -235,117 +244,15 @@ export class MongoService {
     }
   }
 
-  /**
-   * Generate fallback live data when MongoDB is not available
-   */
-  private generateFallbackLiveData(limit: number): LiveMonitoringData[] {
-    const data: LiveMonitoringData[] = []
-    const now = Date.now()
 
-    for (let i = 0; i < limit; i++) {
-      const baseRequests = 25 + Math.random() * 10
-      const baseSuccess = 95 + Math.random() * 5
-      const baseItems = 80 + Math.random() * 40
-      const baseProfit = 1000 + Math.random() * 2000
-      const baseMemory = 45 + Math.random() * 15
-      const baseResponse = 800 + Math.random() * 400
 
-      data.push({
-        timestamp: now - (i * 2000), // 2 seconds apart
-        apiRequests: Math.round(baseRequests),
-        successRate: Math.round(baseSuccess * 100) / 100,
-        itemsProcessed: Math.round(baseItems),
-        profit: Math.round(baseProfit),
-        memoryUsage: Math.round(baseMemory * 100) / 100,
-        responseTime: Math.round(baseResponse),
-        rateLimitStatus: baseRequests > 28 ? 'THROTTLED' : 'HEALTHY',
-        itemSelectionEfficiency: Math.round((97 + Math.random() * 2) * 100) / 100,
-        dataQuality: Math.round((92 + Math.random() * 8) * 100) / 100
-      })
-    }
 
-    return data.reverse() // Most recent first
-  }
-
-  /**
-   * Generate fallback aggregated stats
-   */
-  private generateFallbackStats(): Record<string, unknown> {
-    return {
-      totalApiRequests: 1247 + Math.floor(Math.random() * 100),
-      avgSuccessRate: 95.3 + Math.random() * 2,
-      totalItemsProcessed: 2156 + Math.floor(Math.random() * 200),
-      totalProfit: 125000 + Math.random() * 50000,
-      avgResponseTime: 850 + Math.random() * 300,
-      avgDataQuality: 94.2 + Math.random() * 4,
-      healthyPercentage: 96.8 + Math.random() * 2,
-      timeRangeHours: 1
-    }
-  }
-
-  /**
-   * Generate fallback system status
-   */
-  private generateFallbackSystemStatus(): SystemStatus {
-    return {
-      dataCollection: {
-        isActive: true,
-        totalCollections: 1247 + Math.floor(Math.random() * 10),
-        successfulCalls: 1189 + Math.floor(Math.random() * 10),
-        failedCalls: 58 + Math.floor(Math.random() * 5),
-        successRate: (95.3 + Math.random() * 2).toFixed(1) + '%',
-        uptime: Date.now() - (Date.now() - 7200000), // 2 hours ago
-        averageResponseTime: (850 + Math.random() * 300).toFixed(0) + 'ms'
-      },
-      apiRateLimiting: {
-        status: 'HEALTHY',
-        requestsInLastMinute: 18 + Math.floor(Math.random() * 10),
-        requestsInLastHour: 450 + Math.floor(Math.random() * 100),
-        maxRequestsPerMinute: 30,
-        maxRequestsPerHour: 1000,
-        queueLength: Math.floor(Math.random() * 3),
-        activeRequests: Math.floor(Math.random() * 2),
-        totalRequests: 8547 + Math.floor(Math.random() * 50),
-        rateLimitedRequests: 0
-      },
-      smartItemSelection: {
-        totalSelected: 95,
-        capacity: 100,
-        utilizationPercent: '95.0%',
-        efficiency: 'Tracking 95 high-value items instead of 3000+ total OSRS items'
-      },
-      persistence: {
-        enabled: true,
-        type: 'mongodb',
-        mongoConnected: false // Fallback mode
-      }
-    }
-  }
-
-  /**
-   * Generate fallback efficiency metrics
-   */
-  private generateFallbackEfficiencyMetrics(): EfficiencyMetrics {
-    return {
-      smartSelection: {
-        itemsTracked: 95,
-        totalOSRSItems: 3000,
-        reductionPercent: '96.8%',
-        efficiency: '96.8% fewer items to process'
-      },
-      apiUsage: {
-        respectfulUsage: true,
-        utilizationPercent: '60.0%',
-        totalSavedRequests: 'Estimated 97% reduction in API calls',
-        compliance: 'Perfect'
-      },
-      performance: {
-        estimatedTimeReduction: '96.8%',
-        reducedMemoryUsage: '96.8% less memory usage'
-      }
-    }
-  }
 }
 
-// Export singleton instance
-export const mongoService = new MongoService()
+// Environment-based configuration
+const API_CONFIG = {
+  nodeBackend: import.meta.env.VITE_NODE_API_URL || 'http://localhost:3001'
+}
+
+// Export singleton instance with environment-based URL
+export const mongoService = new MongoService(`${API_CONFIG.nodeBackend}/api`)

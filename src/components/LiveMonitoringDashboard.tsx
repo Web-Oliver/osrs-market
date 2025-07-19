@@ -63,9 +63,11 @@ const LiveMonitoringDashboard: React.FC = () => {
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null)
   const [efficiencyMetrics, setEfficiencyMetrics] = useState<EfficiencyMetrics | null>(null)
   const [isMonitoring, setIsMonitoring] = useState(true)
-  const [refreshInterval, setRefreshInterval] = useState(2000) // 2 seconds
+  const [refreshInterval, setRefreshInterval] = useState(10000) // 10 seconds to reduce resource usage
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
+  const [requestInProgress, setRequestInProgress] = useState(false)
+  const requestCacheRef = useRef<{ [key: string]: { data: any, timestamp: number } }>({})
   const [isConnectedToMongo, setIsConnectedToMongo] = useState(false)
   const [aggregatedStats, setAggregatedStats] = useState<{
     marketData?: Record<string, unknown>;
@@ -89,12 +91,61 @@ const LiveMonitoringDashboard: React.FC = () => {
   const [socketUrl] = useState(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.hostname
-    const port = window.location.port ? ':' + (parseInt(window.location.port) + 1) : ':8081' // Assume WebSocket server is on port 8081
-    return `${protocol}//${host}${port}/ws/logs`
+    const port = ':3002' // Backend WebSocket server is on port 3002
+    return `${protocol}//${host}${port}/logs`
   })
   const [logEntries, setLogEntries] = useState<LogEntry[]>([])
   const [isWebSocketConnected, setIsWebSocketConnected] = useState(false)
   const [webSocketError, setWebSocketError] = useState<string | null>(null)
+
+  // WebSocket connection with useWebSocket hook - Context7 optimized
+  const { readyState, lastMessage } = useWebSocket(socketUrl, {
+    onOpen: () => {
+      setIsWebSocketConnected(true)
+      setWebSocketError(null)
+      console.log('✅ WebSocket connected to', socketUrl)
+    },
+    onClose: (event) => {
+      setIsWebSocketConnected(false)
+      console.log('🔌 WebSocket disconnected:', event.code, event.reason)
+    },
+    onError: (event) => {
+      setIsWebSocketConnected(false)
+      setWebSocketError('WebSocket connection failed - backend may be offline')
+      console.warn('❌ WebSocket connection failed:', event)
+    },
+    onMessage: (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'log') {
+          setLogEntries(prev => [data.data, ...prev.slice(0, 499)]); // Keep last 500 logs
+        }
+      } catch (error) {
+        console.warn('Failed to parse WebSocket message:', error);
+      }
+    },
+    // Context7 Pattern: Exponential backoff reconnection
+    shouldReconnect: (closeEvent) => {
+      // Don't reconnect if it was a normal closure or server shutdown
+      return closeEvent.code !== 1000 && closeEvent.code !== 1001;
+    },
+    reconnectAttempts: 10,
+    reconnectInterval: (attemptNumber) =>
+      Math.min(Math.pow(2, attemptNumber) * 1000, 10000), // 1s, 2s, 4s, 8s, then 10s cap
+    // Context7 Pattern: Heartbeat for connection health
+    heartbeat: {
+      message: 'ping',
+      returnMessage: 'pong',
+      timeout: 60000, // 1 minute
+      interval: 25000, // every 25 seconds
+    },
+  })
+
+  // Connection status based on WebSocket ready state
+  const connectionStatus = readyState === ReadyState.OPEN ? 'Connected' : 
+                          readyState === ReadyState.CONNECTING ? 'Connecting' : 
+                          readyState === ReadyState.CLOSING ? 'Closing' : 
+                          'Disconnected'
 
   // Colors for charts following Context7 design patterns
   const chartColors = {
@@ -106,85 +157,22 @@ const LiveMonitoringDashboard: React.FC = () => {
     secondary: '#8E8E93'
   }
 
-  // Generate realistic system actions
-  const generateSystemAction = (): SystemAction => {
-    const actionTemplates = [
-      {
-        type: 'API_CALL' as const,
-        category: 'EXTERNAL' as const,
-        action: 'RuneScape Wiki API Request',
-        details: 'Fetching latest item prices for smart selection',
-        severity: 'LOW' as const,
-        duration: Math.floor(Math.random() * 500) + 200
-      },
-      {
-        type: 'DATA_COLLECTION' as const,
-        category: 'SYSTEM' as const,
-        action: 'Market Data Collection',
-        details: 'Processing market data for trending items',
-        severity: 'MEDIUM' as const,
-        duration: Math.floor(Math.random() * 1000) + 500
-      },
-      {
-        type: 'RATE_LIMIT' as const,
-        category: 'SYSTEM' as const,
-        action: 'Rate Limiting Check',
-        details: 'API request queued due to rate limits',
-        severity: 'LOW' as const
-      },
-      {
-        type: 'DATABASE' as const,
-        category: 'INTERNAL' as const,
-        action: 'MongoDB Write Operation',
-        details: 'Storing live monitoring data with Context7 optimizations',
-        severity: 'LOW' as const,
-        duration: Math.floor(Math.random() * 100) + 50
-      },
-      {
-        type: 'SUCCESS' as const,
-        category: 'SYSTEM' as const,
-        action: 'Smart Item Selection',
-        details: 'Successfully filtered high-value items for tracking',
-        severity: 'LOW' as const
-      },
-      {
-        type: 'WARNING' as const,
-        category: 'SYSTEM' as const,
-        action: 'High API Usage',
-        details: 'API usage at 80% of rate limit threshold',
-        severity: 'MEDIUM' as const
-      },
-      {
-        type: 'ERROR' as const,
-        category: 'EXTERNAL' as const,
-        action: 'API Request Failed',
-        details: 'Failed to fetch data for item ID 1234 - retrying in 30s',
-        severity: 'HIGH' as const
-      }
-    ]
-
-    const template = actionTemplates[Math.floor(Math.random() * actionTemplates.length)]
-    return {
-      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-      timestamp: Date.now(),
-      ...template,
-      metadata: {
-        source: 'LiveMonitoringDashboard',
-        requestId: Math.random().toString(36).substr(2, 9)
-      }
-    }
-  }
+  // System actions should come from real backend events only
 
   // Add new system action and manage notifications
   const addSystemAction = (action: SystemAction) => {
     setSystemActions(prev => {
-      const updated = [action, ...prev].slice(0, 1000) // Keep last 1000 actions
+      const safeArray = Array.isArray(prev) ? prev : []
+      const updated = [action, ...safeArray].slice(0, 1000) // Keep last 1000 actions
       return updated
     })
 
     // Add to notifications for high severity actions
     if (action.severity === 'HIGH' || action.severity === 'CRITICAL') {
-      setNotifications(prev => [action, ...prev].slice(0, 10))
+      setNotifications(prev => {
+        const safeArray = Array.isArray(prev) ? prev : []
+        return [action, ...safeArray].slice(0, 10)
+      })
     }
   }
 
@@ -205,29 +193,113 @@ const LiveMonitoringDashboard: React.FC = () => {
   }
 
   const fetchSystemStatus = async () => {
+    const cacheKey = 'systemStatus'
+    const now = Date.now()
+    const cached = requestCacheRef.current[cacheKey]
+    
+    console.log(`🔍 [fetchSystemStatus] Starting at ${new Date().toLocaleTimeString()}`)
+    
+    // Use cache if data is less than 30 seconds old
+    if (cached && (now - cached.timestamp) < 30000) {
+      console.log(`⚡ [fetchSystemStatus] Using cached data (${Math.round((now - cached.timestamp)/1000)}s old)`)
+      setSystemStatus(cached.data)
+      return
+    }
+    
     try {
-      const status = await mongoService.getSystemStatus()
-      setSystemStatus(status)
+      console.log(`🌐 [fetchSystemStatus] Making API requests to both /api/system-status and /api/auto-training/status`)
+      const startTime = Date.now()
+      
+      // Get both system status and auto training status
+      const [systemStatus, autoTrainingResponse] = await Promise.all([
+        mongoService.getSystemStatus(),
+        fetch('http://localhost:3001/api/auto-training/status').then(r => r.json())
+      ])
+      
+      // Merge the data, prioritizing auto training service data for data collection
+      const mergedStatus = {
+        ...systemStatus,
+        dataCollection: autoTrainingResponse.success && autoTrainingResponse.data?.status?.dataCollection ? {
+          isActive: autoTrainingResponse.data.status.dataCollection.status === 'ACTIVE',
+          totalCollections: autoTrainingResponse.data.status.dataCollection.totalCollections || 0,
+          successfulCalls: systemStatus.dataCollection?.successfulCalls || 0,
+          failedCalls: systemStatus.dataCollection?.failedCalls || 0,
+          successRate: systemStatus.dataCollection?.successRate || '0%',
+          uptime: systemStatus.dataCollection?.uptime || 0,
+          averageResponseTime: systemStatus.dataCollection?.averageResponseTime || '0ms',
+          lastCollection: autoTrainingResponse.data.status.dataCollection.lastCollection,
+          memoryUsage: autoTrainingResponse.data.status.dataCollection.memoryUsage || 0
+        } : systemStatus.dataCollection || {
+          isActive: false,
+          totalCollections: 0,
+          successfulCalls: 0,
+          failedCalls: 0,
+          successRate: '0%',
+          uptime: 0,
+          averageResponseTime: '0ms'
+        }
+      }
+      
+      const duration = Date.now() - startTime
+      console.log(`✅ [fetchSystemStatus] API requests completed in ${duration}ms`)
+      setSystemStatus(mergedStatus)
+      requestCacheRef.current[cacheKey] = { data: mergedStatus, timestamp: now }
     } catch (error) {
-      console.error('Failed to fetch system status:', error)
+      console.error(`❌ [fetchSystemStatus] API request failed:`, error)
     }
   }
 
   const fetchEfficiencyMetrics = async () => {
+    const cacheKey = 'efficiencyMetrics'
+    const now = Date.now()
+    const cached = requestCacheRef.current[cacheKey]
+    
+    console.log(`🔍 [fetchEfficiencyMetrics] Starting at ${new Date().toLocaleTimeString()}`)
+    
+    // Use cache if data is less than 30 seconds old
+    if (cached && (now - cached.timestamp) < 30000) {
+      console.log(`⚡ [fetchEfficiencyMetrics] Using cached data (${Math.round((now - cached.timestamp)/1000)}s old)`)
+      setEfficiencyMetrics(cached.data)
+      return
+    }
+    
     try {
+      console.log(`🌐 [fetchEfficiencyMetrics] Making API request to /api/efficiency-metrics`)
+      const startTime = Date.now()
       const metrics = await mongoService.getEfficiencyMetrics()
+      const duration = Date.now() - startTime
+      console.log(`✅ [fetchEfficiencyMetrics] API request completed in ${duration}ms`)
       setEfficiencyMetrics(metrics)
+      requestCacheRef.current[cacheKey] = { data: metrics, timestamp: now }
     } catch (error) {
-      console.error('Failed to fetch efficiency metrics:', error)
+      console.error(`❌ [fetchEfficiencyMetrics] API request failed:`, error)
     }
   }
 
   const fetchAggregatedStats = async () => {
+    const cacheKey = 'aggregatedStats'
+    const now = Date.now()
+    const cached = requestCacheRef.current[cacheKey]
+    
+    console.log(`🔍 [fetchAggregatedStats] Starting at ${new Date().toLocaleTimeString()}`)
+    
+    // Use cache if data is less than 30 seconds old
+    if (cached && (now - cached.timestamp) < 30000) {
+      console.log(`⚡ [fetchAggregatedStats] Using cached data (${Math.round((now - cached.timestamp)/1000)}s old)`)
+      setAggregatedStats(cached.data)
+      return
+    }
+    
     try {
+      console.log(`🌐 [fetchAggregatedStats] Making API request to /api/aggregated-stats`)
+      const startTime = Date.now()
       const stats = await mongoService.getAggregatedStats()
+      const duration = Date.now() - startTime
+      console.log(`✅ [fetchAggregatedStats] API request completed in ${duration}ms`)
       setAggregatedStats(stats)
+      requestCacheRef.current[cacheKey] = { data: stats, timestamp: now }
     } catch (error) {
-      console.error('Failed to fetch aggregated stats:', error)
+      console.error(`❌ [fetchAggregatedStats] API request failed:`, error)
     }
   }
 
@@ -245,43 +317,48 @@ const LiveMonitoringDashboard: React.FC = () => {
     
     loadInitialData()
 
-    // Start real-time updates from MongoDB if available
-    if (isMonitoring) {
-      // Try to start real-time updates via change streams
-      mongoService.startRealTimeUpdates((newData) => {
-        setLiveData(prev => {
-          const updated = [...prev, newData]
-          // Keep only last 50 data points for performance
-          return updated.slice(-50)
-        })
-        setLastUpdate(new Date())
-        setIsConnectedToMongo(true)
-        
-        // Generate system action for data update
-        addSystemAction({
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
-          timestamp: Date.now(),
-          type: 'SUCCESS',
-          category: 'SYSTEM',
-          action: 'Live Data Update',
-          details: `Received new monitoring data: ${newData.apiRequests} API requests, ${newData.successRate}% success rate`,
-          severity: 'LOW',
-          metadata: { dataPoint: newData }
-        })
-      })
+    // Note: Real-time updates are now handled in the monitoring toggle useEffect to avoid duplicates
 
-      // Also set up periodic refresh for other data
+    if (isMonitoring) {
+      // Set up periodic refresh for other data
       intervalRef.current = setInterval(async () => {
-        await Promise.all([
-          fetchSystemStatus(),
-          fetchEfficiencyMetrics(),
-          fetchAggregatedStats()
-        ])
+        console.log(`🔄 [POLLING] Starting polling cycle at ${new Date().toLocaleTimeString()}`)
         
-        // Generate periodic system actions
-        if (Math.random() < 0.7) { // 70% chance to generate action
-          addSystemAction(generateSystemAction())
+        // Prevent multiple requests from running simultaneously
+        if (requestInProgress) {
+          console.log('⏸️ [POLLING] Previous request still in progress, skipping this cycle')
+          return
         }
+        
+        setRequestInProgress(true)
+        console.log(`🚀 [POLLING] Starting sequential API requests`)
+        
+        try {
+          // Run requests sequentially to avoid overwhelming browser resources
+          console.log(`📊 [POLLING] Step 1/3: Fetching system status`)
+          await fetchSystemStatus()
+          
+          console.log(`⏳ [POLLING] Waiting 1s before next request`)
+          await new Promise(resolve => setTimeout(resolve, 1000)) // 1s delay
+          
+          console.log(`📈 [POLLING] Step 2/3: Fetching efficiency metrics`)
+          await fetchEfficiencyMetrics()
+          
+          console.log(`⏳ [POLLING] Waiting 1s before next request`)
+          await new Promise(resolve => setTimeout(resolve, 1000)) // 1s delay
+          
+          console.log(`📋 [POLLING] Step 3/3: Fetching aggregated stats`)
+          await fetchAggregatedStats()
+          
+          console.log(`✅ [POLLING] All requests completed successfully`)
+        } catch (error) {
+          console.error('❌ [POLLING] Error in periodic refresh:', error)
+        } finally {
+          setRequestInProgress(false)
+          console.log(`🏁 [POLLING] Polling cycle finished, next cycle in ${refreshInterval/1000}s`)
+        }
+        
+        // System actions should come from real backend events only
       }, refreshInterval)
     }
 
@@ -338,36 +415,22 @@ const LiveMonitoringDashboard: React.FC = () => {
       // Start real-time updates when monitoring is enabled
       mongoService.startRealTimeUpdates((newData) => {
         setLiveData(prev => {
-          const updated = [...prev, newData]
+          const safeArray = Array.isArray(prev) ? prev : []
+          const updated = [...safeArray, newData]
           return updated.slice(-50)
         })
         setLastUpdate(new Date())
         setIsConnectedToMongo(true)
       })
-
-      // Periodic data refresh
-      intervalRef.current = setInterval(async () => {
-        await Promise.all([
-          fetchSystemStatus(),
-          fetchEfficiencyMetrics(),
-          fetchAggregatedStats()
-        ])
-      }, refreshInterval)
     } else {
       // Stop updates when monitoring is disabled
       mongoService.stopRealTimeUpdates()
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
     }
 
     return () => {
       mongoService.stopRealTimeUpdates()
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current)
-      }
     }
-  }, [isMonitoring, refreshInterval])
+  }, [isMonitoring])
 
   // Format time for charts (remove this as we're importing from utils)
   const formatTimeForChart = (timestamp: number) => {
@@ -378,43 +441,9 @@ const LiveMonitoringDashboard: React.FC = () => {
     })
   }
   
-  // Generate mock log entries for fallback when WebSocket is not available
-  const generateMockLogEntry = useCallback((): LogEntry => {
-    const services = ['MongoDB-Debug', 'DataCollector-Debug', 'RateLimiter-Debug', 'SmartSelector-Debug']
-    const messages = [
-      'Context7 optimized query executed',
-      'Smart item filtering applied',
-      'Making rate-limited API request',
-      'Items grouped by tier',
-      'Real-time change stream activated',
-      'Market summary generated',
-      'API request successful',
-      'Live monitoring data saved with Context7 optimizations',
-      'Collection cycle completed'
-    ]
-    
-    return {
-      timestamp: Date.now(),
-      level: Math.random() > 0.8 ? 'warn' : 'info',
-      service: services[Math.floor(Math.random() * services.length)],
-      message: messages[Math.floor(Math.random() * messages.length)],
-      traceId: Math.random().toString(36).substr(2, 9)
-    }
-  }, [])
+  // Real log entry handling only - no mock data
   
-  // Add mock log entries when WebSocket is not connected (for demo purposes)
-  useEffect(() => {
-    if (!isWebSocketConnected && isMonitoring) {
-      const interval = setInterval(() => {
-        setLogEntries(prev => {
-          const mockEntry = generateMockLogEntry()
-          return [mockEntry, ...prev].slice(0, 100)
-        })
-      }, 3000) // Generate mock logs every 3 seconds
-      
-      return () => clearInterval(interval)
-    }
-  }, [isWebSocketConnected, isMonitoring, generateMockLogEntry])
+  // Only use real log data from WebSocket - no mock data generation
 
   // Format uptime
   const formatUptime = (ms: number) => {
@@ -593,9 +622,15 @@ const LiveMonitoringDashboard: React.FC = () => {
                       checked={activityFilter.type.includes(type)}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setActivityFilter(prev => ({ ...prev, type: [...prev.type, type] }))
+                          setActivityFilter(prev => ({ 
+                            ...prev, 
+                            type: [...(Array.isArray(prev.type) ? prev.type : []), type] 
+                          }))
                         } else {
-                          setActivityFilter(prev => ({ ...prev, type: prev.type.filter(t => t !== type) }))
+                          setActivityFilter(prev => ({ 
+                            ...prev, 
+                            type: (Array.isArray(prev.type) ? prev.type : []).filter(t => t !== type) 
+                          }))
                         }
                       }}
                       className="mr-2"
@@ -616,9 +651,15 @@ const LiveMonitoringDashboard: React.FC = () => {
                       checked={activityFilter.category.includes(category)}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setActivityFilter(prev => ({ ...prev, category: [...prev.category, category] }))
+                          setActivityFilter(prev => ({ 
+                            ...prev, 
+                            category: [...(Array.isArray(prev.category) ? prev.category : []), category] 
+                          }))
                         } else {
-                          setActivityFilter(prev => ({ ...prev, category: prev.category.filter(c => c !== category) }))
+                          setActivityFilter(prev => ({ 
+                            ...prev, 
+                            category: (Array.isArray(prev.category) ? prev.category : []).filter(c => c !== category) 
+                          }))
                         }
                       }}
                       className="mr-2"
@@ -639,9 +680,15 @@ const LiveMonitoringDashboard: React.FC = () => {
                       checked={activityFilter.severity.includes(severity)}
                       onChange={(e) => {
                         if (e.target.checked) {
-                          setActivityFilter(prev => ({ ...prev, severity: [...prev.severity, severity] }))
+                          setActivityFilter(prev => ({ 
+                            ...prev, 
+                            severity: [...(Array.isArray(prev.severity) ? prev.severity : []), severity] 
+                          }))
                         } else {
-                          setActivityFilter(prev => ({ ...prev, severity: prev.severity.filter(s => s !== severity) }))
+                          setActivityFilter(prev => ({ 
+                            ...prev, 
+                            severity: (Array.isArray(prev.severity) ? prev.severity : []).filter(s => s !== severity) 
+                          }))
                         }
                       }}
                       className="mr-2"
@@ -860,7 +907,7 @@ const LiveMonitoringDashboard: React.FC = () => {
             </div>
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={liveData} accessibilityLayer>
+            <LineChart data={Array.isArray(liveData) ? liveData : []} accessibilityLayer>
               <CartesianGrid stroke="#f0f0f0" strokeDasharray="5 5" />
               <XAxis 
                 dataKey="timestamp" 
@@ -891,7 +938,7 @@ const LiveMonitoringDashboard: React.FC = () => {
             </div>
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={liveData} accessibilityLayer>
+            <LineChart data={Array.isArray(liveData) ? liveData : []} accessibilityLayer>
               <CartesianGrid stroke="#f0f0f0" strokeDasharray="5 5" />
               <XAxis 
                 dataKey="timestamp" 
@@ -932,23 +979,23 @@ const LiveMonitoringDashboard: React.FC = () => {
             <div className={`space-y-3`}>
               <div className={`flex justify-between items-center`}>
                 <span className={`text-sm text-gray-600`}>Status</span>
-                <StatusIndicator status={systemStatus.dataCollection.isActive ? 'ACTIVE' : 'INACTIVE'} />
+                <StatusIndicator status={systemStatus?.dataCollection?.isActive ? 'ACTIVE' : 'INACTIVE'} />
               </div>
               <div className={`flex justify-between items-center`}>
                 <span className={`text-sm text-gray-600`}>Total Collections</span>
-                <span className={`font-medium`}>{systemStatus.dataCollection.totalCollections.toLocaleString()}</span>
+                <span className={`font-medium`}>{systemStatus?.dataCollection?.totalCollections?.toLocaleString() || '0'}</span>
               </div>
               <div className={`flex justify-between items-center`}>
                 <span className={`text-sm text-gray-600`}>Success Rate</span>
-                <span className={`font-medium text-green-600`}>{systemStatus.dataCollection.successRate}</span>
+                <span className={`font-medium text-green-600`}>{systemStatus?.dataCollection?.successRate || '0%'}</span>
               </div>
               <div className={`flex justify-between items-center`}>
                 <span className={`text-sm text-gray-600`}>Uptime</span>
-                <span className={`font-medium`}>{formatUptime(systemStatus.dataCollection.uptime)}</span>
+                <span className={`font-medium`}>{formatUptime(systemStatus?.dataCollection?.uptime || 0)}</span>
               </div>
               <div className={`flex justify-between items-center`}>
                 <span className={`text-sm text-gray-600`}>Avg Response</span>
-                <span className={`font-medium`}>{systemStatus.dataCollection.averageResponseTime}</span>
+                <span className={`font-medium`}>{systemStatus?.dataCollection?.averageResponseTime || '0ms'}</span>
               </div>
             </div>
           </div>
@@ -962,27 +1009,27 @@ const LiveMonitoringDashboard: React.FC = () => {
             <div className={`space-y-3`}>
               <div className={`flex justify-between items-center`}>
                 <span className={`text-sm text-gray-600`}>Status</span>
-                <StatusIndicator status={systemStatus.apiRateLimiting.status as 'HEALTHY' | 'THROTTLED' | 'COOLDOWN' | 'OVERLOADED' | 'ACTIVE' | 'INACTIVE'} />
+                <StatusIndicator status={(systemStatus?.apiRateLimiting?.status as 'HEALTHY' | 'THROTTLED' | 'COOLDOWN' | 'OVERLOADED' | 'ACTIVE' | 'INACTIVE') || 'INACTIVE'} />
               </div>
               <div className={`flex justify-between items-center`}>
                 <span className={`text-sm text-gray-600`}>Requests/min</span>
                 <span className={`font-medium`}>
-                  {systemStatus.apiRateLimiting.requestsInLastMinute}/{systemStatus.apiRateLimiting.maxRequestsPerMinute}
+                  {systemStatus?.apiRateLimiting?.requestsInLastMinute || 0}/{systemStatus?.apiRateLimiting?.maxRequestsPerMinute || 0}
                 </span>
               </div>
               <div className={`flex justify-between items-center`}>
                 <span className={`text-sm text-gray-600`}>Requests/hour</span>
                 <span className={`font-medium`}>
-                  {systemStatus.apiRateLimiting.requestsInLastHour}/{systemStatus.apiRateLimiting.maxRequestsPerHour}
+                  {systemStatus?.apiRateLimiting?.requestsInLastHour || 0}/{systemStatus?.apiRateLimiting?.maxRequestsPerHour || 0}
                 </span>
               </div>
               <div className={`flex justify-between items-center`}>
                 <span className={`text-sm text-gray-600`}>Queue Length</span>
-                <span className={`font-medium`}>{systemStatus.apiRateLimiting.queueLength}</span>
+                <span className={`font-medium`}>{systemStatus?.apiRateLimiting?.queueLength || 0}</span>
               </div>
               <div className={`flex justify-between items-center`}>
                 <span className={`text-sm text-gray-600`}>Rate Limited</span>
-                <span className={`font-medium text-green-600`}>{systemStatus.apiRateLimiting.rateLimitedRequests}</span>
+                <span className={`font-medium text-green-600`}>{systemStatus?.apiRateLimiting?.rateLimitedRequests || 0}</span>
               </div>
             </div>
           </div>
@@ -996,22 +1043,22 @@ const LiveMonitoringDashboard: React.FC = () => {
             <div className={`space-y-3`}>
               <div className={`flex justify-between items-center`}>
                 <span className={`text-sm text-gray-600`}>Items Tracked</span>
-                <span className={`font-medium`}>{systemStatus.smartItemSelection.totalSelected}/{systemStatus.smartItemSelection.capacity}</span>
+                <span className={`font-medium`}>{systemStatus?.smartItemSelection?.totalSelected || 0}/{systemStatus?.smartItemSelection?.capacity || 0}</span>
               </div>
               <div className={`flex justify-between items-center`}>
                 <span className={`text-sm text-gray-600`}>Utilization</span>
-                <span className={`font-medium text-purple-600`}>{systemStatus.smartItemSelection.utilizationPercent}</span>
+                <span className={`font-medium text-purple-600`}>{systemStatus?.smartItemSelection?.utilizationPercent || '0%'}</span>
               </div>
               <div className={`mt-4`}>
                 <div className={`w-full bg-gray-200 rounded-full h-2`}>
                   <div 
                     className={`bg-purple-600 h-2 rounded-full transition-all duration-500`}
-                    style={{ width: systemStatus.smartItemSelection.utilizationPercent }}
+                    style={{ width: systemStatus?.smartItemSelection?.utilizationPercent || '0%' }}
                   />
                 </div>
               </div>
               <div className={`text-xs text-gray-500 mt-2`}>
-                {systemStatus.smartItemSelection.efficiency}
+                {systemStatus?.smartItemSelection?.efficiency || 'Loading...'}
               </div>
             </div>
           </div>
@@ -1030,33 +1077,33 @@ const LiveMonitoringDashboard: React.FC = () => {
             {/* Smart Selection Efficiency */}
             <div className={`text-center`}>
               <div className={`text-3xl font-bold text-purple-600 mb-2`}>
-                {efficiencyMetrics.smartSelection.reductionPercent}
+                {efficiencyMetrics?.smartSelection?.reductionPercent || '0%'}
               </div>
               <div className={`text-sm font-medium text-gray-900 mb-1`}>Fewer Items to Process</div>
               <div className={`text-xs text-gray-500`}>
-                Tracking {efficiencyMetrics.smartSelection.itemsTracked} instead of {efficiencyMetrics.smartSelection.totalOSRSItems.toLocaleString()}
+                Tracking {efficiencyMetrics?.smartSelection?.itemsTracked || 0} instead of {efficiencyMetrics?.smartSelection?.totalOSRSItems?.toLocaleString() || '0'}
               </div>
             </div>
 
             {/* API Usage Efficiency */}
             <div className={`text-center`}>
               <div className={`text-3xl font-bold text-green-600 mb-2`}>
-                {efficiencyMetrics.apiUsage.compliance}
+                {efficiencyMetrics?.apiUsage?.compliance || 'Unknown'}
               </div>
               <div className={`text-sm font-medium text-gray-900 mb-1`}>API Compliance</div>
               <div className={`text-xs text-gray-500`}>
-                {efficiencyMetrics.apiUsage.totalSavedRequests}
+                {efficiencyMetrics?.apiUsage?.totalSavedRequests || 'Calculating...'}
               </div>
             </div>
 
             {/* Performance Improvement */}
             <div className={`text-center`}>
               <div className={`text-3xl font-bold text-blue-600 mb-2`}>
-                {efficiencyMetrics.performance.estimatedTimeReduction}
+                {efficiencyMetrics?.performance?.estimatedTimeReduction || '0%'}
               </div>
               <div className={`text-sm font-medium text-gray-900 mb-1`}>Time Reduction</div>
               <div className={`text-xs text-gray-500`}>
-                {efficiencyMetrics.performance.reducedMemoryUsage}
+                {efficiencyMetrics?.performance?.reducedMemoryUsage || '0%'}
               </div>
             </div>
           </div>
@@ -1208,7 +1255,7 @@ const LiveMonitoringDashboard: React.FC = () => {
         <div className={`bg-black text-green-400 font-mono text-sm space-y-1 max-h-64 overflow-y-auto`}>
           {logEntries.length === 0 ? (
             <div className={`text-gray-500 text-center py-4`}>
-              {isWebSocketConnected ? 'Waiting for log messages...' : 'WebSocket disconnected. Showing demo logs.'}
+              {isWebSocketConnected ? 'Waiting for log messages...' : 'WebSocket disconnected. No logs available.'}
             </div>
           ) : (
             logEntries.map((entry, index) => {

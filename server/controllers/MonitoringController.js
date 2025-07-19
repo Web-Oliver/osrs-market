@@ -43,7 +43,7 @@ class MonitoringController {
       });
 
       // Context7 Pattern: Validate request parameters
-      const validation = validateRequest.getLiveData(req.query);
+      const validation = validateRequest.getLiveMonitoringData(req.query);
       if (!validation.isValid) {
         return ApiResponse.badRequest(res, 'Invalid request parameters', validation.errors);
       }
@@ -277,19 +277,19 @@ class MonitoringController {
         requestId: req.id
       });
 
-      return ApiResponse.custom(res, health, 'Health check completed', statusCode);
+      return ApiResponse.custom(res, statusCode, health, 'Health check completed');
     } catch (error) {
       this.logger.error('Error performing health check', error, {
         requestId: req.id
       });
       
       // Context7 Pattern: Always return health status even on error
-      return ApiResponse.custom(res, {
+      return ApiResponse.custom(res, 503, {
         status: 'unhealthy',
         mongodb: false,
         error: error.message,
         timestamp: Date.now()
-      }, 'Health check failed', 503);
+      }, 'Health check failed');
     }
   }
 

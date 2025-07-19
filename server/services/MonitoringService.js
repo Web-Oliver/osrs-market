@@ -31,7 +31,7 @@ class MonitoringService {
     try {
       const mongoConfig = {
         connectionString: process.env.MONGODB_CONNECTION_STRING || 'mongodb://localhost:27017',
-        databaseName: process.env.MONGODB_DATABASE || 'osrs_market_tracker'
+        databaseName: process.env.MONGODB_DATABASE || 'osrs_market_data'
       };
 
       this.mongoService = new MongoDataPersistence(mongoConfig);
@@ -274,28 +274,62 @@ class MonitoringService {
   }
 
   /**
-   * Context7 Pattern: Get health status
+   * Context7 Pattern: Get health status with robust error handling
    */
   async getHealthStatus() {
     try {
       this.logger.debug('Performing health check');
 
+      // Check if MongoDB service is initialized
+      if (!this.mongoService) {
+        this.logger.warn('MongoDB service not initialized, attempting to initialize');
+        await this.initializeMongoDB();
+      }
+
       if (this.mongoService) {
-        const health = await this.mongoService.healthCheck();
-        return {
-          status: health.connected ? 'healthy' : 'unhealthy',
-          mongodb: health.connected,
-          database: health.database,
-          collections: health.collections,
-          timestamp: health.timestamp
-        };
+        try {
+          const health = await this.mongoService.healthCheck();
+          return {
+            status: health.connected ? 'healthy' : 'unhealthy',
+            mongodb: health.connected,
+            database: health.database || 'osrs_market_data',
+            collections: health.collections || [],
+            timestamp: health.timestamp || Date.now(),
+            uptime: process.uptime(),
+            memory: {
+              used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+              total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024)
+            }
+          };
+        } catch (mongoError) {
+          this.logger.warn('MongoDB health check failed', mongoError);
+          return {
+            status: 'degraded',
+            mongodb: false,
+            database: 'osrs_market_data',
+            collections: [],
+            error: mongoError.message,
+            timestamp: Date.now(),
+            uptime: process.uptime(),
+            memory: {
+              used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+              total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024)
+            }
+          };
+        }
       } else {
         return {
           status: 'unhealthy',
           mongodb: false,
-          database: 'osrs_market_tracker',
+          database: 'osrs_market_data',
           collections: [],
-          timestamp: Date.now()
+          error: 'MongoDB service failed to initialize',
+          timestamp: Date.now(),
+          uptime: process.uptime(),
+          memory: {
+            used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+            total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024)
+          }
         };
       }
     } catch (error) {
@@ -304,7 +338,12 @@ class MonitoringService {
         status: 'unhealthy',
         mongodb: false,
         error: error.message,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        uptime: process.uptime(),
+        memory: {
+          used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+          total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024)
+        }
       };
     }
   }

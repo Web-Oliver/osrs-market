@@ -1,7 +1,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { AutoTrainingConfig } from '../types/autoTraining'
 
-const BASE_URL = 'http://localhost:3001/api/auto-training'
+// Environment-based configuration
+const API_CONFIG = {
+  nodeBackend: import.meta.env.VITE_NODE_API_URL || 'http://localhost:3001'
+}
+
+const BASE_URL = `${API_CONFIG.nodeBackend}/api/auto-training`
 
 export interface AutoTrainingStats {
   isRunning: boolean
@@ -463,21 +468,11 @@ export const useAutoTrainingBackend = () => {
   }, [])
 
   /**
-   * Auto-refresh status when running
+   * Auto-refresh status when running (disabled to prevent infinite loops)
+   * Status updates will be handled manually when needed
    */
-  useEffect(() => {
-    if (!state.isRunning) return
-
-    const interval = setInterval(async () => {
-      try {
-        await getAutoTrainingStatus()
-      } catch {
-        // Silently fail for auto-refresh
-      }
-    }, 10000) // Refresh every 10 seconds
-
-    return () => clearInterval(interval)
-  }, [state.isRunning, getAutoTrainingStatus])
+  // useEffect removed to prevent infinite re-render loops
+  // Manual status fetching is available through getAutoTrainingStatus()
 
   return {
     ...state,

@@ -61,7 +61,11 @@ jest.mock('../../controllers/MarketDataController', () => ({
     getPortfolioAnalysis: jest.fn(),
     getLiveMarketData: jest.fn(),
     getLatestPrices: jest.fn(),
-    validateData: jest.fn()
+    validateData: jest.fn(),
+    getPopularItems: jest.fn(),
+    getTopFlips: jest.fn(),
+    manualTest: jest.fn(),
+    getManualTestResults: jest.fn()
   }))
 }));
 

@@ -420,15 +420,36 @@ class ErrorMiddleware {
    */
   getAvailableEndpoints() {
     return [
+      // Monitoring routes
       'GET /api/health',
       'GET /api/live-monitoring',
       'POST /api/live-monitoring',
       'GET /api/aggregated-stats',
       'GET /api/system-status',
       'GET /api/efficiency-metrics',
+      'POST /api/cleanup',
+      
+      // Market data routes
       'GET /api/market-data',
       'POST /api/market-data',
-      'POST /api/cleanup'
+      'GET /api/market-data/summary',
+      
+      // AI Trading routes
+      'GET /api/ai-trading',
+      'POST /api/ai-trading/sessions',
+      'GET /api/ai-trading/sessions',
+      'GET /api/ai-trading/system-status',
+      'POST /api/ai-trading/signals',
+      
+      // Auto Training routes
+      'POST /api/auto-training/start',
+      'POST /api/auto-training/stop',
+      'GET /api/auto-training/status',
+      'PUT /api/auto-training/config',
+      
+      // Utility routes
+      'GET /api/ping',
+      'GET /api/version'
     ];
   }
 }

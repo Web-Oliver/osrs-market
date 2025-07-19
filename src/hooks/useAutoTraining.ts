@@ -5,57 +5,24 @@ import type { AutoTrainingConfig } from '../types/autoTraining'
 // Default comprehensive configuration with MongoDB persistence
 const DEFAULT_AUTO_TRAINING_CONFIG: AutoTrainingConfig = {
   dataCollection: {
-    updateInterval: 300000, // 5 minutes
-    maxRetries: 3,
-    enableTimeseriesData: true,
-    enableMapping: true,
-    enableHistoricalData: false,
-    enablePersistence: true,
-    persistence: {
-      type: 'mongodb',
-      config: {
-        connectionString: 'mongodb://localhost:27017',
-        databaseName: 'osrs_market_data',
-        options: {
-          maxPoolSize: 10,
-          serverSelectionTimeoutMS: 5000,
-          retryWrites: true,
-          w: 'majority'
-        }
-      }
-    },
-    itemFilters: {
-      minPrice: 1000, // 1k GP minimum
-      maxPrice: 100000000, // 100M GP maximum
-      membersOnly: false,
-      tradeable: true,
-      grandExchange: true
-    },
-    dataRetention: {
-      maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      maxRecords: 10000
-    }
+    enableAutoCollection: true,
+    collectionInterval: 300000, // 5 minutes
+    maxItemsPerCollection: 1000,
+    enableHistoricalData: true
   },
   neuralNetwork: {
-    inputSize: 8,
-    hiddenLayers: [128, 64, 32],
+    inputSize: 10,
+    hiddenLayers: [64, 32],
     outputSize: 3,
     learningRate: 0.001,
     batchSize: 32,
-    memorySize: 10000,
-    epsilon: 1.0,
-    epsilonDecay: 0.995,
-    epsilonMin: 0.01,
-    gamma: 0.99,
-    tau: 0.001
+    epochs: 100
   },
   adaptiveLearning: {
-    enableOnlineLearning: true,
-    learningFrequency: 50,
-    performanceThreshold: 60,
-    adaptationRate: 0.1,
-    memoryRetention: 0.8,
-    explorationBoost: true
+    enableAdaptation: true,
+    adaptationInterval: 3600000, // 1 hour
+    performanceThreshold: 0.7,
+    explorationDecay: 0.995
   },
   training: {
     enableAutoTraining: true,
@@ -66,11 +33,11 @@ const DEFAULT_AUTO_TRAINING_CONFIG: AutoTrainingConfig = {
   },
   itemSelection: {
     enableSmartFiltering: true,
-    volumeThreshold: 100,
-    priceRangeMin: 5000, // 5k GP minimum for trading
-    priceRangeMax: 50000000, // 50M GP maximum for manageable risk
-    spreadThreshold: 2, // 2% minimum spread
-    maxItemsToTrade: 50
+    volumeThreshold: 1000,
+    priceRangeMin: 1000,
+    priceRangeMax: 10000000,
+    spreadThreshold: 5,
+    maxItemsToTrade: 100
   }
 }
 
@@ -132,7 +99,14 @@ export function useAutoTraining() {
         setError('Failed to start auto training')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start auto training')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to start auto training'
+      // If already running, that's not really an error
+      if (errorMessage.includes('already running')) {
+        setError(null)
+        console.log('Auto training is already running')
+      } else {
+        setError(errorMessage)
+      }
     }
   }, [isInitialized, config, backend])
 
@@ -266,23 +240,27 @@ export function useAutoTraining() {
     }
   }, [backend])
 
-  // Auto-initialize on mount
+  // Auto-initialize on mount and check backend status
   useEffect(() => {
     if (!isInitialized) {
       initialize()
     }
   }, [isInitialized, initialize])
 
-  // Auto-load saved model on initialization
-  useEffect(() => {
-    if (isInitialized && !backend.isRunning) {
-      const savedModel = localStorage.getItem('osrs-auto-training-model')
-      if (savedModel) {
-        console.log('Auto-loading saved model...')
-        loadModel(savedModel)
-      }
-    }
-  }, [isInitialized, backend.isRunning, loadModel])
+  // Check backend status on initialization (removed to prevent infinite loop)
+  // The status will be fetched automatically by the backend hook's auto-refresh mechanism
+
+  // Auto-load saved model on initialization (disabled to prevent infinite loops)
+  // Model loading should be done manually when needed
+  // useEffect(() => {
+  //   if (isInitialized && !backend.isRunning) {
+  //     const savedModel = localStorage.getItem('osrs-auto-training-model')
+  //     if (savedModel) {
+  //       console.log('Auto-loading saved model...')
+  //       loadModel(savedModel)
+  //     }
+  //   }
+  // }, [isInitialized, backend.isRunning, loadModel])
 
   return {
     // State

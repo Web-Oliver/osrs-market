@@ -166,7 +166,7 @@ export const useAITradingBackend = () => {
   }, [])
 
   /**
-   * Process market data for trading decisions
+   * Process market data for trading decisions with auto-session refresh
    */
   const processMarketData = useCallback(async (
     sessionId: string,
@@ -178,6 +178,28 @@ export const useAITradingBackend = () => {
       const response = await AITradingApi.processMarketData(sessionId, items)
       
       if (!response.success) {
+        // Check if it's a session not found error (404)
+        if (response.error?.includes('404') || response.error?.includes('not found') || response.error?.includes('session')) {
+          console.log('🔄 Session expired, creating new session...')
+          
+          // Create a new session automatically
+          const newSession = await startTradingSession('Auto-refreshed Session')
+          if (newSession) {
+            console.log('✅ New session created:', newSession.sessionId)
+            
+            // Retry with new session
+            const retryResponse = await AITradingApi.processMarketData(newSession.sessionId, items)
+            if (retryResponse.success) {
+              setState(prev => ({
+                ...prev,
+                isLoading: false,
+                actions: retryResponse.data.actions
+              }))
+              return retryResponse.data.actions
+            }
+          }
+        }
+        
         throw new Error(response.error || 'Failed to process market data')
       }
 
@@ -198,10 +220,10 @@ export const useAITradingBackend = () => {
       }))
       return []
     }
-  }, [])
+  }, [startTradingSession])
 
   /**
-   * Get training progress for a session
+   * Get training progress for a session with auto-session refresh
    */
   const getTrainingProgress = useCallback(async (sessionId: string): Promise<void> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }))
@@ -210,6 +232,28 @@ export const useAITradingBackend = () => {
       const response = await AITradingApi.getTrainingProgress(sessionId)
       
       if (!response.success) {
+        // Check if it's a session not found error (404)
+        if (response.error?.includes('404') || response.error?.includes('not found') || response.error?.includes('session')) {
+          console.log('🔄 Session expired, creating new session for progress check...')
+          
+          // Create a new session automatically
+          const newSession = await startTradingSession('Auto-refreshed Session for Progress')
+          if (newSession) {
+            console.log('✅ New session created for progress:', newSession.sessionId)
+            
+            // Retry with new session
+            const retryResponse = await AITradingApi.getTrainingProgress(newSession.sessionId)
+            if (retryResponse.success) {
+              setState(prev => ({
+                ...prev,
+                isLoading: false,
+                trainingProgress: retryResponse.data
+              }))
+              return
+            }
+          }
+        }
+        
         throw new Error(response.error || 'Failed to get training progress')
       }
 
@@ -225,10 +269,10 @@ export const useAITradingBackend = () => {
         error: error instanceof Error ? error.message : 'Unknown error'
       }))
     }
-  }, [])
+  }, [startTradingSession])
 
   /**
-   * Get performance analytics for a session
+   * Get performance analytics for a session with auto-session refresh
    */
   const getPerformanceAnalytics = useCallback(async (sessionId: string): Promise<void> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }))
@@ -237,6 +281,28 @@ export const useAITradingBackend = () => {
       const response = await AITradingApi.getPerformanceAnalytics(sessionId)
       
       if (!response.success) {
+        // Check if it's a session not found error (404)
+        if (response.error?.includes('404') || response.error?.includes('not found') || response.error?.includes('session')) {
+          console.log('🔄 Session expired, creating new session for analytics...')
+          
+          // Create a new session automatically
+          const newSession = await startTradingSession('Auto-refreshed Session for Analytics')
+          if (newSession) {
+            console.log('✅ New session created for analytics:', newSession.sessionId)
+            
+            // Retry with new session
+            const retryResponse = await AITradingApi.getPerformanceAnalytics(newSession.sessionId)
+            if (retryResponse.success) {
+              setState(prev => ({
+                ...prev,
+                isLoading: false,
+                analytics: retryResponse.data
+              }))
+              return
+            }
+          }
+        }
+        
         throw new Error(response.error || 'Failed to get performance analytics')
       }
 
@@ -252,10 +318,10 @@ export const useAITradingBackend = () => {
         error: error instanceof Error ? error.message : 'Unknown error'
       }))
     }
-  }, [])
+  }, [startTradingSession])
 
   /**
-   * Update adaptive configuration
+   * Update adaptive configuration with auto-session refresh
    */
   const updateAdaptiveConfig = useCallback(async (
     sessionId: string,
@@ -267,6 +333,33 @@ export const useAITradingBackend = () => {
       const response = await AITradingApi.updateAdaptiveConfig(sessionId, config)
       
       if (!response.success) {
+        // Check if it's a session not found error (404)
+        if (response.error?.includes('404') || response.error?.includes('not found') || response.error?.includes('session')) {
+          console.log('🔄 Session expired, creating new session for config update...')
+          
+          // Create a new session automatically
+          const newSession = await startTradingSession('Auto-refreshed Session for Config')
+          if (newSession) {
+            console.log('✅ New session created for config:', newSession.sessionId)
+            
+            // Retry with new session
+            const retryResponse = await AITradingApi.updateAdaptiveConfig(newSession.sessionId, config)
+            if (retryResponse.success) {
+              setState(prev => ({
+                ...prev,
+                isLoading: false,
+                sessions: prev.sessions.map(s => 
+                  s.sessionId === newSession.sessionId ? { ...s, adaptiveConfig: retryResponse.data.adaptiveConfig } : s
+                ),
+                currentSession: prev.currentSession?.sessionId === newSession.sessionId 
+                  ? { ...prev.currentSession, adaptiveConfig: retryResponse.data.adaptiveConfig }
+                  : prev.currentSession
+              }))
+              return true
+            }
+          }
+        }
+        
         throw new Error(response.error || 'Failed to update adaptive configuration')
       }
 
@@ -290,10 +383,10 @@ export const useAITradingBackend = () => {
       }))
       return false
     }
-  }, [])
+  }, [startTradingSession])
 
   /**
-   * Save AI model
+   * Save AI model with auto-session refresh
    */
   const saveModel = useCallback(async (sessionId: string): Promise<string | null> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }))
@@ -302,6 +395,24 @@ export const useAITradingBackend = () => {
       const response = await AITradingApi.saveModel(sessionId)
       
       if (!response.success) {
+        // Check if it's a session not found error (404)
+        if (response.error?.includes('404') || response.error?.includes('not found') || response.error?.includes('session')) {
+          console.log('🔄 Session expired, creating new session for model save...')
+          
+          // Create a new session automatically
+          const newSession = await startTradingSession('Auto-refreshed Session for Save')
+          if (newSession) {
+            console.log('✅ New session created for save:', newSession.sessionId)
+            
+            // Retry with new session
+            const retryResponse = await AITradingApi.saveModel(newSession.sessionId)
+            if (retryResponse.success) {
+              setState(prev => ({ ...prev, isLoading: false }))
+              return retryResponse.data.modelData
+            }
+          }
+        }
+        
         throw new Error(response.error || 'Failed to save model')
       }
 
@@ -315,10 +426,10 @@ export const useAITradingBackend = () => {
       }))
       return null
     }
-  }, [])
+  }, [startTradingSession])
 
   /**
-   * Load AI model
+   * Load AI model with auto-session refresh
    */
   const loadModel = useCallback(async (sessionId: string, modelData: string): Promise<boolean> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }))
@@ -327,6 +438,24 @@ export const useAITradingBackend = () => {
       const response = await AITradingApi.loadModel(sessionId, modelData)
       
       if (!response.success) {
+        // Check if it's a session not found error (404)
+        if (response.error?.includes('404') || response.error?.includes('not found') || response.error?.includes('session')) {
+          console.log('🔄 Session expired, creating new session for model load...')
+          
+          // Create a new session automatically
+          const newSession = await startTradingSession('Auto-refreshed Session for Load')
+          if (newSession) {
+            console.log('✅ New session created for load:', newSession.sessionId)
+            
+            // Retry with new session
+            const retryResponse = await AITradingApi.loadModel(newSession.sessionId, modelData)
+            if (retryResponse.success) {
+              setState(prev => ({ ...prev, isLoading: false }))
+              return true
+            }
+          }
+        }
+        
         throw new Error(response.error || 'Failed to load model')
       }
 
@@ -340,10 +469,10 @@ export const useAITradingBackend = () => {
       }))
       return false
     }
-  }, [])
+  }, [startTradingSession])
 
   /**
-   * Export training data
+   * Export training data with auto-session refresh
    */
   const exportTrainingData = useCallback(async (sessionId: string): Promise<Record<string, unknown> | null> => {
     setState(prev => ({ ...prev, isLoading: true, error: null }))
@@ -352,6 +481,24 @@ export const useAITradingBackend = () => {
       const response = await AITradingApi.exportTrainingData(sessionId)
       
       if (!response.success) {
+        // Check if it's a session not found error (404)
+        if (response.error?.includes('404') || response.error?.includes('not found') || response.error?.includes('session')) {
+          console.log('🔄 Session expired, creating new session for data export...')
+          
+          // Create a new session automatically
+          const newSession = await startTradingSession('Auto-refreshed Session for Export')
+          if (newSession) {
+            console.log('✅ New session created for export:', newSession.sessionId)
+            
+            // Retry with new session
+            const retryResponse = await AITradingApi.exportTrainingData(newSession.sessionId)
+            if (retryResponse.success) {
+              setState(prev => ({ ...prev, isLoading: false }))
+              return retryResponse.data.exportData
+            }
+          }
+        }
+        
         throw new Error(response.error || 'Failed to export training data')
       }
 
@@ -365,7 +512,7 @@ export const useAITradingBackend = () => {
       }))
       return null
     }
-  }, [])
+  }, [startTradingSession])
 
   /**
    * Generate trading signals

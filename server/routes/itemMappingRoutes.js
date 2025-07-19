@@ -36,7 +36,6 @@ router.post(
       force: { type: 'boolean', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 300000, max: 2 }), // 2 requests per 5 minutes
   errorMiddleware.handleAsyncError(itemMappingController.importMappings)
 );
 
@@ -46,7 +45,6 @@ router.post(
  */
 router.get(
   '/health',
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   errorMiddleware.handleAsyncError(itemMappingController.healthCheck)
 );
 
@@ -56,7 +54,6 @@ router.get(
  */
 router.get(
   '/sync/status',
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 30 }), // 30 requests per minute
   errorMiddleware.handleAsyncError(itemMappingController.getSyncStatus)
 );
 
@@ -69,12 +66,11 @@ router.get(
   requestMiddleware.validateRequest({
     query: {
       searchTerm: { type: 'string', required: true, minLength: 2, maxLength: 100 },
-      limit: { type: 'number', min: 1, max: 100, optional: true },
+      limit: { type: 'string', optional: true },
       members: { type: 'boolean', optional: true },
       tradeable: { type: 'boolean', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 120 }), // 120 requests per minute
   errorMiddleware.handleAsyncError(itemMappingController.searchItems)
 );
 
@@ -86,12 +82,11 @@ router.get(
   '/high-value',
   requestMiddleware.validateRequest({
     query: {
-      limit: { type: 'number', min: 1, max: 100, optional: true },
-      minValue: { type: 'number', min: 0, optional: true },
+      limit: { type: 'string', optional: true },
+      minValue: { type: 'string', optional: true },
       members: { type: 'boolean', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   errorMiddleware.handleAsyncError(itemMappingController.getHighValueItems)
 );
 
@@ -110,12 +105,11 @@ router.get(
       }
     },
     query: {
-      limit: { type: 'number', min: 1, max: 100, optional: true },
+      limit: { type: 'string', optional: true },
       tradeable: { type: 'boolean', optional: true },
       sort: { type: 'string', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   errorMiddleware.handleAsyncError(itemMappingController.getItemsByCategory)
 );
 
@@ -127,16 +121,15 @@ router.get(
   '/',
   requestMiddleware.validateRequest({
     query: {
-      page: { type: 'number', min: 1, optional: true },
-      limit: { type: 'number', min: 1, max: 100, optional: true },
+      page: { type: 'string', optional: true },
+      limit: { type: 'string', optional: true },
       members: { type: 'boolean', optional: true },
       tradeable: { type: 'boolean', optional: true },
-      minValue: { type: 'number', min: 0, optional: true },
-      maxValue: { type: 'number', min: 0, optional: true },
+      minValue: { type: 'string', optional: true },
+      maxValue: { type: 'string', optional: true },
       sort: { type: 'string', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 120 }), // 120 requests per minute
   errorMiddleware.handleAsyncError(itemMappingController.getItems)
 );
 
@@ -150,7 +143,6 @@ router.get(
  */
 router.get(
   '/business/insights',
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 20 }), // 20 requests per minute
   errorMiddleware.handleAsyncError(itemMappingController.getBusinessInsights)
 );
 
@@ -179,13 +171,12 @@ router.get(
       }
     },
     query: {
-      valueThreshold: { type: 'number', min: 0, optional: true },
-      minimumProfit: { type: 'number', min: 0, optional: true },
-      maxAge: { type: 'number', min: 0, optional: true },
-      maxValue: { type: 'number', min: 0, optional: true }
+      valueThreshold: { type: 'string', optional: true },
+      minimumProfit: { type: 'string', optional: true },
+      maxAge: { type: 'string', optional: true },
+      maxValue: { type: 'string', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 60 }), // 60 requests per minute
   errorMiddleware.handleAsyncError(itemMappingController.findByBusinessCriteria)
 );
 
@@ -197,11 +188,60 @@ router.get(
   '/:itemId/enhanced',
   requestMiddleware.validateRequest({
     params: {
-      itemId: { type: 'number', required: true, min: 1 }
+      itemId: { type: 'string', required: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 120 }), // 120 requests per minute
   errorMiddleware.handleAsyncError(itemMappingController.getItemEnhanced)
+);
+
+/**
+ * Context7 Pattern: GET /api/items/:itemId/ge-limits
+ * Get Grand Exchange buy limits for a specific item
+ */
+router.get(
+  '/:itemId/ge-limits',
+  requestMiddleware.validateRequest({
+    params: {
+      itemId: { type: 'string', required: true }
+    }
+  }),
+  async (req, res) => {
+    try {
+      const itemId = parseInt(req.params.itemId);
+      const { ItemMappingService } = require('../services/ItemMappingService');
+      const itemMappingService = new ItemMappingService();
+      
+      const item = await itemMappingService.getItemById(itemId);
+      
+      if (!item) {
+        return res.status(404).json({
+          success: false,
+          error: 'Item not found',
+          timestamp: Date.now()
+        });
+      }
+      
+      const geLimits = {
+        itemId: itemId,
+        buyLimit: item.buy_limit || null,
+        tradeableOnGE: item.tradeable_on_ge || false,
+        members: item.members || false,
+        stackable: item.stackable || false
+      };
+      
+      res.status(200).json({
+        success: true,
+        data: geLimits,
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+        timestamp: Date.now()
+      });
+    }
+  }
 );
 
 /**
@@ -212,10 +252,9 @@ router.get(
   '/:itemId',
   requestMiddleware.validateRequest({
     params: {
-      itemId: { type: 'number', required: true, min: 1 }
+      itemId: { type: 'string', required: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 200 }), // 200 requests per minute
   errorMiddleware.handleAsyncError(itemMappingController.getItem)
 );
 
@@ -243,7 +282,6 @@ router.post(
       icon: { type: 'string', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 10 }), // 10 requests per minute
   errorMiddleware.handleAsyncError(itemMappingController.createItem)
 );
 
@@ -273,7 +311,6 @@ router.put(
       icon: { type: 'string', optional: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 20 }), // 20 requests per minute
   errorMiddleware.handleAsyncError(itemMappingController.updateItem)
 );
 
@@ -285,10 +322,9 @@ router.delete(
   '/:itemId',
   requestMiddleware.validateRequest({
     params: {
-      itemId: { type: 'number', required: true, min: 1 }
+      itemId: { type: 'string', required: true }
     }
   }),
-  requestMiddleware.rateLimit({ windowMs: 60000, max: 10 }), // 10 requests per minute
   errorMiddleware.handleAsyncError(itemMappingController.deleteItem)
 );
 

@@ -108,7 +108,7 @@ class ImportScript {
       
       const databaseName = 
         process.env.MONGODB_DATABASE || 
-        'osrs_market_tracker';
+        'osrs_market_data';
 
       const connectionUrl = `${mongoConnectionString}/${databaseName}`;
       
@@ -189,7 +189,7 @@ DESCRIPTION:
 
 ENVIRONMENT VARIABLES:
   MONGODB_CONNECTION_STRING   MongoDB connection URL (default: mongodb://localhost:27017)
-  MONGODB_DATABASE           Database name (default: osrs_market_tracker)
+  MONGODB_DATABASE           Database name (default: osrs_market_data)
 
 EXAMPLES:
   # Normal import (will skip if data exists)

@@ -44,10 +44,8 @@ class MarketDataValidator extends BaseValidator {
         }
       },
       getItemPriceHistory: {
-        params: {
-          itemId: { type: 'number', required: true, min: 1 }
-        },
         query: {
+          itemId: { type: 'string', required: true, pattern: '^[1-9][0-9]*$' },
           startTime: { type: 'number', min: 0, optional: true },
           endTime: { type: 'number', min: 0, optional: true },
           limit: { type: 'number', min: 1, max: 1000, optional: true },

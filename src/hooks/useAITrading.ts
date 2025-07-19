@@ -8,8 +8,8 @@ import { useAITradingBackend } from './useAITradingBackend'
 
 // Default neural network configuration
 const DEFAULT_NETWORK_CONFIG: NeuralNetworkConfig = {
-  inputSize: 8, // Market state features
-  hiddenLayers: [128, 64, 32], // Three hidden layers
+  inputSize: 10, // Market state features
+  hiddenLayers: [64, 32], // Two hidden layers
   outputSize: 3, // BUY, SELL, HOLD
   learningRate: 0.001,
   batchSize: 32,
@@ -25,7 +25,7 @@ const DEFAULT_NETWORK_CONFIG: NeuralNetworkConfig = {
 const DEFAULT_ADAPTIVE_CONFIG: AdaptiveLearningConfig = {
   enableOnlineLearning: true,
   learningFrequency: 50, // Retrain every 50 trades
-  performanceThreshold: 60, // 60% success rate threshold
+  performanceThreshold: 0.6, // 60% success rate threshold (0.0 to 1.0 range)
   adaptationRate: 0.1,
   memoryRetention: 0.8, // Keep 80% of old memories
   explorationBoost: true
@@ -139,6 +139,13 @@ export function useAITrading() {
 
   // Process market data and get trading actions
   const processMarketData = useCallback(async (items: ItemPrice[]) => {
+    console.log('🔍 [useAITrading.processMarketData] Called with:', {
+      currentSessionId,
+      itemsLength: items.length,
+      itemsSample: items.slice(0, 2),
+      firstItem: items[0] ? JSON.stringify(items[0], null, 2) : null
+    });
+
     if (!currentSessionId) {
       setError('AI system not initialized')
       return []
@@ -149,6 +156,7 @@ export function useAITrading() {
       setError(null)
       return actions
     } catch (err) {
+      console.error('❌ [useAITrading.processMarketData] Error:', err);
       setError(err instanceof Error ? err.message : 'Failed to process market data')
       return []
     }
@@ -301,7 +309,7 @@ export function useAITrading() {
     if (!isInitialized) {
       initializeAI()
     }
-  }, [isInitialized, initializeAI])
+  }, [isInitialized])
 
   // Auto-load saved model on initialization
   useEffect(() => {

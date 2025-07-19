@@ -27,7 +27,7 @@ class AutoTrainingService {
       },
       neuralNetwork: {
         inputSize: 10,
-        hiddenSize: 64,
+        hiddenLayers: [64, 32],
         outputSize: 3,
         learningRate: 0.001,
         batchSize: 32,

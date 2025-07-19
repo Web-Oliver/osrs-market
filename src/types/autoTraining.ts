@@ -1,35 +1,9 @@
 export interface AutoTrainingConfig {
   dataCollection: {
-    updateInterval: number
-    maxRetries: number
-    enableTimeseriesData: boolean
-    enableMapping: boolean
+    enableAutoCollection: boolean
+    collectionInterval: number
+    maxItemsPerCollection: number
     enableHistoricalData: boolean
-    enablePersistence: boolean
-    persistence?: {
-      type: 'mongodb' | 'file'
-      config: {
-        connectionString: string
-        databaseName: string
-        options: {
-          maxPoolSize: number
-          serverSelectionTimeoutMS: number
-          retryWrites: boolean
-          w: string
-        }
-      }
-    }
-    itemFilters: {
-      minPrice: number
-      maxPrice: number
-      membersOnly: boolean
-      tradeable: boolean
-      grandExchange: boolean
-    }
-    dataRetention: {
-      maxAge: number
-      maxRecords: number
-    }
   }
   neuralNetwork: {
     inputSize: number
@@ -37,20 +11,13 @@ export interface AutoTrainingConfig {
     outputSize: number
     learningRate: number
     batchSize: number
-    memorySize: number
-    epsilon: number
-    epsilonDecay: number
-    epsilonMin: number
-    gamma: number
-    tau: number
+    epochs: number
   }
   adaptiveLearning: {
-    enableOnlineLearning: boolean
-    learningFrequency: number
+    enableAdaptation: boolean
+    adaptationInterval: number
     performanceThreshold: number
-    adaptationRate: number
-    memoryRetention: number
-    explorationBoost: boolean
+    explorationDecay: number
   }
   training: {
     enableAutoTraining: boolean

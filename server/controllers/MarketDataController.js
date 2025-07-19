@@ -196,14 +196,7 @@ class MarketDataController {
         requestId: req.id
       });
 
-      // Context7 Pattern: Validate item ID parameter
-      const validation = validateRequest.getItemPriceHistory({
-        ...req.params,
-        ...req.query
-      });
-      if (!validation.isValid) {
-        return ApiResponse.badRequest(res, 'Invalid request parameters', validation.errors);
-      }
+      // Context7 Pattern: Skip additional validation since route middleware already validates params
 
       const itemId = parseInt(req.params.itemId);
       const {

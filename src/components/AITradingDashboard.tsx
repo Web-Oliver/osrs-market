@@ -3,7 +3,24 @@ import { useAITrading } from '../hooks/useAITrading'
 import { useItemPrices } from '../hooks/useItemPrices'
 import { useNotifications } from '../hooks/useNotifications'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { generateMockTrainingData, formatTimestamp, formatCurrency, formatPercentage } from '../utils/mockChartData'
+// Utility functions for formatting (extracted from mockChartData)
+const formatTimestamp = (timestamp: string): string => {
+  const date = new Date(timestamp);
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
+const formatCurrency = (value: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
+};
+
+const formatPercentage = (value: number): string => {
+  return `${(value * 100).toFixed(1)}%`;
+};
 import type { AdaptiveLearningConfig } from '../types/aiTrading'
 import type { PerformanceAnalytics } from '../services/aiTradingApi'
 
@@ -40,10 +57,19 @@ export function AITradingDashboard() {
 
   // Auto-process market data when available
   useEffect(() => {
+    console.log('🔍 [AITradingDashboard] Auto-process check:', {
+      itemsLength: items.length,
+      isInitialized,
+      isTraining,
+      itemsSample: items.slice(0, 2),
+      willProcess: items.length > 0 && isInitialized && isTraining
+    });
+    
     if (items.length > 0 && isInitialized && isTraining) {
+      console.log('🚀 [AITradingDashboard] Processing market data with items:', items.length);
       processMarketData(items)
     }
-  }, [items, isInitialized, isTraining, processMarketData])
+  }, [items, isInitialized, isTraining])
 
   const handleStartTraining = () => {
     if (!isTraining) {
@@ -90,7 +116,7 @@ export function AITradingDashboard() {
 
   const recentMetrics = trainingMetrics.slice(-10)
   const [analytics, setAnalytics] = useState<PerformanceAnalytics | null>(null)
-  const [trainingData, setTrainingData] = useState(() => generateMockTrainingData())
+  const [trainingData, setTrainingData] = useState<any[]>([])
   
   useEffect(() => {
     const fetchAnalytics = async () => {
@@ -98,17 +124,31 @@ export function AITradingDashboard() {
       setAnalytics(result)
     }
     fetchAnalytics()
-  }, [getPerformanceAnalytics])
+  }, [])
 
   // Update training data every 30 seconds when training is active
   useEffect(() => {
+    const fetchTrainingData = async () => {
+      try {
+        if (currentSession?.id) {
+          const response = await fetch(`/api/ai-trading/sessions/${currentSession.id}/training-data`);
+          if (response.ok) {
+            const data = await response.json();
+            setTrainingData(data);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching training data:', error);
+      }
+    };
+
+    fetchTrainingData();
+    
     if (isTraining) {
-      const interval = setInterval(() => {
-        setTrainingData(generateMockTrainingData())
-      }, 30000)
-      return () => clearInterval(interval)
+      const interval = setInterval(fetchTrainingData, 30000);
+      return () => clearInterval(interval);
     }
-  }, [isTraining])
+  }, [isTraining, currentSession?.id])
 
   return (
     <div className="space-y-6">
@@ -193,7 +233,9 @@ export function AITradingDashboard() {
               <div>
                 <span className="text-blue-600">Created:</span>
                 <span className="ml-2 font-medium">
-                  {new Date(currentSession.createdAt).toLocaleDateString()}
+                  {currentSession.createdAt 
+                    ? new Date(currentSession.createdAt).toLocaleDateString() 
+                    : 'Not available'}
                 </span>
               </div>
             </div>

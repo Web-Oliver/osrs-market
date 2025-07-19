@@ -8,10 +8,13 @@
  * - Efficiency calculations
  */
 
+const { Logger } = require('./Logger');
+
 class MetricsCalculator {
   constructor() {
     this.cache = new Map();
     this.cacheTimeout = 60000; // 1 minute cache
+    this.logger = new Logger('MetricsCalculator');
   }
 
   /**
@@ -88,7 +91,9 @@ class MetricsCalculator {
         }
       });
     } else {
-      this.logger.warn('Insufficient historical data for trend calculation');
+      if (this.logger && this.logger.warn) {
+        this.logger.warn('Insufficient historical data for trend calculation');
+      }
       // Set all trends to 'unknown' when no historical data is available
       Object.keys(trends).forEach(metric => {
         trends[metric] = 'unknown';

@@ -11,17 +11,16 @@
 const express = require('express');
 const { OSRSScraperController } = require('../controllers/OSRSScraperController');
 const { RequestMiddleware } = require('../middleware/RequestMiddleware');
+const { ErrorMiddleware } = require('../middleware/ErrorMiddleware');
 
 const router = express.Router();
 const scraperController = new OSRSScraperController();
 const requestMiddleware = new RequestMiddleware();
+const errorMiddleware = new ErrorMiddleware();
 
 /**
- * Context7 Pattern: Apply middleware for rate limiting and validation
+ * Context7 Pattern: Apply route-specific middleware only
  */
-router.use(requestMiddleware.cors());
-router.use(requestMiddleware.securityHeaders());
-router.use(requestMiddleware.sanitizeRequest());
 
 /**
  * POST /api/osrs-scraper/import/start
@@ -40,14 +39,7 @@ router.use(requestMiddleware.sanitizeRequest());
  * - Respectful scraping with rate limiting
  */
 router.post('/import/start', 
-  requestMiddleware.rateLimit({ 
-    windowMs: 600000, // 10 minutes 
-    max: 1, // Only 1 scrape per 10 minutes
-    message: 'Data import rate limited. Please wait 10 minutes between scrapes.'
-  }),
-  async (req, res) => {
-    await scraperController.startFullImport(req, res);
-  }
+  errorMiddleware.handleAsyncError(scraperController.startFullImport)
 );
 
 /**
@@ -60,9 +52,7 @@ router.post('/import/start',
  * - System resource usage
  * - Last scrape completion details
  */
-router.get('/status', async (req, res) => {
-  await scraperController.getScrapingStatus(req, res);
-});
+router.get('/status', errorMiddleware.handleAsyncError(scraperController.getScrapingStatus));
 
 /**
  * GET /api/osrs-scraper/data/latest
@@ -75,9 +65,7 @@ router.get('/status', async (req, res) => {
  * 
  * Example: GET /data/latest?category=mostTraded&limit=20&format=csv
  */
-router.get('/data/latest', async (req, res) => {
-  await scraperController.getLatestScrapedData(req, res);
-});
+router.get('/data/latest', errorMiddleware.handleAsyncError(scraperController.getLatestScrapedData));
 
 /**
  * GET /api/osrs-scraper/patterns
@@ -93,9 +81,7 @@ router.get('/data/latest', async (req, res) => {
  * - Anomaly detection results
  * - Market intelligence insights
  */
-router.get('/patterns', async (req, res) => {
-  await scraperController.getMarketPatterns(req, res);
-});
+router.get('/patterns', errorMiddleware.handleAsyncError(scraperController.getMarketPatterns));
 
 /**
  * GET /api/osrs-scraper/search
@@ -113,14 +99,7 @@ router.get('/patterns', async (req, res) => {
  * Example: GET /search?query=dragon&includeHistorical=true
  */
 router.get('/search', 
-  requestMiddleware.rateLimit({ 
-    windowMs: 60000, // 1 minute
-    max: 30, // 30 searches per minute
-    message: 'Search rate limited. Maximum 30 searches per minute.'
-  }),
-  async (req, res) => {
-    await scraperController.searchItemData(req, res);
-  }
+  errorMiddleware.handleAsyncError(scraperController.searchItemData)
 );
 
 /**
@@ -133,9 +112,7 @@ router.get('/search',
  * - System resource monitoring
  * - Recent operation status
  */
-router.get('/health', async (req, res) => {
-  await scraperController.getHealthStatus(req, res);
-});
+router.get('/health', errorMiddleware.handleAsyncError(scraperController.getHealthStatus));
 
 /**
  * Context7 Pattern: API Documentation endpoint

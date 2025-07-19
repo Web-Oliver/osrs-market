@@ -12,11 +12,13 @@
 const express = require('express');
 const { AITradingController } = require('../controllers/AITradingController');
 const { validateRequest } = require('../validators/AITradingValidator');
+const { ErrorMiddleware } = require('../middleware/ErrorMiddleware');
 const { ApiResponse } = require('../utils/ApiResponse');
 const { Logger } = require('../utils/Logger');
 
 const router = express.Router();
 const controller = new AITradingController();
+const errorMiddleware = new ErrorMiddleware();
 const logger = new Logger('AITradingRoutes');
 
 /**
@@ -84,7 +86,7 @@ router.get('/sessions/:sessionId/export', controller.exportTrainingData);
  */
 
 // Generate trading signals (no session required)
-router.post('/signals', controller.generateTradingSignals);
+router.post('/signals', errorMiddleware.handleAsyncError(controller.generateTradingSignals));
 
 /**
  * Context7 Pattern: Documentation Routes
@@ -288,7 +290,7 @@ router.use((error, req, res, next) => {
   }
 
   // Default error response
-  return ApiResponse.internalServerError(res, 'AI Trading operation failed');
+  return ApiResponse.error(res, 'AI Trading operation failed');
 });
 
 module.exports = router;

@@ -10,10 +10,12 @@
  */
 
 const { Logger } = require('../utils/Logger');
+const { PythonRLClientService } = require('./PythonRLClientService');
 const { NeuralTradingAgentService } = require('./NeuralTradingAgentService');
 const { TradeOutcomeTrackerService } = require('./TradeOutcomeTrackerService');
 const { TradingAnalysisService } = require('./TradingAnalysisService');
 const { MongoDataPersistence } = require('../mongoDataPersistence');
+const { AIModelMetadata } = require('../models/AIModelMetadata');
 
 // DOMAIN INTEGRATION FOR TRADING
 const { ItemRepository } = require('../repositories/ItemRepository');
@@ -23,6 +25,11 @@ const { ItemDomainService } = require('../domain/services/ItemDomainService');
 class AITradingOrchestratorService {
   constructor(networkConfig, adaptiveConfig) {
     this.logger = new Logger('AITradingOrchestrator');
+    
+    // REFACTORED: Use PythonRLClientService for AI operations
+    this.pythonRLClient = new PythonRLClientService(networkConfig);
+    
+    // Keep legacy agent for fallback compatibility
     this.agent = new NeuralTradingAgentService(networkConfig);
     this.outcomeTracker = new TradeOutcomeTrackerService();
     this.tradingAnalysis = new TradingAnalysisService();
@@ -115,44 +122,75 @@ class AITradingOrchestratorService {
       });
 
       for (const item of items) {
-        const marketState = this.convertToMarketState(item);
-        const prediction = this.agent.predict(marketState);
-        
-        // CRITICAL: Save AI decision to MongoDB for tracking and learning
-        if (this.persistence && this.currentSession) {
-          const decision = {
-            sessionId: this.currentSession.id,
-            itemId: item.id || item.itemId,
-            action: prediction.action,
-            confidence: prediction.confidence,
-            marketState: marketState,
-            reasoning: prediction.reasoning || 'Neural network prediction',
-            timestamp: Date.now()
-          };
+        try {
+          // Add individual item debugging
+          this.logger.debug('🔍 Processing individual item', {
+            itemId: item.id,
+            itemName: item.name,
+            hasPriceData: !!item.priceData,
+            hasPriceHistory: !!item.priceHistory,
+            priceHistoryLength: item.priceHistory?.length || 0
+          });
+
+          const marketState = this.convertToMarketState(item);
+          const prediction = await this.predictWithPythonRL(marketState);
           
-          try {
-            const decisionId = await this.persistence.saveAIDecision(decision);
-            prediction.decisionId = decisionId; // Track for outcome updates
+          // CRITICAL: Save AI decision to MongoDB for tracking and learning
+          if (this.persistence && this.currentSession) {
+            const decision = {
+              sessionId: this.currentSession.id,
+              itemId: item.id || item.itemId,
+              action: prediction.action,
+              confidence: prediction.confidence,
+              marketState: marketState,
+              reasoning: prediction.reasoning || 'Neural network prediction',
+              timestamp: Date.now()
+            };
             
-            this.logger.debug('💾 AI decision saved to database', {
-              decisionId,
-              itemId: decision.itemId,
-              action: decision.action,
-              confidence: decision.confidence
-            });
-          } catch (error) {
-            this.logger.error('❌ Failed to save AI decision', error);
+            try {
+              const decisionId = await this.persistence.saveAIDecision(decision);
+              prediction.decisionId = decisionId; // Track for outcome updates
+              
+              this.logger.debug('💾 AI decision saved to database', {
+                decisionId,
+                itemId: decision.itemId,
+                action: decision.action,
+                confidence: decision.confidence
+              });
+            } catch (error) {
+              this.logger.error('❌ Failed to save AI decision', error);
+            }
           }
-        }
-        
-        // Only execute trades with high confidence or during training
-        if (prediction.confidence > 0.7 || this.isTraining()) {
-          actions.push(prediction);
           
-          // Simulate trade execution for training
-          if (this.isTraining()) {
-            await this.simulateTradeExecution(marketState, prediction);
+          // Only execute trades with high confidence or during training
+          if (prediction.confidence > 0.7 || this.isTraining()) {
+            actions.push(prediction);
+            
+            // Simulate trade execution for training
+            if (this.isTraining()) {
+              await this.simulateTradeExecution(marketState, prediction);
+            }
           }
+
+          this.logger.debug('✅ Successfully processed item', {
+            itemId: item.id,
+            actionType: prediction.action?.type,
+            confidence: prediction.confidence
+          });
+
+        } catch (itemError) {
+          // Log the error but continue processing other items
+          this.logger.error('❌ Failed to process individual item - skipping', itemError, {
+            itemId: item.id,
+            itemName: item.name,
+            errorMessage: itemError.message,
+            hasPriceData: !!item.priceData,
+            hasPriceHistory: !!item.priceHistory,
+            priceHistoryLength: item.priceHistory?.length || 0
+          });
+          
+          // Continue to next item instead of failing entire operation
+          continue;
         }
       }
 
@@ -172,6 +210,118 @@ class AITradingOrchestratorService {
   }
 
   /**
+   * Context7 Pattern: Predict using Python RL service with fallback
+   */
+  async predictWithPythonRL(marketState) {
+    try {
+      // Try Python RL service first
+      const features = this.encodeStateForPython(marketState);
+      const pythonPrediction = await this.pythonRLClient.predict(features);
+      
+      // Convert Python prediction to expected format
+      const prediction = {
+        action: this.convertPythonAction(pythonPrediction.action, marketState, pythonPrediction),
+        confidence: pythonPrediction.confidence,
+        expectedReturn: pythonPrediction.expectedReturn,
+        qValues: pythonPrediction.qValues,
+        modelVersion: pythonPrediction.modelVersion,
+        source: 'python_rl'
+      };
+      
+      this.logger.debug('🐍 Python RL prediction received', {
+        itemId: marketState.itemId,
+        action: prediction.action.type,
+        confidence: prediction.confidence,
+        expectedReturn: prediction.expectedReturn
+      });
+      
+      return prediction;
+    } catch (error) {
+      this.logger.warn('⚠️ Python RL service unavailable, falling back to local agent', error);
+      
+      try {
+        // Fallback to local neural agent
+        const localPrediction = this.agent.predict(marketState);
+        localPrediction.source = 'local_neural';
+        
+        return localPrediction;
+      } catch (fallbackError) {
+        this.logger.error('❌ Both Python RL and local agent failed, using simple fallback', fallbackError);
+        
+        // Simple fallback prediction
+        return {
+          action: {
+            type: 'HOLD',
+            itemId: marketState.itemId,
+            quantity: 0,
+            price: marketState.price,
+            confidence: 0.1,
+            reason: 'AI services unavailable - holding position'
+          },
+          confidence: 0.1,
+          expectedReturn: 0,
+          qValues: [0.1, 0.1, 0.8], // [BUY, SELL, HOLD]
+          source: 'fallback'
+        };
+      }
+    }
+  }
+
+  /**
+   * Context7 Pattern: Encode market state for Python RL service
+   */
+  encodeStateForPython(marketState) {
+    return [
+      marketState.price / 10000000, // Normalize price
+      marketState.volume / 1000, // Normalize volume
+      marketState.spread / 100, // Normalize spread
+      marketState.volatility / 10, // Normalize volatility
+      (marketState.rsi - 50) / 50, // Normalize RSI to [-1, 1]
+      marketState.macd / 1000, // Normalize MACD
+      marketState.trend === 'UP' ? 1 : marketState.trend === 'DOWN' ? -1 : 0,
+      (Date.now() - marketState.timestamp) / (24 * 60 * 60 * 1000) // Time decay
+    ];
+  }
+
+  /**
+   * Context7 Pattern: Convert Python action to expected format
+   */
+  convertPythonAction(pythonAction, marketState = null, fullPrediction = null) {
+    // Python action can be a number (0=BUY, 1=HOLD, 2=SELL) or an object with type
+    let actionType;
+    
+    if (typeof pythonAction === 'number') {
+      // Convert numeric action to string
+      switch (pythonAction) {
+        case 0: actionType = 'BUY'; break;
+        case 1: actionType = 'HOLD'; break;
+        case 2: actionType = 'SELL'; break;
+        default: actionType = 'HOLD'; break;
+      }
+    } else if (typeof pythonAction === 'object') {
+      // Handle object format
+      actionType = pythonAction.type || pythonAction.action || 'HOLD';
+    } else {
+      // Handle string format
+      actionType = pythonAction || 'HOLD';
+    }
+    
+    // Use action_name from full prediction if available (fallback response includes this)
+    if (fullPrediction && fullPrediction.action_name) {
+      actionType = fullPrediction.action_name;
+    }
+    
+    return {
+      type: actionType,
+      itemId: (marketState && marketState.itemId) || (pythonAction && pythonAction.itemId) || null,
+      quantity: (pythonAction && pythonAction.quantity) || 1,
+      price: (pythonAction && pythonAction.price) || (marketState && marketState.currentPrice) || 0,
+      confidence: (fullPrediction && fullPrediction.confidence) || (pythonAction && pythonAction.confidence) || 0.5,
+      reason: (pythonAction && pythonAction.reason) || 'Python RL prediction'
+    };
+  }
+
+  /**
    * Context7 Pattern: Convert item price to market state
    */
   convertToMarketState(item) {
@@ -188,7 +338,7 @@ class AITradingOrchestratorService {
     }
 
     const priceHistory = item.priceHistory.map(point => point.price || point.high || 0).filter(p => p > 0);
-    const indicators = this.tradingAnalysis.calculateTechnicalIndicators(priceHistory);
+    const indicators = this.tradingAnalysis.getTechnicalIndicators(item.priceData, item.priceHistory);
 
     return {
       itemId: item.id,
@@ -240,6 +390,309 @@ class AITradingOrchestratorService {
   }
 
   /**
+   * Context7 Pattern: Create OpenAI Gym compatible environment data
+   */
+  createGymEnvironmentData(marketState, historicalData = []) {
+    try {
+      // Convert to OpenAI Gym format for Python RL service
+      const observation = this.encodeStateForPython(marketState);
+      
+      // Add historical context if available
+      const historyFeatures = historicalData.slice(-10).map(state => 
+        this.encodeStateForPython(state)
+      );
+      
+      // Pad history to fixed size for consistent input
+      while (historyFeatures.length < 10) {
+        historyFeatures.unshift(new Array(8).fill(0));
+      }
+      
+      return {
+        observation: observation,
+        history: historyFeatures,
+        action_space: {
+          type: 'discrete',
+          n: 3, // BUY, SELL, HOLD
+          actions: ['BUY', 'SELL', 'HOLD']
+        },
+        observation_space: {
+          type: 'box',
+          shape: [8], // 8 features per observation
+          low: [-1, 0, 0, 0, -1, -1, -1, 0],
+          high: [1, 1, 1, 1, 1, 1, 1, 1]
+        },
+        reward_range: [-100, 100],
+        metadata: {
+          itemId: marketState.itemId,
+          timestamp: marketState.timestamp,
+          sessionId: this.currentSession?.id
+        }
+      };
+    } catch (error) {
+      this.logger.error('❌ Error creating Gym environment data', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Run simulation episode using Python OpenAI Gym
+   */
+  async runSimulationEpisode(marketStates, maxSteps = 100) {
+    try {
+      this.logger.info('🎮 Starting simulation episode', {
+        marketStates: marketStates.length,
+        maxSteps,
+        sessionId: this.currentSession?.id
+      });
+
+      const episodeData = {
+        observations: [],
+        actions: [],
+        rewards: [],
+        dones: [],
+        info: []
+      };
+
+      let totalReward = 0;
+      let step = 0;
+      let currentPortfolioValue = 1000000; // Start with 1M GP
+
+      for (const marketState of marketStates.slice(0, maxSteps)) {
+        try {
+          // Create OpenAI Gym environment data
+          const gymData = this.createGymEnvironmentData(
+            marketState,
+            episodeData.observations.slice(-10)
+          );
+
+          // Get prediction from Python RL service
+          const prediction = await this.predictWithPythonRL(marketState);
+          
+          // Simulate trade execution
+          const tradeResult = await this.simulateTradeForEpisode(
+            marketState, 
+            prediction, 
+            currentPortfolioValue
+          );
+
+          // Calculate reward
+          const reward = this.calculateEpisodeReward(
+            marketState,
+            prediction,
+            tradeResult,
+            currentPortfolioValue
+          );
+
+          // Update portfolio value
+          currentPortfolioValue += tradeResult.profitLoss;
+          totalReward += reward;
+
+          // Store episode data
+          episodeData.observations.push(gymData.observation);
+          episodeData.actions.push(this.actionToIndex(prediction.action));
+          episodeData.rewards.push(reward);
+          episodeData.dones.push(false);
+          episodeData.info.push({
+            itemId: marketState.itemId,
+            tradeResult,
+            portfolioValue: currentPortfolioValue,
+            prediction: prediction.action
+          });
+
+          step++;
+        } catch (error) {
+          this.logger.error('❌ Error in simulation step', error, { step });
+          break;
+        }
+      }
+
+      // Mark final step as done
+      if (episodeData.dones.length > 0) {
+        episodeData.dones[episodeData.dones.length - 1] = true;
+      }
+
+      // Send episode data to Python RL service for training
+      if (episodeData.observations.length > 0) {
+        try {
+          const trainingData = this.formatEpisodeForTraining(episodeData);
+          await this.pythonRLClient.train(trainingData);
+        } catch (error) {
+          this.logger.warn('⚠️ Failed to send episode data to Python RL service', error);
+        }
+      }
+
+      const episodeResults = {
+        totalSteps: step,
+        totalReward,
+        averageReward: totalReward / step,
+        finalPortfolioValue: currentPortfolioValue,
+        portfolioGrowth: ((currentPortfolioValue - 1000000) / 1000000) * 100,
+        successRate: episodeData.rewards.filter(r => r > 0).length / episodeData.rewards.length,
+        episodeData
+      };
+
+      this.logger.info('✅ Simulation episode completed', {
+        totalSteps: step,
+        totalReward: totalReward.toFixed(2),
+        portfolioGrowth: episodeResults.portfolioGrowth.toFixed(2) + '%',
+        successRate: (episodeResults.successRate * 100).toFixed(1) + '%'
+      });
+
+      return episodeResults;
+    } catch (error) {
+      this.logger.error('❌ Error running simulation episode', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Simulate trade for episode
+   */
+  async simulateTradeForEpisode(marketState, prediction, currentPortfolioValue) {
+    try {
+      const action = prediction.action;
+      const confidence = prediction.confidence;
+      
+      // Determine trade size based on confidence and portfolio value
+      const maxTradeSize = currentPortfolioValue * 0.1; // Max 10% of portfolio
+      const tradeSize = Math.min(maxTradeSize, confidence * maxTradeSize);
+      
+      let profitLoss = 0;
+      let executed = false;
+      
+      if (action.type === 'BUY') {
+        // Simulate buying at current price and selling at predicted price
+        const buyPrice = marketState.price;
+        const sellPrice = buyPrice * (1 + (marketState.spread / 100));
+        
+        // Calculate potential profit (simplified)
+        const quantity = Math.floor(tradeSize / buyPrice);
+        if (quantity > 0) {
+          profitLoss = quantity * (sellPrice - buyPrice);
+          executed = true;
+        }
+      } else if (action.type === 'SELL') {
+        // Simulate selling at current price
+        const sellPrice = marketState.price;
+        const buyPrice = sellPrice * (1 - (marketState.spread / 100));
+        
+        const quantity = Math.floor(tradeSize / sellPrice);
+        if (quantity > 0) {
+          profitLoss = quantity * (sellPrice - buyPrice);
+          executed = true;
+        }
+      }
+      
+      // Add market volatility and execution risk
+      if (executed) {
+        const volatilityFactor = 1 + (Math.random() - 0.5) * (marketState.volatility / 100);
+        const executionRisk = Math.random() > 0.95 ? 0.5 : 1; // 5% chance of partial execution
+        
+        profitLoss = profitLoss * volatilityFactor * executionRisk;
+      }
+      
+      return {
+        executed,
+        profitLoss,
+        tradeSize,
+        action: action.type,
+        confidence
+      };
+    } catch (error) {
+      this.logger.error('❌ Error simulating trade for episode', error);
+      return {
+        executed: false,
+        profitLoss: 0,
+        tradeSize: 0,
+        action: 'HOLD',
+        confidence: 0
+      };
+    }
+  }
+
+  /**
+   * Context7 Pattern: Calculate reward for episode step
+   */
+  calculateEpisodeReward(marketState, prediction, tradeResult, currentPortfolioValue) {
+    try {
+      let reward = 0;
+      
+      // Primary reward: profit/loss from trade
+      if (tradeResult.executed) {
+        reward += tradeResult.profitLoss / 10000; // Scale down for neural network
+      }
+      
+      // Confidence reward: reward high confidence correct predictions
+      if (tradeResult.executed && tradeResult.profitLoss > 0) {
+        reward += prediction.confidence * 5;
+      } else if (tradeResult.executed && tradeResult.profitLoss < 0) {
+        reward -= prediction.confidence * 5;
+      }
+      
+      // Risk management reward: penalize risky trades
+      if (tradeResult.tradeSize > currentPortfolioValue * 0.2) {
+        reward -= 10; // Penalty for over-sized trades
+      }
+      
+      // Market condition reward: reward appropriate actions
+      if (marketState.trend === 'UP' && prediction.action.type === 'BUY') {
+        reward += 2;
+      } else if (marketState.trend === 'DOWN' && prediction.action.type === 'SELL') {
+        reward += 2;
+      } else if (marketState.trend === 'FLAT' && prediction.action.type === 'HOLD') {
+        reward += 1;
+      }
+      
+      // Volatility penalty: reduce reward for high volatility trades
+      if (marketState.volatility > 20) {
+        reward -= Math.min(5, marketState.volatility / 10);
+      }
+      
+      return Math.max(-50, Math.min(50, reward)); // Clamp reward
+    } catch (error) {
+      this.logger.error('❌ Error calculating episode reward', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Convert action to index for Python RL
+   */
+  actionToIndex(action) {
+    switch (action.type) {
+      case 'BUY': return 0;
+      case 'SELL': return 1;
+      case 'HOLD': return 2;
+      default: return 2;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Format episode data for training
+   */
+  formatEpisodeForTraining(episodeData) {
+    try {
+      const trainingData = [];
+      
+      for (let i = 0; i < episodeData.observations.length - 1; i++) {
+        trainingData.push({
+          state: episodeData.observations[i],
+          action: episodeData.actions[i],
+          reward: episodeData.rewards[i],
+          nextState: episodeData.observations[i + 1],
+          done: episodeData.dones[i],
+          info: episodeData.info[i]
+        });
+      }
+      
+      return trainingData;
+    } catch (error) {
+      this.logger.error('❌ Error formatting episode for training', error);
+      return [];
+    }
+  }
+
+  /**
    * Context7 Pattern: Process trade outcome for learning
    */
   async processTradeOutcome(marketState, prediction, newMarketState, success, tradeOutcome) {
@@ -253,6 +706,28 @@ class AITradingOrchestratorService {
         tradeOutcome.profit
       );
 
+      // Store experience in Python RL service if available
+      if (prediction.source === 'python_rl') {
+        try {
+          await this.pythonRLClient.memorizeExperience(
+            marketState,
+            prediction.action,
+            reward.totalReward,
+            newMarketState,
+            true
+          );
+          
+          this.logger.debug('🐍 Experience stored in Python RL service', {
+            itemId: marketState.itemId,
+            reward: reward.totalReward,
+            action: prediction.action.type
+          });
+        } catch (error) {
+          this.logger.warn('⚠️ Failed to store experience in Python RL service', error);
+        }
+      }
+
+      // Also store in local agent for fallback
       this.agent.memorizeExperience({
         state: marketState,
         action: prediction.action,
@@ -261,8 +736,34 @@ class AITradingOrchestratorService {
         done: true
       });
 
-      // Train the agent
-      const loss = this.agent.trainOnBatch();
+      // Train the appropriate agent
+      let loss = 0;
+      if (prediction.source === 'python_rl') {
+        try {
+          // Train Python RL service
+          const trainingResult = await this.pythonRLClient.train([{
+            state: marketState,
+            action: prediction.action,
+            reward: reward.totalReward,
+            nextState: newMarketState,
+            done: true
+          }]);
+          
+          loss = trainingResult.averageLoss || 0;
+          
+          this.logger.debug('🐍 Python RL training completed', {
+            episodesTrained: trainingResult.episodesTrained,
+            averageLoss: trainingResult.averageLoss,
+            averageReward: trainingResult.averageReward
+          });
+        } catch (error) {
+          this.logger.warn('⚠️ Python RL training failed, falling back to local agent', error);
+          loss = this.agent.trainOnBatch();
+        }
+      } else {
+        // Train local agent
+        loss = this.agent.trainOnBatch();
+      }
       await this.updateTrainingMetrics(tradeOutcome, reward.totalReward, loss);
 
       // Check for adaptive learning
@@ -968,10 +1469,20 @@ class AITradingOrchestratorService {
    */
   loadModel(modelData) {
     try {
-      this.agent.loadModel(modelData);
+      if (!modelData) {
+        throw new Error('Model data is required');
+      }
+      
+      // Ensure modelData is a string (JSON)
+      const modelString = typeof modelData === 'string' ? modelData : JSON.stringify(modelData);
+      
+      this.agent.loadModel(modelString);
       this.logger.info('📁 Model loaded successfully');
     } catch (error) {
-      this.logger.error('❌ Error loading model', error);
+      this.logger.error('❌ Error loading model', error, {
+        modelDataType: typeof modelData,
+        modelDataLength: modelData ? modelData.length : 0
+      });
       throw error;
     }
   }
@@ -1056,6 +1567,323 @@ class AITradingOrchestratorService {
         latest: this.trainingMetrics[this.trainingMetrics.length - 1]
       }
     };
+  }
+
+  // ==========================================
+  // AI MODEL METADATA MANAGEMENT
+  // ==========================================
+
+  /**
+   * Context7 Pattern: Save model with metadata
+   */
+  async saveModelWithMetadata(modelId, version, description = '') {
+    try {
+      this.logger.info('💾 Saving model with metadata', {
+        modelId,
+        version,
+        description
+      });
+
+      // Save model to Python RL service
+      const saveResult = await this.pythonRLClient.saveModel(modelId);
+      
+      // Get current performance metrics
+      const performance = this.outcomeTracker.calculatePerformanceMetrics();
+      const modelStats = this.agent.getModelStats();
+      
+      // Get Python RL model metrics if available
+      let pythonMetrics = {};
+      try {
+        pythonMetrics = await this.pythonRLClient.getModelMetrics(modelId);
+      } catch (error) {
+        this.logger.warn('Could not get Python RL model metrics', error);
+      }
+
+      // Create AI model metadata
+      const modelMetadata = new AIModelMetadata({
+        modelId,
+        version,
+        description,
+        trainingDate: new Date(),
+        trainingDuration: this.currentSession ? 
+          Date.now() - this.currentSession.startTime : 0,
+        trainingEpisodes: this.currentSession?.episodeCount || 0,
+        
+        performanceMetrics: {
+          roi: performance.roi || 0,
+          accuracy: performance.accuracy || 0,
+          totalProfit: performance.totalProfit || 0,
+          winRate: performance.winRate || 0,
+          averageProfit: performance.averageProfit || 0,
+          maxDrawdown: performance.maxDrawdown || 0,
+          sharpeRatio: performance.sharpeRatio || 0,
+          totalTrades: performance.totalTrades || 0,
+          profitableTrades: performance.profitableTrades || 0,
+          averageTradeDuration: performance.averageTradeDuration || 0
+        },
+        
+        technicalMetrics: {
+          modelSize: saveResult.modelSize || 0,
+          parameters: modelStats.networkLayers || 0,
+          averageLoss: pythonMetrics.averageLoss || 0,
+          averageReward: pythonMetrics.averageReward || 0,
+          epsilon: modelStats.epsilon || 0,
+          learningRate: modelStats.learningRate || 0
+        },
+        
+        modelConfig: {
+          architecture: modelStats.architecture || 'Unknown',
+          hyperparameters: {
+            epsilon: modelStats.epsilon,
+            learningRate: modelStats.learningRate,
+            memorySize: modelStats.memoryCapacity,
+            batchSize: modelStats.batchSize
+          },
+          trainingParameters: {
+            adaptiveConfig: this.adaptiveConfig,
+            trainingEpisodes: this.currentSession?.episodeCount || 0
+          }
+        },
+        
+        storagePath: saveResult.modelPath || `models/${modelId}`,
+        storageSize: saveResult.modelSize || 0,
+        
+        status: 'testing',
+        createdBy: 'ai_trading_orchestrator',
+        tags: ['reinforcement_learning', 'osrs_trading', 'neural_network']
+      });
+
+      // Save metadata to database
+      await modelMetadata.save();
+      
+      this.logger.info('✅ Model saved with metadata successfully', {
+        modelId,
+        version,
+        metadataId: modelMetadata._id,
+        performanceScore: modelMetadata.calculateEfficiencyScore()
+      });
+
+      return {
+        success: true,
+        modelId,
+        version,
+        metadataId: modelMetadata._id,
+        performanceScore: modelMetadata.calculateEfficiencyScore(),
+        saveResult
+      };
+    } catch (error) {
+      this.logger.error('❌ Error saving model with metadata', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Load model with metadata
+   */
+  async loadModelWithMetadata(modelId) {
+    try {
+      this.logger.info('📁 Loading model with metadata', { modelId });
+
+      // Find model metadata
+      const modelMetadata = await AIModelMetadata.findOne({ modelId })
+        .sort({ createdAt: -1 });
+
+      if (!modelMetadata) {
+        throw new Error(`Model metadata not found for modelId: ${modelId}`);
+      }
+
+      // Load model from Python RL service
+      const loadResult = await this.pythonRLClient.loadModel(modelId);
+      
+      // Update usage statistics
+      await modelMetadata.updateUsageStats({
+        totalPredictions: modelMetadata.usageStats.totalPredictions + 1,
+        lastUsedAt: new Date()
+      });
+
+      this.logger.info('✅ Model loaded with metadata successfully', {
+        modelId,
+        version: modelMetadata.version,
+        metadataId: modelMetadata._id,
+        performanceScore: modelMetadata.calculateEfficiencyScore()
+      });
+
+      return {
+        success: true,
+        modelId,
+        version: modelMetadata.version,
+        metadata: modelMetadata,
+        loadResult
+      };
+    } catch (error) {
+      this.logger.error('❌ Error loading model with metadata', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Get production model
+   */
+  async getProductionModel() {
+    try {
+      const productionModel = await AIModelMetadata.getProductionModel();
+      
+      if (!productionModel) {
+        this.logger.warn('No production model found');
+        return null;
+      }
+
+      return {
+        modelId: productionModel.modelId,
+        version: productionModel.version,
+        metadata: productionModel,
+        summary: productionModel.getSummary()
+      };
+    } catch (error) {
+      this.logger.error('❌ Error getting production model', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Set model as production
+   */
+  async setModelAsProduction(modelId) {
+    try {
+      this.logger.info('🚀 Setting model as production', { modelId });
+
+      // First, archive current production model
+      const currentProduction = await AIModelMetadata.getProductionModel();
+      if (currentProduction) {
+        await currentProduction.archive();
+        this.logger.info('Archived previous production model', {
+          previousModel: currentProduction.modelId
+        });
+      }
+
+      // Find the target model
+      const targetModel = await AIModelMetadata.findOne({ modelId })
+        .sort({ createdAt: -1 });
+
+      if (!targetModel) {
+        throw new Error(`Model not found: ${modelId}`);
+      }
+
+      // Set as production
+      await targetModel.markAsProduction();
+      
+      // Load the model into the system
+      await this.loadModelWithMetadata(modelId);
+
+      this.logger.info('✅ Model set as production successfully', {
+        modelId,
+        version: targetModel.version,
+        performanceScore: targetModel.calculateEfficiencyScore()
+      });
+
+      return {
+        success: true,
+        modelId,
+        version: targetModel.version,
+        metadata: targetModel
+      };
+    } catch (error) {
+      this.logger.error('❌ Error setting model as production', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Get model performance comparison
+   */
+  async getModelPerformanceComparison(limit = 10) {
+    try {
+      const recentModels = await AIModelMetadata.getRecentModels(limit);
+      
+      const comparison = recentModels.map(model => ({
+        modelId: model.modelId,
+        version: model.version,
+        status: model.status,
+        performanceScore: model.calculateEfficiencyScore(),
+        roi: model.performanceMetrics.roi,
+        winRate: model.performanceMetrics.winRate,
+        totalProfit: model.performanceMetrics.totalProfit,
+        totalTrades: model.performanceMetrics.totalTrades,
+        createdAt: model.createdAt,
+        daysSinceCreation: model.ageInDays
+      }));
+
+      // Sort by performance score
+      comparison.sort((a, b) => b.performanceScore - a.performanceScore);
+
+      return {
+        models: comparison,
+        summary: {
+          totalModels: comparison.length,
+          avgPerformanceScore: comparison.reduce((sum, m) => sum + m.performanceScore, 0) / comparison.length,
+          bestPerforming: comparison[0] || null,
+          avgRoi: comparison.reduce((sum, m) => sum + m.roi, 0) / comparison.length
+        }
+      };
+    } catch (error) {
+      this.logger.error('❌ Error getting model performance comparison', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Update model performance metrics
+   */
+  async updateModelPerformanceMetrics(modelId, metrics) {
+    try {
+      const model = await AIModelMetadata.findOne({ modelId })
+        .sort({ createdAt: -1 });
+
+      if (!model) {
+        throw new Error(`Model not found: ${modelId}`);
+      }
+
+      await model.updatePerformanceMetrics(metrics);
+      
+      this.logger.info('✅ Model performance metrics updated', {
+        modelId,
+        version: model.version,
+        updatedMetrics: Object.keys(metrics)
+      });
+
+      return {
+        success: true,
+        modelId,
+        version: model.version,
+        performanceScore: model.calculateEfficiencyScore()
+      };
+    } catch (error) {
+      this.logger.error('❌ Error updating model performance metrics', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Context7 Pattern: Get model statistics
+   */
+  async getModelStatistics() {
+    try {
+      const statistics = await AIModelMetadata.getModelStatistics();
+      
+      return {
+        byStatus: statistics,
+        totalModels: statistics.reduce((sum, stat) => sum + stat.count, 0),
+        avgMetrics: {
+          roi: statistics.reduce((sum, stat) => sum + (stat.avgRoi || 0), 0) / statistics.length,
+          accuracy: statistics.reduce((sum, stat) => sum + (stat.avgAccuracy || 0), 0) / statistics.length,
+          totalProfit: statistics.reduce((sum, stat) => sum + (stat.totalProfit || 0), 0),
+          totalTrades: statistics.reduce((sum, stat) => sum + (stat.totalTrades || 0), 0)
+        }
+      };
+    } catch (error) {
+      this.logger.error('❌ Error getting model statistics', error);
+      throw error;
+    }
   }
 }
 

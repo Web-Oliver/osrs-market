@@ -1,8 +1,20 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Play, Square, Download, Upload, Settings, Activity, TrendingUp, Database, Brain } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts'
 import { useAutoTraining } from '../hooks/useAutoTraining'
-import { generateMockAutoTrainingMetrics, formatCurrency, formatPercentage } from '../utils/mockChartData'
+// Utility functions for formatting (extracted from mockChartData)
+const formatCurrency = (value: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
+};
+
+const formatPercentage = (value: number): string => {
+  return `${(value * 100).toFixed(1)}%`;
+};
 
 export function AutoTrainingDashboard() {
   const {
@@ -22,8 +34,38 @@ export function AutoTrainingDashboard() {
   } = useAutoTraining()
 
   const [showAdvancedConfig, setShowAdvancedConfig] = useState(false)
-  const [trainingMetrics, setTrainingMetrics] = useState(() => generateMockAutoTrainingMetrics())
+  const [trainingMetrics, setTrainingMetrics] = useState<any[]>([])
   const [configForm, setConfigForm] = useState(config)
+
+  // Fetch real training metrics from backend
+  useEffect(() => {
+    const fetchTrainingMetrics = async () => {
+      try {
+        const response = await fetch('http://localhost:3001/api/auto-training/status');
+        if (response.ok) {
+          const statusData = await response.json();
+          if (statusData.success && statusData.data?.status?.training?.metrics) {
+            setTrainingMetrics(statusData.data.status.training.metrics);
+          } else {
+            // If no metrics available, set empty array
+            setTrainingMetrics([]);
+          }
+        } else {
+          console.error('Failed to fetch training status:', response.statusText);
+        }
+      } catch (error) {
+        console.error('Error fetching training status:', error);
+      }
+    };
+
+    // Initial fetch
+    fetchTrainingMetrics();
+    
+    // Refresh metrics periodically
+    const interval = setInterval(fetchTrainingMetrics, 30000); // Every 30 seconds
+
+    return () => clearInterval(interval);
+  }, []); // Empty dependency array to prevent infinite loops
 
   const handleStart = async () => {
     clearError()

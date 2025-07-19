@@ -9,7 +9,10 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const http = require('http');
+const mongoose = require('mongoose');
 const MongoDataPersistence = require('./services/mongoDataPersistence');
+const { WebSocketLoggingService } = require('./services/WebSocketLoggingService');
 
 // Import centralized routes
 const apiRoutes = require('./routes/index');
@@ -20,7 +23,7 @@ const PORT = process.env.PORT || 3001;
 // MongoDB configuration with Context7 optimizations
 const mongoConfig = {
   connectionString: process.env.MONGODB_CONNECTION_STRING || 'mongodb://localhost:27017',
-  databaseName: process.env.MONGODB_DATABASE || 'osrs_market_tracker',
+  databaseName: process.env.MONGODB_DATABASE || 'osrs_market_data',
   options: {
     // Additional Context7 optimizations can be added here
     appName: 'OSRS-Market-Tracker-Backend'
@@ -42,14 +45,68 @@ app.use('/api', apiRoutes);
 async function connectToMongoDB() {
   try {
     console.log('🔌 Connecting to MongoDB with Context7 optimizations...');
+    console.log('📋 MongoDB Config:', {
+      connectionString: mongoConfig.connectionString,
+      databaseName: mongoConfig.databaseName,
+      appName: mongoConfig.options.appName
+    });
     
     mongoService = new MongoDataPersistence(mongoConfig);
     await mongoService.connect();
+    
+    // Test the connection
+    const healthCheck = await mongoService.healthCheck();
+    console.log('🩺 MongoDB Health Check:', healthCheck);
     
     console.log('✅ Connected to MongoDB successfully with Context7 optimizations');
     return true;
   } catch (error) {
     console.error('❌ Failed to connect to MongoDB:', error);
+    console.error('🔧 MongoDB connection details:', {
+      connectionString: mongoConfig.connectionString,
+      error: error.message,
+      stack: error.stack
+    });
+    return false;
+  }
+}
+
+// Mongoose connection for models
+async function connectToMongoose() {
+  try {
+    console.log('🍃 Connecting to MongoDB via Mongoose...');
+    
+    const mongooseConnectionString = `${mongoConfig.connectionString}/${mongoConfig.databaseName}`;
+    console.log('📋 Mongoose Connection String:', mongooseConnectionString.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'));
+    
+    await mongoose.connect(mongooseConnectionString, {
+      // Same optimizations as native driver
+      maxPoolSize: 50,
+      minPoolSize: 5,
+      maxConnecting: 5,
+      maxIdleTimeMS: 30000,
+      connectTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+      serverSelectionTimeoutMS: 10000,
+      retryWrites: true,
+      retryReads: true
+    });
+    
+    console.log('✅ Mongoose connected successfully');
+    
+    // Test mongoose connection
+    const adminDb = mongoose.connection.db.admin();
+    await adminDb.ping();
+    console.log('🏓 Mongoose ping successful');
+    
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to connect to Mongoose:', error);
+    console.error('🔧 Mongoose connection details:', {
+      connectionString: `${mongoConfig.connectionString}/${mongoConfig.databaseName}`.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'),
+      error: error.message,
+      stack: error.stack
+    });
     return false;
   }
 }
@@ -333,12 +390,43 @@ app.use((err, req, res, next) => {
 
 // Start server with Context7 optimizations
 async function startServer() {
-  const mongoConnected = await connectToMongoDB();
+  console.log('🚀 Starting server with dual database connections...');
   
-  app.listen(PORT, () => {
+  // Connect both database drivers
+  const [mongoConnected, mongooseConnected] = await Promise.all([
+    connectToMongoDB(),
+    connectToMongoose()
+  ]);
+  
+  if (!mongoConnected || !mongooseConnected) {
+    console.error('❌ Failed to connect to one or more databases');
+    console.log('📊 Database Connection Status:', {
+      mongoNative: mongoConnected ? '✅ Connected' : '❌ Failed',
+      mongoose: mongooseConnected ? '✅ Connected' : '❌ Failed'
+    });
+  } else {
+    console.log('✅ Both database connections established successfully');
+  }
+  
+  // Create HTTP server for WebSocket support
+  const server = http.createServer(app);
+  
+  // Initialize WebSocket logging service
+  let webSocketService = null;
+  try {
+    webSocketService = new WebSocketLoggingService(server, {
+      path: '/logs'
+    });
+    console.log('🔌 WebSocket logging service initialized');
+  } catch (error) {
+    console.error('❌ Failed to initialize WebSocket service:', error);
+  }
+  
+  server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📊 Dashboard: http://localhost:${PORT}`);
     console.log(`🔗 API: http://localhost:${PORT}/api`);
+    console.log(`🔌 WebSocket: ws://localhost:${PORT}/logs`);
     console.log(`💾 MongoDB: ${mongoConnected ? 'Connected with Context7 optimizations' : 'Disconnected (using fallback data)'}`);
     
     if (mongoConnected) {
@@ -355,14 +443,27 @@ async function startServer() {
 process.on('SIGINT', async () => {
   console.log('\n🛑 Shutting down server with Context7 cleanup...');
   
+  // Close both database connections
+  const shutdownPromises = [];
+  
   if (mongoService) {
-    try {
-      await mongoService.disconnect();
-      console.log('📦 MongoDB connection closed with Context7 cleanup');
-    } catch (error) {
-      console.error('Error during MongoDB cleanup:', error);
-    }
+    shutdownPromises.push(
+      mongoService.disconnect()
+        .then(() => console.log('📦 MongoDB native connection closed'))
+        .catch(error => console.error('Error closing MongoDB native connection:', error))
+    );
   }
+  
+  if (mongoose.connection.readyState !== 0) {
+    shutdownPromises.push(
+      mongoose.connection.close()
+        .then(() => console.log('🍃 Mongoose connection closed'))
+        .catch(error => console.error('Error closing Mongoose connection:', error))
+    );
+  }
+  
+  await Promise.all(shutdownPromises);
+  console.log('✅ All database connections closed');
   
   process.exit(0);
 });

@@ -84,6 +84,9 @@ class OSRSDataScraperService {
       this.mongoPersistence = new MongoDataPersistence(mongoConfig);
       await this.mongoPersistence.initialize();
       
+      // Launch browser
+      await this.launchBrowser();
+      
       this.logger.info('✅ OSRS Data Scraper initialized with MongoDB persistence');
       return true;
     } catch (error) {
@@ -191,7 +194,9 @@ class OSRSDataScraperService {
     const items = [];
     
     try {
-      await page.setUserAgent(this.config.userAgent);
+      await page.setExtraHTTPHeaders({
+        'User-Agent': this.config.userAgent
+      });
       await page.goto(url, { 
         waitUntil: 'networkidle', 
         timeout: this.config.timeout 
@@ -311,7 +316,9 @@ class OSRSDataScraperService {
     const items = [];
     
     try {
-      await page.setUserAgent(this.config.userAgent);
+      await page.setExtraHTTPHeaders({
+        'User-Agent': this.config.userAgent
+      });
       await page.goto(url, { 
         waitUntil: 'networkidle', 
         timeout: this.config.timeout 
@@ -668,7 +675,9 @@ class OSRSDataScraperService {
       const itemUrl = item.detailUrl || 
         `https://secure.runescape.com/m=itemdb_oldschool/viewitem?obj=${item.itemId}`;
       
-      await page.setUserAgent(this.config.userAgent);
+      await page.setExtraHTTPHeaders({
+        'User-Agent': this.config.userAgent
+      });
       await page.goto(itemUrl, { 
         waitUntil: 'networkidle', 
         timeout: this.config.timeout 
@@ -1367,143 +1376,82 @@ class OSRSDataScraperService {
       // Construct individual item page URL
       const itemPageUrl = `https://secure.runescape.com/m=itemdb_oldschool/${encodeURIComponent(itemName)}/viewitem?obj=${itemId}`;
       
-      await page.setUserAgent(this.config.userAgent);
+      await page.setExtraHTTPHeaders({
+        'User-Agent': this.config.userAgent
+      });
       await page.goto(itemPageUrl, { 
         waitUntil: 'networkidle', 
         timeout: this.config.timeout 
       });
       
-      // Wait for the price graph to load
-      await page.waitForSelector('.priceGraph', { timeout: 10000 });
+      // Wait for the page to load and JavaScript arrays to be available
+      await page.waitForTimeout(3000); // Wait for JavaScript to execute
       
-      // Extract historical data from the price graph
+      // Extract historical data from JavaScript arrays (average180 and trade180)
       const priceData = await page.evaluate(() => {
         const extractedData = [];
         
-        // Look for price graph data in various possible locations
-        // Method 1: Check for embedded JavaScript data
-        const scripts = document.querySelectorAll('script');
-        let graphData = null;
-        
-        for (const script of scripts) {
-          const scriptContent = script.textContent;
-          if (scriptContent.includes('priceData') || scriptContent.includes('graphData')) {
-            // Try to extract data from JavaScript variables
-            const priceMatch = scriptContent.match(/priceData\s*=\s*(\[.*?\])/);
-            const volumeMatch = scriptContent.match(/volumeData\s*=\s*(\[.*?\])/);
+        try {
+          // Check if the 6-month data arrays exist
+          if (typeof average180 !== 'undefined' && typeof trade180 !== 'undefined') {
+            // Skip header row and process data
+            const priceRows = average180.slice(1);
+            const tradeRows = trade180.slice(1);
             
-            if (priceMatch && volumeMatch) {
-              try {
-                const prices = JSON.parse(priceMatch[1]);
-                const volumes = JSON.parse(volumeMatch[1]);
-                
-                for (let i = 0; i < Math.min(prices.length, volumes.length); i++) {
-                  if (prices[i] && volumes[i]) {
-                    extractedData.push({
-                      timestamp: prices[i].timestamp || Date.now() - (i * 24 * 60 * 60 * 1000),
-                      price: prices[i].price || prices[i],
-                      volume: volumes[i].volume || volumes[i]
-                    });
-                  }
-                }
-              } catch (e) {
-                // Continue to next method if parsing fails
-              }
-            }
-          }
-        }
-        
-        // Method 2: Check for data attributes on graph elements
-        if (extractedData.length === 0) {
-          const graphElements = document.querySelectorAll('.priceGraph [data-price], .priceGraph [data-value]');
-          for (const element of graphElements) {
-            const price = element.getAttribute('data-price') || element.getAttribute('data-value');
-            const timestamp = element.getAttribute('data-timestamp') || element.getAttribute('data-date');
-            const volume = element.getAttribute('data-volume') || element.getAttribute('data-trades');
-            
-            if (price && timestamp) {
-              extractedData.push({
-                timestamp: parseInt(timestamp) || Date.now(),
-                price: parseInt(price) || 0,
-                volume: parseInt(volume) || 0
-              });
-            }
-          }
-        }
-        
-        // Method 3: Check for table data (fallback)
-        if (extractedData.length === 0) {
-          const tableRows = document.querySelectorAll('table tr');
-          for (const row of tableRows) {
-            const cells = row.querySelectorAll('td');
-            if (cells.length >= 3) {
-              const dateText = cells[0]?.textContent?.trim();
-              const priceText = cells[1]?.textContent?.trim();
-              const volumeText = cells[2]?.textContent?.trim();
+            // Combine price and trade data
+            for (let i = 0; i < Math.min(priceRows.length, tradeRows.length); i++) {
+              const priceRow = priceRows[i];
+              const tradeRow = tradeRows[i];
               
-              if (dateText && priceText && volumeText) {
-                // Parse date string to timestamp
-                const timestamp = Date.parse(dateText) || Date.now();
-                const price = parseInt(priceText.replace(/[^\d]/g, '')) || 0;
-                const volume = parseInt(volumeText.replace(/[^\d]/g, '')) || 0;
+              if (priceRow && tradeRow && priceRow.length >= 3 && tradeRow.length >= 2) {
+                const dateStr = priceRow[0]; // ISO date string
+                const dailyPrice = priceRow[1]; // Daily price
+                const avgPrice = priceRow[2]; // Average price
+                const totalVolume = tradeRow[1]; // Total volume
                 
-                if (price > 0) {
-                  extractedData.push({
-                    timestamp,
-                    price,
-                    volume
-                  });
-                }
+                extractedData.push({
+                  timestamp: new Date(dateStr).getTime(),
+                  date: dateStr,
+                  dailyPrice: dailyPrice,
+                  averagePrice: avgPrice,
+                  volume: totalVolume,
+                  source: 'OSRS_GE_6Month_Chart'
+                });
               }
             }
+            
+            return {
+              success: true,
+              data: extractedData,
+              totalDataPoints: extractedData.length,
+              message: `Extracted ${extractedData.length} days of 6-month historical data`
+            };
+          } else {
+            return {
+              success: false,
+              data: [],
+              message: 'average180 or trade180 arrays not found on page'
+            };
           }
+        } catch (error) {
+          return {
+            success: false,
+            data: [],
+            error: error.message
+          };
         }
-        
-        return extractedData;
       });
       
-      // Process and validate extracted data
-      for (const dataPoint of priceData) {
-        if (dataPoint.timestamp && dataPoint.price && dataPoint.price > 0) {
-          historicalData.push({
-            timestamp: dataPoint.timestamp,
-            price: dataPoint.price,
-            volume: dataPoint.volume || 0
-          });
-        }
+      // Process the response from page evaluation
+      if (priceData.success && priceData.data && priceData.data.length > 0) {
+        this.logger.info(`✅ Successfully extracted ${priceData.data.length} historical data points for ${itemName}`);
+        return priceData.data;
+      } else {
+        this.logger.warn(`⚠️ No historical data extracted for ${itemName}: ${priceData.message || priceData.error || 'Unknown error'}`);
       }
       
-      // If no data found, generate some mock data points for testing
-      if (historicalData.length === 0) {
-        this.logger.warn(`⚠️ No historical data found for ${itemName} (ID: ${itemId}), generating mock data`);
-        
-        // Generate 30 days of mock historical data
-        const now = Date.now();
-        const basePrice = 1000 + (itemId % 10000); // Use itemId to generate consistent base price
-        
-        for (let i = 29; i >= 0; i--) {
-          const timestamp = now - (i * 24 * 60 * 60 * 1000);
-          const priceVariation = 0.8 + (Math.random() * 0.4); // ±20% variation
-          const price = Math.floor(basePrice * priceVariation);
-          const volume = Math.floor(100 + (Math.random() * 900)); // 100-1000 volume
-          
-          historicalData.push({
-            timestamp,
-            price,
-            volume
-          });
-        }
-      }
-      
-      // Sort by timestamp ascending (oldest first)
-      historicalData.sort((a, b) => a.timestamp - b.timestamp);
-      
-      this.logger.info(`✅ Scraped ${historicalData.length} historical data points for ${itemName} (ID: ${itemId})`);
-      
-      // Add delay between requests to be respectful
-      await new Promise(resolve => setTimeout(resolve, this.config.requestDelay));
-      
-      return historicalData;
+      // Return empty array if no data found (no mock data - we want real data only)
+      return [];
       
     } catch (error) {
       this.logger.error(`❌ Failed to scrape individual item page for ${itemName} (ID: ${itemId})`, error);

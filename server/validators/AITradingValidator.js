@@ -46,7 +46,7 @@ class AITradingValidator extends BaseValidator {
     } catch (error) {
       return {
         isValid: false,
-        errors: ['Validation error occurred']
+        errors: [`Validation error occurred: ${error.message}`]
       };
     }
   }
@@ -81,7 +81,7 @@ class AITradingValidator extends BaseValidator {
     } catch (error) {
       return {
         isValid: false,
-        errors: ['Validation error occurred']
+        errors: [`Validation error occurred: ${error.message}`]
       };
     }
   }
@@ -116,7 +116,7 @@ class AITradingValidator extends BaseValidator {
     } catch (error) {
       return {
         isValid: false,
-        errors: ['Validation error occurred']
+        errors: [`Validation error occurred: ${error.message}`]
       };
     }
   }
@@ -143,7 +143,7 @@ class AITradingValidator extends BaseValidator {
     } catch (error) {
       return {
         isValid: false,
-        errors: ['Validation error occurred']
+        errors: [`Validation error occurred: ${error.message}`]
       };
     }
   }
@@ -180,7 +180,7 @@ class AITradingValidator extends BaseValidator {
     } catch (error) {
       return {
         isValid: false,
-        errors: ['Validation error occurred']
+        errors: [`Validation error occurred: ${error.message}`]
       };
     }
   }
@@ -441,6 +441,21 @@ class AITradingValidator extends BaseValidator {
       isValid: errors.length === 0,
       errors
     };
+  }
+
+  /**
+   * Context7 Pattern: Utility validation methods
+   */
+  isValidInteger(value, min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER) {
+    return Number.isInteger(value) && value >= min && value <= max;
+  }
+
+  isValidFloat(value, min = Number.MIN_VALUE, max = Number.MAX_VALUE) {
+    return typeof value === 'number' && !isNaN(value) && value >= min && value <= max;
+  }
+
+  isValidString(value, minLength = 0, maxLength = Infinity) {
+    return typeof value === 'string' && value.length >= minLength && value.length <= maxLength;
   }
 }
 

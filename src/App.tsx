@@ -3,12 +3,16 @@ import { TradingDashboard } from './components/TradingDashboard'
 import { AITradingDashboard } from './components/AITradingDashboard'
 import { AutoTrainingDashboard } from './components/AutoTrainingDashboard'
 import LiveMonitoringDashboard from './components/LiveMonitoringDashboard'
+import ItemsAnalysis from './components/ItemsAnalysis'
+import SystemOverview from './components/SystemOverview'
+import AITradingVisualizer from './components/AITradingVisualizer'
+import LiveMarketFeed from './components/LiveMarketFeed'
 import { NotificationToast } from './components/NotificationToast'
 import { useNotifications } from './hooks/useNotifications'
 import './App.css'
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'manual' | 'ai' | 'auto' | 'monitoring'>('manual')
+  const [activeTab, setActiveTab] = useState<'overview' | 'analysis' | 'ai-viz' | 'live-feed' | 'manual' | 'ai' | 'auto' | 'monitoring'>('overview')
   const { notifications, showSuccess, showError, showWarning, showInfo, dismissNotification } = useNotifications()
 
   return (
@@ -29,6 +33,46 @@ function App() {
           {/* Navigation Tabs */}
           <div className="mt-6 border-b border-gray-200">
             <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'overview'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                🏠 System Overview
+              </button>
+              <button
+                onClick={() => setActiveTab('analysis')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'analysis'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                🔍 Items Analysis
+              </button>
+              <button
+                onClick={() => setActiveTab('ai-viz')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'ai-viz'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                🧠 AI Intelligence
+              </button>
+              <button
+                onClick={() => setActiveTab('live-feed')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'live-feed'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                📡 Live Feed
+              </button>
               <button
                 onClick={() => setActiveTab('manual')}
                 className={`py-2 px-1 border-b-2 font-medium text-sm ${
@@ -74,7 +118,11 @@ function App() {
         </div>
       </header>
       
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className={activeTab === 'analysis' || activeTab === 'overview' || activeTab === 'ai-viz' || activeTab === 'live-feed' ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'}>
+        {activeTab === 'overview' && <SystemOverview />}
+        {activeTab === 'analysis' && <ItemsAnalysis />}
+        {activeTab === 'ai-viz' && <AITradingVisualizer />}
+        {activeTab === 'live-feed' && <LiveMarketFeed />}
         {activeTab === 'manual' && <TradingDashboard />}
         {activeTab === 'ai' && <AITradingDashboard />}
         {activeTab === 'auto' && <AutoTrainingDashboard />}
