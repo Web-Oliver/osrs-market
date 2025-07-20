@@ -3,6 +3,7 @@ import { Search, Star, Filter, BarChart3, Activity, Grid, List, Map } from 'luci
 import PriceChart from './PriceChart';
 import MetricsCard from './MetricsCard';
 import MarketHeatmap from './MarketHeatmap';
+import { TimeConstants } from '../utils/TimeConstants';
 
 interface Item {
   itemId: number;
@@ -546,13 +547,13 @@ const ItemsAnalysis: React.FC = () => {
             <PriceChart
               data={[
                 {
-                  timestamp: Date.now() - 24 * 60 * 60 * 1000,
+                  timestamp: Date.now() - TimeConstants.ONE_DAY,
                   highPrice: selectedItem.marketData.highPrice * 0.95,
                   lowPrice: selectedItem.marketData.lowPrice * 0.95,
                   volume: selectedItem.marketData.volume * 0.8
                 },
                 {
-                  timestamp: Date.now() - 12 * 60 * 60 * 1000,
+                  timestamp: Date.now() - TimeConstants.TWELVE_HOURS,
                   highPrice: selectedItem.marketData.highPrice * 0.98,
                   lowPrice: selectedItem.marketData.lowPrice * 0.98,
                   volume: selectedItem.marketData.volume * 0.9

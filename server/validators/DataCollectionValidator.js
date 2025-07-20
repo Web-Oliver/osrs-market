@@ -67,7 +67,7 @@ class DataCollectionValidator extends BaseValidator {
       return businessValidation;
     }
 
-    return { isValid: true, errors: [] };
+    return this.formatSuccessResponse(null, 'Configuration validation successful');
   }
 
   /**
@@ -157,128 +157,90 @@ class DataCollectionValidator extends BaseValidator {
       }
     }
 
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
+    if (errors.length > 0) {
+      return this.formatErrorResponse(errors, 'DATA_COLLECTION_VALIDATION_ERROR');
+    }
+    
+    return this.formatSuccessResponse(null, 'Data collection validation successful');
   }
 
   /**
-   * Context7 Pattern: Validate collection interval
+   * Context7 Pattern: Validate collection interval (Enhanced with DRY pattern)
    */
   validateCollectionInterval(interval) {
-    if (typeof interval !== 'number') {
-      return { isValid: false, error: 'Collection interval must be a number' };
+    const validation = this.validateInteger(interval, 5000, 300000, 'collectionInterval');
+    
+    if (!validation.isValid) {
+      return { isValid: false, error: validation.error };
     }
 
-    if (interval < 5000) {
-      return { isValid: false, error: 'Collection interval must be at least 5 seconds' };
-    }
-
-    if (interval > 300000) {
-      return { isValid: false, error: 'Collection interval cannot exceed 5 minutes' };
-    }
-
-    return { isValid: true, interval };
+    return { isValid: true, interval: validation.value };
   }
 
   /**
-   * Context7 Pattern: Validate item tracking limits
+   * Context7 Pattern: Validate item tracking limits (Enhanced with DRY pattern)
    */
   validateItemTrackingLimits(maxItems, minProfitMargin, minVolume) {
     const errors = [];
 
     if (maxItems !== undefined) {
-      if (typeof maxItems !== 'number' || maxItems < 10 || maxItems > 500) {
-        errors.push('Max items to track must be between 10 and 500');
+      const maxItemsValidation = this.validateInteger(maxItems, 10, 500, 'maxItems');
+      if (!maxItemsValidation.isValid) {
+        errors.push(maxItemsValidation.error);
       }
     }
 
     if (minProfitMargin !== undefined) {
-      if (typeof minProfitMargin !== 'number' || minProfitMargin < 0 || minProfitMargin > 100) {
-        errors.push('Minimum profit margin must be between 0 and 100%');
+      const profitMarginValidation = this.validatePercentage(minProfitMargin, 'minProfitMargin', false);
+      if (!profitMarginValidation.isValid) {
+        errors.push(profitMarginValidation.error);
       }
     }
 
     if (minVolume !== undefined) {
-      if (typeof minVolume !== 'number' || minVolume < 0) {
-        errors.push('Minimum volume must be non-negative');
+      const volumeValidation = this.validateFloat(minVolume, 0, Number.MAX_VALUE, 'minVolume');
+      if (!volumeValidation.isValid) {
+        errors.push(volumeValidation.error);
       }
     }
 
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
+    if (errors.length > 0) {
+      return this.formatErrorResponse(errors, 'DATA_COLLECTION_VALIDATION_ERROR');
+    }
+    
+    return this.formatSuccessResponse(null, 'Data collection validation successful');
   }
 
   /**
-   * Context7 Pattern: Validate time range parameter
+   * Context7 Pattern: Validate time range parameter (Enhanced with DRY pattern)
    */
   validateTimeRange(timeRange) {
-    if (!timeRange) {
-      return { isValid: true, timeRange: 3600000 }; // Default 1 hour
-    }
-
-    if (typeof timeRange !== 'number') {
-      return { isValid: false, error: 'Time range must be a number' };
-    }
-
-    if (timeRange < 60000) {
-      return { isValid: false, error: 'Time range must be at least 1 minute' };
-    }
-
-    if (timeRange > 2592000000) { // 30 days
-      return { isValid: false, error: 'Time range cannot exceed 30 days' };
-    }
-
-    return { isValid: true, timeRange };
+    const TimeConstants = require('../utils/TimeConstants');
+    return super.validateTimeRange(timeRange, TimeConstants.ONE_HOUR, TimeConstants.THIRTY_DAYS);
   }
 
   /**
-   * Context7 Pattern: Validate export format
+   * Context7 Pattern: Validate export format (Enhanced with DRY pattern)
    */
   validateExportFormat(format) {
     if (!format) {
       return { isValid: true, format: 'json' }; // Default
     }
 
-    if (typeof format !== 'string') {
-      return { isValid: false, error: 'Export format must be a string' };
+    const formatValidation = this.validateEnum(format.toLowerCase(), ['json', 'csv'], 'exportFormat', false);
+    
+    if (!formatValidation.isValid) {
+      return formatValidation;
     }
 
-    const validFormats = ['json', 'csv'];
-    if (!validFormats.includes(format.toLowerCase())) {
-      return {
-        isValid: false,
-        error: `Export format must be one of: ${validFormats.join(', ')}`
-      };
-    }
-
-    return { isValid: true, format: format.toLowerCase() };
+    return { isValid: true, format: formatValidation.value };
   }
 
   /**
-   * Context7 Pattern: Validate limit parameter
+   * Context7 Pattern: Validate limit parameter (Enhanced with DRY pattern)
    */
   validateLimit(limit) {
-    if (!limit) {
-      return { isValid: true, limit: 50 }; // Default
-    }
-
-    if (typeof limit !== 'number') {
-      return { isValid: false, error: 'Limit must be a number' };
-    }
-
-    if (limit < 1) {
-      return { isValid: false, error: 'Limit must be at least 1' };
-    }
-
-    if (limit > 1000) {
-      return { isValid: false, error: 'Limit cannot exceed 1000' };
-    }
-
-    return { isValid: true, limit };
+    return super.validateLimit(limit, 50, 1000);
   }
 
   /**
@@ -299,33 +261,28 @@ class DataCollectionValidator extends BaseValidator {
       }
     }
 
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
+    if (errors.length > 0) {
+      return this.formatErrorResponse(errors, 'DATA_COLLECTION_VALIDATION_ERROR');
+    }
+    
+    return this.formatSuccessResponse(null, 'Data collection validation successful');
   }
 
   /**
-   * Context7 Pattern: Validate retry configuration
+   * Context7 Pattern: Validate retry configuration (Enhanced with DRY pattern)
    */
   validateRetryConfig(maxRetries) {
     if (!maxRetries) {
       return { isValid: true, maxRetries: 3 }; // Default
     }
 
-    if (typeof maxRetries !== 'number') {
-      return { isValid: false, error: 'Max retries must be a number' };
+    const validation = this.validateInteger(maxRetries, 1, 10, 'maxRetries');
+    
+    if (!validation.isValid) {
+      return { isValid: false, error: validation.error };
     }
 
-    if (maxRetries < 1) {
-      return { isValid: false, error: 'Must allow at least 1 retry' };
-    }
-
-    if (maxRetries > 10) {
-      return { isValid: false, error: 'Max retries cannot exceed 10' };
-    }
-
-    return { isValid: true, maxRetries };
+    return { isValid: true, maxRetries: validation.value };
   }
 
   /**
@@ -380,8 +337,9 @@ class DataCollectionValidator extends BaseValidator {
       errors.push(timeRangeValidation.error);
     }
 
-    // Additional validation for export size
-    if (params.timeRange && params.timeRange > 86400000) { // 24 hours
+    // Additional validation for export size using TimeConstants
+    const TimeConstants = require('../utils/TimeConstants');
+    if (params.timeRange && params.timeRange > TimeConstants.ONE_DAY) {
       const estimatedRecords = (params.timeRange / 30000) * 100; // Rough estimate
       if (estimatedRecords > 100000) {
         errors.push('Export time range too large, may result in excessive data');
@@ -418,10 +376,11 @@ class DataCollectionValidator extends BaseValidator {
       errors.push('Insufficient memory to start collection');
     }
 
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
+    if (errors.length > 0) {
+      return this.formatErrorResponse(errors, 'DATA_COLLECTION_VALIDATION_ERROR');
+    }
+    
+    return this.formatSuccessResponse(null, 'Data collection validation successful');
   }
 
   /**
@@ -439,10 +398,11 @@ class DataCollectionValidator extends BaseValidator {
       errors.push('Graceful shutdown option must be a boolean');
     }
 
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
+    if (errors.length > 0) {
+      return this.formatErrorResponse(errors, 'DATA_COLLECTION_VALIDATION_ERROR');
+    }
+    
+    return this.formatSuccessResponse(null, 'Data collection validation successful');
   }
 }
 

@@ -10,7 +10,6 @@
 
 const express = require('express');
 const { RequestMiddleware } = require('../middleware/RequestMiddleware');
-const { ErrorMiddleware } = require('../middleware/ErrorMiddleware');
 const { ApiResponse } = require('../utils/ApiResponse');
 const { Logger } = require('../utils/Logger');
 
@@ -18,7 +17,6 @@ const router = express.Router();
 
 // Context7 Pattern: Initialize dependencies
 const requestMiddleware = new RequestMiddleware();
-const errorMiddleware = new ErrorMiddleware();
 const logger = new Logger('RouteIndex');
 
 // Context7 Pattern: Import route modules

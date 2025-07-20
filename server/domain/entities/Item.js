@@ -10,6 +10,7 @@
 const { ItemId } = require('../value-objects/ItemId');
 const { AlchemyInfo } = require('../value-objects/AlchemyInfo');
 const { Logger } = require('../../utils/Logger');
+const TimeConstants = require('../../utils/TimeConstants');
 
 /**
  * @typedef {import('../../types/domain/Item.js').ItemData} ItemData
@@ -409,7 +410,7 @@ class Item {
    * @param {number} maxAgeMs - Maximum age in milliseconds
    * @returns {boolean} True if sync needed
    */
-  needsSync(maxAgeMs = 24 * 60 * 60 * 1000) {
+  needsSync(maxAgeMs = TimeConstants.ONE_DAY) {
     const age = Date.now() - this.#audit.lastSyncedAt.getTime();
     return age > maxAgeMs;
   }

@@ -7,6 +7,7 @@
  * - Clean business logic separation
  */
 
+const TimeConstants = require('../../utils/TimeConstants');
 
 /**
  * Base Specification class
@@ -201,7 +202,7 @@ class ItemNameContainsSpecification extends Specification {
  * Check if item needs synchronization
  */
 class NeedsSyncSpecification extends Specification {
-  constructor(maxAgeMs = 24 * 60 * 60 * 1000) {
+  constructor(maxAgeMs = TimeConstants.ONE_DAY) {
     super();
     this.maxAgeMs = maxAgeMs;
   }
@@ -253,7 +254,7 @@ class ValueRangeSpecification extends Specification {
  * Check if item was updated recently
  */
 class RecentlyUpdatedSpecification extends Specification {
-  constructor(maxAgeMs = 60 * 60 * 1000) { // 1 hour default
+  constructor(maxAgeMs = TimeConstants.ONE_HOUR) { // 1 hour default
     super();
     this.maxAgeMs = maxAgeMs;
   }
@@ -314,7 +315,7 @@ class ItemSpecifications {
    * @param {number} maxAgeMs - Maximum age before sync needed
    * @returns {Specification} Combined specification
    */
-  static needsDataRefresh(maxAgeMs = 24 * 60 * 60 * 1000) {
+  static needsDataRefresh(maxAgeMs = TimeConstants.ONE_DAY) {
     return new NeedsSyncSpecification(maxAgeMs)
       .and(new ActiveItemSpecification());
   }
@@ -370,7 +371,7 @@ class ItemSpecifications {
    * @param {number} valueThreshold - Minimum value threshold
    * @returns {Specification} Combined specification
    */
-  static recentlyUpdatedHighValue(maxAge = 60 * 60 * 1000, valueThreshold = 100000) {
+  static recentlyUpdatedHighValue(maxAge = TimeConstants.ONE_HOUR, valueThreshold = 100000) {
     return new RecentlyUpdatedSpecification(maxAge)
       .and(new HighValueItemSpecification(valueThreshold))
       .and(new ActiveItemSpecification());

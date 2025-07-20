@@ -15,6 +15,8 @@
 
 const mongoose = require('mongoose');
 const { Schema } = mongoose;
+const MongooseTransformUtil = require('../utils/MongooseTransformUtil');
+const TimeConstants = require('../utils/TimeConstants');
 
 /**
  * Context7 Pattern: Market Price Snapshot Schema Definition
@@ -45,7 +47,7 @@ const MarketPriceSnapshotSchema = new Schema({
     index: true,
     validate: {
       validator: function(v) {
-        return v > 0 && v <= Date.now() + 86400000; // Not more than 24 hours in the future
+        return v > 0 && v <= Date.now() + TimeConstants.ONE_DAY; // Not more than 24 hours in the future
       },
       message: 'Timestamp must be a valid Unix timestamp'
     }
@@ -319,10 +321,7 @@ const MarketPriceSnapshotSchema = new Schema({
 
   // JSON transformation for API responses
   toJSON: {
-    transform: function(doc, ret) {
-      delete ret.__v;
-      return ret;
-    }
+    transform: MongooseTransformUtil.marketDataTransform
   }
 });
 
@@ -387,7 +386,7 @@ MarketPriceSnapshotSchema.pre('save', function(next) {
 
   // Ensure timestamp is reasonable
   const now = Date.now();
-  if (this.timestamp > now + 86400000) { // More than 24 hours in future
+  if (this.timestamp > now + TimeConstants.ONE_DAY) { // More than 24 hours in future
     return next(new Error('Timestamp cannot be more than 24 hours in the future'));
   }
 

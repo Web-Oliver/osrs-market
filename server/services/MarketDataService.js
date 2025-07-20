@@ -19,12 +19,11 @@ const { MarketPriceSnapshotModel } = require('../models/MarketPriceSnapshotModel
 const { FinancialCalculationService } = require('./consolidated/FinancialCalculationService');
 const { MarketDataFetchService } = require('./consolidated/MarketDataFetchService');
 const { DatabaseUtility } = require('../utils/DatabaseUtility');
-const { QueryBuilderService } = require('./QueryBuilderService');
 const { MarketDataProcessingService } = require('./consolidated/MarketDataProcessingService');
 const { DataTransformer } = require('../utils/DataTransformer');
+const TimeConstants = require('../utils/TimeConstants');
+const DateRangeUtil = require('../utils/DateRangeUtil');
 
-// TRADING INTEGRATION (Legacy compatibility)
-const { AITradingOrchestratorService } = require('./AITradingOrchestratorService');
 const { ItemRepository } = require('../repositories/ItemRepository');
 
 class MarketDataService extends BaseService {
@@ -47,7 +46,6 @@ class MarketDataService extends BaseService {
     // Legacy compatibility
     this.dataTransformer = new DataTransformer();
     this.itemRepository = new ItemRepository();
-    this.aiTrading = new AITradingOrchestratorService();
   }
 
   /**
@@ -284,7 +282,7 @@ const { period = 30 } = options;
 
       // Get historical data
       const snapshots = await this.getMarketSnapshots(itemId, 'latest', 
-        new Date(Date.now() - period * 24 * 60 * 60 * 1000));
+        DateRangeUtil.getDaysAgo(period));
 
       if (snapshots.length < 5) {
         return { error: 'Insufficient historical data', itemId, dataPoints: snapshots.length };
@@ -441,7 +439,7 @@ const marketData = await this.get1HourMarketData();
   /**
    * Controller compatibility: Get market data summary
    */
-  async getMarketDataSummary(timeRange = 24 * 60 * 60 * 1000) {
+  async getMarketDataSummary(timeRange = TimeConstants.ONE_DAY) {
     return this.execute(async () => {
       this.logger.debug('Getting market data summary', { timeRange });
       

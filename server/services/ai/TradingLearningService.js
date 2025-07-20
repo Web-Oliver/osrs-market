@@ -177,7 +177,7 @@ class TradingLearningService extends BaseService {
 
     // Check time since last update (don't update too frequently)
     const timeSinceUpdate = Date.now() - this.lastLearningUpdate;
-    if (timeSinceUpdate < 5 * 60 * 1000) { // Minimum 5 minutes between updates
+    if (timeSinceUpdate < TimeConstants.FIVE_MINUTES) { // Minimum 5 minutes between updates
       return false;
     }
 

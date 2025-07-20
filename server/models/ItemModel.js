@@ -11,6 +11,8 @@
 
 const mongoose = require('mongoose');
 const { Logger } = require('../utils/Logger');
+const TimeConstants = require('../utils/TimeConstants');
+const MongooseTransformUtil = require('../utils/MongooseTransformUtil');
 
 const logger = new Logger('ItemModel');
 
@@ -182,22 +184,18 @@ const ItemSchema = new mongoose.Schema({
   // Optimize for read performance
   collection: 'items',
 
-  // JSON transform options
+  // JSON transform options using MongooseTransformUtil
   toJSON: {
     transform: function(doc, ret) {
       ret.id = ret.itemId;
-      delete ret._id;
-      delete ret.__v;
-      return ret;
+      return MongooseTransformUtil.standardTransform(doc, ret);
     }
   },
 
   toObject: {
     transform: function(doc, ret) {
       ret.id = ret.itemId;
-      delete ret._id;
-      delete ret.__v;
-      return ret;
+      return MongooseTransformUtil.standardTransform(doc, ret);
     }
   }
 });
@@ -314,8 +312,8 @@ ItemSchema.statics = {
   /**
    * Find items requiring sync
    */
-  async findItemsRequiringSync(maxAge = 24 * 60 * 60 * 1000) { // 24 hours
-    const cutoff = new Date(Date.now() - maxAge);
+  async findItemsRequiringSync(maxAge = TimeConstants.ONE_DAY) { // 24 hours
+    const cutoff = TimeConstants.getPastTime(maxAge);
     return this.find({
       $or: [
         { lastSyncedAt: { $lt: cutoff } },

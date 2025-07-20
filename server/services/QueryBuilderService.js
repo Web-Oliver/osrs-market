@@ -12,6 +12,7 @@
 const { DatabaseUtility } = require('../utils/DatabaseUtility');
 const { AppConstants } = require('../config/AppConstants');
 const { Logger } = require('../utils/Logger');
+const DateRangeUtil = require('../utils/DateRangeUtil');
 
 class QueryBuilderService {
   constructor() {
@@ -134,13 +135,7 @@ class QueryBuilderService {
    * DRY: Eliminates duplicate "top items" aggregation patterns
    */
   static buildTopItemsAggregation(metric = 'volume', timeRange = '24h', limit = 10) {
-    const timeRanges = {
-      '1h': new Date(Date.now() - 60 * 60 * 1000),
-      '24h': new Date(Date.now() - 24 * 60 * 60 * 1000),
-      '7d': new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-      '30d': new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-    };
-
+    const timeRanges = DateRangeUtil.getQueryTimeRanges();
     const startTime = timeRanges[timeRange] || timeRanges['24h'];
 
     const groupFields = {
@@ -198,12 +193,7 @@ class QueryBuilderService {
    * DRY: Eliminates duplicate user activity patterns
    */
   static buildUserActivityAggregation(userId, timeRange = '7d') {
-    const timeRanges = {
-      '24h': new Date(Date.now() - 24 * 60 * 60 * 1000),
-      '7d': new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-      '30d': new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-    };
-
+    const timeRanges = DateRangeUtil.getMonitoringTimeRanges();
     const startTime = timeRanges[timeRange] || timeRanges['7d'];
 
     return [

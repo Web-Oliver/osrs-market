@@ -14,6 +14,7 @@ import {
 import useWebSocket, { ReadyState } from 'react-use-websocket'
 import { mongoService, type SystemStatus, type EfficiencyMetrics, type LiveMonitoringData } from '../services/mongoService'
 import { formatTime } from '../utils/formatters'
+import { TimeConstants } from '../utils/TimeConstants'
 
 // Use LiveMonitoringData from mongoService
 type LiveData = LiveMonitoringData
@@ -374,11 +375,11 @@ const LiveMonitoringDashboard: React.FC = () => {
   const filteredActions = systemActions.filter(action => {
     // Time range filter
     const timeRangeMs = {
-      '5m': 5 * 60 * 1000,
-      '15m': 15 * 60 * 1000,
-      '1h': 60 * 60 * 1000,
-      '6h': 6 * 60 * 60 * 1000,
-      '24h': 24 * 60 * 60 * 1000
+      '5m': TimeConstants.FIVE_MINUTES,
+      '15m': TimeConstants.FIFTEEN_MINUTES,
+      '1h': TimeConstants.ONE_HOUR,
+      '6h': TimeConstants.SIX_HOURS,
+      '24h': TimeConstants.TWENTY_FOUR_HOURS
     }[activityFilter.timeRange]
     
     if (Date.now() - action.timestamp > timeRangeMs) {

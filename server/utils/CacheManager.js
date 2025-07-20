@@ -8,8 +8,10 @@
  * - Performance optimization
  */
 
+const TimeConstants = require('./TimeConstants');
+
 class CacheManager {
-  constructor(namespace = 'default', defaultTTL = 300000) { // 5 minutes default
+  constructor(namespace = 'default', defaultTTL = TimeConstants.FIVE_MINUTES) { // 5 minutes default
     this.namespace = namespace;
     this.defaultTTL = defaultTTL;
     this.cache = new Map();

@@ -9,6 +9,7 @@
  */
 
 const mongoose = require('mongoose');
+const MongooseTransformUtil = require('../utils/MongooseTransformUtil');
 
 /**
  * Context7 Pattern: Watchlist Item Schema
@@ -203,11 +204,7 @@ watchlistSchema.post('save', function(error, doc, next) {
  */
 watchlistSchema.set('toJSON', {
   virtuals: true,
-  transform: function(doc, ret) {
-    delete ret._id;
-    delete ret.__v;
-    return ret;
-  }
+  transform: MongooseTransformUtil.standardTransform
 });
 
 /**

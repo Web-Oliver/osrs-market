@@ -25,6 +25,8 @@ const { MarketDataProcessingService } = require('./consolidated/MarketDataProces
 const { MonitoringService } = require('./MonitoringService');
 const { ItemModel } = require('../models/ItemModel');
 const { ScrapeQueueModel } = require('../models/ScrapeQueueModel');
+const TimeConstants = require('../utils/TimeConstants');
+const DateRangeUtil = require('../utils/DateRangeUtil');
 
 class DataCollectionService extends BaseService {
   constructor(dependencies = {}) {
@@ -188,7 +190,7 @@ class DataCollectionService extends BaseService {
   /**
    * SOLID: Schedule automatic collection
    */
-  startScheduledCollection(intervalMs = 300000) { // 5 minutes default
+  startScheduledCollection(intervalMs = TimeConstants.FIVE_MINUTES) { // 5 minutes default
     if (this.collectionInterval) {
       this.stopScheduledCollection();
     }
@@ -272,9 +274,9 @@ class DataCollectionService extends BaseService {
   /**
    * SOLID: Cleanup old data
    */
-  async cleanupOldData() {
+  async cleanupOldData(maxAgeMs = TimeConstants.SEVEN_DAYS) {
     return this.execute(async() => {
-      const cutoff = new Date(Date.now() - maxAgeMs);
+      const cutoff = DateRangeUtil.getCutoffDate(maxAgeMs);
 
       // Cleanup completed scrape queue items
       const deletedQueue = await ScrapeQueueModel.deleteMany({
@@ -479,7 +481,7 @@ class DataCollectionService extends BaseService {
       this.logger.info('Starting data pipeline orchestrator');
       
       // Start scheduled collection
-      this.startScheduledCollection(300000); // 5 minutes
+      this.startScheduledCollection(TimeConstants.FIVE_MINUTES); // 5 minutes
       
       // Start AI data flow if not already running
       if (!this.aiDataInterval) {

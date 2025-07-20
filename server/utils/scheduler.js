@@ -14,6 +14,7 @@
 
 const { Logger } = require('./Logger');
 const { DataCollectionService } = require('../services/DataCollectionService');
+const TimeConstants = require('./TimeConstants');
 
 
 const logger = new Logger('Scheduler');
@@ -42,7 +43,7 @@ async function startMarketDataPolling() {
       } catch (error) {
         logger.error('❌ 5-minute data collection failed', error);
       }
-    }, 5 * 60 * 1000); // 5 minutes
+    }, TimeConstants.FIVE_MINUTES); // 5 minutes
 
     activeIntervals.set('5min_collection', fiveMinInterval);
 
@@ -72,7 +73,7 @@ async function startMarketDataPolling() {
       } catch (error) {
         logger.error('❌ Scrape queue processing failed', error);
       }
-    }, 15 * 60 * 1000); // 15 minutes
+    }, 3 * TimeConstants.FIVE_MINUTES); // 15 minutes
 
     activeIntervals.set('scrape_queue', scrapeQueueInterval);
 

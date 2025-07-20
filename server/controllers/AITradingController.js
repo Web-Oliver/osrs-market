@@ -392,8 +392,8 @@ class AITradingController extends BaseController {
         const prices = item.priceHistory.map(point => point.price || point.high || 0).filter(p => p > 0);
 
         if (prices.length >= 3) {
-          const analysis = this.tradingAnalysis.getMarketAnalysis(prices, item.priceData);
-          const flippingOpportunity = this.tradingAnalysis.identifyFlippingOpportunity(
+          const analysis = this.tradingAnalysisService.getMarketAnalysis(prices, item.priceData);
+          const flippingOpportunity = this.tradingAnalysisService.identifyFlippingOpportunity(
             item.id,
             item.name,
             item.priceData

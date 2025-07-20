@@ -10,6 +10,7 @@
  */
 
 const mongoose = require('mongoose');
+const TimeConstants = require('../utils/TimeConstants');
 
 /**
  * AI Model Metadata Schema
@@ -445,7 +446,7 @@ AIModelMetadataSchema.statics.findModelsForCleanup = function(daysOld = 30) {
  * Model age in days
  */
 AIModelMetadataSchema.virtual('ageInDays').get(function() {
-  return Math.floor((Date.now() - this.createdAt.getTime()) / (24 * 60 * 60 * 1000));
+  return Math.floor((Date.now() - this.createdAt.getTime()) / TimeConstants.ONE_DAY);
 });
 
 /**
@@ -455,7 +456,7 @@ AIModelMetadataSchema.virtual('daysSinceLastUse').get(function() {
   if (!this.usageStats.lastUsedAt) {
     return null;
   }
-  return Math.floor((Date.now() - this.usageStats.lastUsedAt.getTime()) / (24 * 60 * 60 * 1000));
+  return Math.floor((Date.now() - this.usageStats.lastUsedAt.getTime()) / TimeConstants.ONE_DAY);
 });
 
 /**

@@ -14,6 +14,7 @@ const MongoDataPersistence = require('./services/mongoDataPersistence');
 const { WebSocketLoggingService } = require('./services/WebSocketLoggingService');
 const { ErrorHandler } = require('./middleware/ErrorHandler');
 const { AppConstants } = require('./config/AppConstants');
+const ApiResponse = require('./utils/ApiResponse');
 
 // Import centralized routes
 const apiRoutes = require('./routes/index');
@@ -93,7 +94,7 @@ async function connectToMongoDB() {
 app.get('/api/live-monitoring', async(req, res) => {
   try {
     if (!mongoService) {
-      return res.status(503).json({ error: 'Database not connected' });
+      return ApiResponse.serviceUnavailable(res, 'Database not connected');
     }
 
     const limit = parseInt(req.query.limit) || AppConstants.DATABASE.DEFAULT_LIMIT;
@@ -102,7 +103,7 @@ app.get('/api/live-monitoring', async(req, res) => {
     res.json(data);
   } catch (error) {
     console.error('Error fetching live monitoring data:', error);
-    res.status(500).json({ error: 'Failed to fetch live monitoring data' });
+    ApiResponse.internalServerError(res, 'Failed to fetch live monitoring data');
   }
 });
 
@@ -112,7 +113,7 @@ app.get('/api/live-monitoring', async(req, res) => {
 app.post('/api/live-monitoring', async(req, res) => {
   try {
     if (!mongoService) {
-      return res.status(503).json({ error: 'Database not connected' });
+      return ApiResponse.serviceUnavailable(res, 'Database not connected');
     }
 
     const data = {
@@ -124,7 +125,7 @@ app.post('/api/live-monitoring', async(req, res) => {
     res.json({ id: insertedId.toString() });
   } catch (error) {
     console.error('Error saving live monitoring data:', error);
-    res.status(500).json({ error: 'Failed to save live monitoring data' });
+    ApiResponse.internalServerError(res, 'Failed to save live monitoring data');
   }
 });
 
@@ -134,7 +135,7 @@ app.post('/api/live-monitoring', async(req, res) => {
 app.get('/api/aggregated-stats', async(req, res) => {
   try {
     if (!mongoService) {
-      return res.status(503).json({ error: 'Database not connected' });
+      return ApiResponse.serviceUnavailable(res, 'Database not connected');
     }
 
     const timeRange = parseInt(req.query.timeRange) || AppConstants.CACHE.DEFAULT_TTL;
@@ -143,7 +144,7 @@ app.get('/api/aggregated-stats', async(req, res) => {
     res.json(stats);
   } catch (error) {
     console.error('Error fetching aggregated stats:', error);
-    res.status(500).json({ error: 'Failed to fetch aggregated stats' });
+    ApiResponse.internalServerError(res, 'Failed to fetch aggregated stats');
   }
 });
 
@@ -153,7 +154,7 @@ app.get('/api/aggregated-stats', async(req, res) => {
 app.get('/api/system-status', async(req, res) => {
   try {
     if (!mongoService) {
-      return res.status(503).json({ error: 'Database not connected' });
+      return ApiResponse.serviceUnavailable(res, 'Database not connected');
     }
 
     // Get database summary and health check
@@ -208,7 +209,7 @@ app.get('/api/system-status', async(req, res) => {
     res.json(status);
   } catch (error) {
     console.error('Error fetching system status:', error);
-    res.status(500).json({ error: 'Failed to fetch system status' });
+    ApiResponse.internalServerError(res, 'Failed to fetch system status');
   }
 });
 
@@ -244,7 +245,7 @@ app.get('/api/efficiency-metrics', async(req, res) => {
     res.json(metrics);
   } catch (error) {
     console.error('Error fetching efficiency metrics:', error);
-    res.status(500).json({ error: 'Failed to fetch efficiency metrics' });
+    ApiResponse.internalServerError(res, 'Failed to fetch efficiency metrics');
   }
 });
 
@@ -254,7 +255,7 @@ app.get('/api/efficiency-metrics', async(req, res) => {
 app.get('/api/market-data', async(req, res) => {
   try {
     if (!mongoService) {
-      return res.status(503).json({ error: 'Database not connected' });
+      return ApiResponse.serviceUnavailable(res, 'Database not connected');
     }
 
     const options = {
@@ -269,7 +270,7 @@ app.get('/api/market-data', async(req, res) => {
     res.json(data);
   } catch (error) {
     console.error('Error fetching market data:', error);
-    res.status(500).json({ error: 'Failed to fetch market data' });
+    ApiResponse.internalServerError(res, 'Failed to fetch market data');
   }
 });
 
@@ -279,20 +280,20 @@ app.get('/api/market-data', async(req, res) => {
 app.post('/api/market-data', async(req, res) => {
   try {
     if (!mongoService) {
-      return res.status(503).json({ error: 'Database not connected' });
+      return ApiResponse.serviceUnavailable(res, 'Database not connected');
     }
 
     const { items, collectionSource = 'API' } = req.body;
 
     if (!items || !Array.isArray(items)) {
-      return res.status(400).json({ error: 'Invalid items data' });
+      return ApiResponse.badRequest(res, 'Invalid items data');
     }
 
     await mongoService.saveMarketData(items, collectionSource);
     res.json({ success: true, itemsSaved: items.length });
   } catch (error) {
     console.error('Error saving market data:', error);
-    res.status(500).json({ error: 'Failed to save market data' });
+    ApiResponse.internalServerError(res, 'Failed to save market data');
   }
 });
 
@@ -302,7 +303,7 @@ app.post('/api/market-data', async(req, res) => {
 app.post('/api/cleanup', async(req, res) => {
   try {
     if (!mongoService) {
-      return res.status(503).json({ error: 'Database not connected' });
+      return ApiResponse.serviceUnavailable(res, 'Database not connected');
     }
 
     const maxAge = req.body.maxAge || AppConstants.DATABASE.DEFAULT_MAX_AGE;
@@ -311,7 +312,7 @@ app.post('/api/cleanup', async(req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error during cleanup:', error);
-    res.status(500).json({ error: 'Failed to cleanup old data' });
+    ApiResponse.internalServerError(res, 'Failed to cleanup old data');
   }
 });
 
@@ -321,7 +322,7 @@ app.post('/api/cleanup', async(req, res) => {
 app.get('/api/health', async(req, res) => {
   try {
     if (!mongoService) {
-      return res.status(503).json({
+      return ApiResponse.serviceUnavailable(res, 'Service unhealthy', {
         status: 'unhealthy',
         mongodb: false,
         timestamp: Date.now()
@@ -339,7 +340,7 @@ app.get('/api/health', async(req, res) => {
     });
   } catch (error) {
     console.error('Health check failed:', error);
-    res.status(503).json({
+    ApiResponse.serviceUnavailable(res, 'Health check failed', {
       status: 'unhealthy',
       mongodb: false,
       error: error.message,
@@ -373,7 +374,7 @@ app.get('/api/scraper/status', async(req, res) => {
     res.json(status);
   } catch (error) {
     console.error('Error getting scraper status:', error);
-    res.status(500).json({ error: 'Failed to get scraper status' });
+    ApiResponse.internalServerError(res, 'Failed to get scraper status');
   }
 });
 
@@ -392,7 +393,7 @@ app.post('/api/scraper/start', async(req, res) => {
     res.json(result);
   } catch (error) {
     console.error('Error starting scraper:', error);
-    res.status(500).json({ error: 'Failed to start scraper', details: error.message });
+    ApiResponse.internalServerError(res, 'Failed to start scraper', { details: error.message });
   }
 });
 
@@ -420,7 +421,7 @@ app.post('/api/scraper/start/:category', async(req, res) => {
     });
   } catch (error) {
     console.error(`Error starting scraper for ${req.params.category}:`, error);
-    res.status(500).json({ error: 'Failed to start scraper', details: error.message });
+    ApiResponse.internalServerError(res, 'Failed to start scraper', { details: error.message });
   }
 });
 

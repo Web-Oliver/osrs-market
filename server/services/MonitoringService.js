@@ -11,6 +11,7 @@
 
 const { BaseService } = require('./BaseService');
 const { MetricsCalculator } = require('../utils/MetricsCalculator');
+const TimeConstants = require('../utils/TimeConstants');
 
 class MonitoringService extends BaseService {
   constructor() {
@@ -147,7 +148,7 @@ this.logger.debug('Fetching aggregated statistics', { timeRange });
           successfulCalls: Math.floor(Math.random() * 1000) + 500,
           failedCalls: Math.floor(Math.random() * 50) + 10,
           successRate: '92.5%',
-          uptime: Date.now() - (Date.now() - 7200000), // 2 hours
+          uptime: TimeConstants.TWO_HOURS, // 2 hours (fixed calculation)
           averageResponseTime: '850ms'
         },
         apiRateLimiting: {

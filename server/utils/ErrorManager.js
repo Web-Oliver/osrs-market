@@ -16,6 +16,7 @@
  */
 
 const { ErrorHandlerManager } = require('../strategies/ErrorHandlingStrategy');
+const TimeConstants = require('./TimeConstants');
 
 class ErrorManager {
   constructor(logger) {
@@ -294,7 +295,7 @@ class ErrorManager {
     errors.push(now);
     
     // Keep only errors from last 5 minutes
-    const fiveMinutesAgo = now - (5 * 60 * 1000);
+    const fiveMinutesAgo = now - TimeConstants.FIVE_MINUTES;
     this.errorCounts.set(key, errors.filter(time => time > fiveMinutesAgo));
   }
 
@@ -314,7 +315,7 @@ class ErrorManager {
    */
   triggerCircuitBreaker(context) {
     const now = Date.now();
-    this.circuitBreakers.set(context, now + (15 * 60 * 1000)); // 15 minute cooldown
+    this.circuitBreakers.set(context, now + (3 * TimeConstants.FIVE_MINUTES)); // 15 minute cooldown
     
     this.logger.error('Circuit breaker triggered', {
       context,
@@ -341,7 +342,7 @@ class ErrorManager {
       recentErrors: 0
     };
 
-    const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+    const fiveMinutesAgo = Date.now() - TimeConstants.FIVE_MINUTES;
     
     for (const [key, errors] of this.errorCounts.entries()) {
       const [context, category] = key.split(':');

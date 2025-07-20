@@ -46,7 +46,7 @@ class OSRSWikiService extends BaseService {
 
     // Per-item rate limiting - track last fetch time for each item
     this.itemLastFetchTime = new Map();
-    this.ITEM_RATE_LIMIT_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
+    this.ITEM_RATE_LIMIT_MS = TimeConstants.FIVE_MINUTES; // 5 minutes in milliseconds
 
     // OSRS Wiki API configuration
     this.baseURL = 'https://prices.runescape.wiki/api/v1/osrs';

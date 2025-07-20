@@ -1,12 +1,13 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useAutoTrainingBackend } from './useAutoTrainingBackend'
 import type { AutoTrainingConfig } from '../types/autoTraining'
+import { TimeConstants } from '../utils/TimeConstants'
 
 // Default comprehensive configuration with MongoDB persistence
 const DEFAULT_AUTO_TRAINING_CONFIG: AutoTrainingConfig = {
   dataCollection: {
     enableAutoCollection: true,
-    collectionInterval: 300000, // 5 minutes
+    collectionInterval: TimeConstants.FIVE_MINUTES, // 5 minutes
     maxItemsPerCollection: 1000,
     enableHistoricalData: true
   },
@@ -20,13 +21,13 @@ const DEFAULT_AUTO_TRAINING_CONFIG: AutoTrainingConfig = {
   },
   adaptiveLearning: {
     enableAdaptation: true,
-    adaptationInterval: 3600000, // 1 hour
+    adaptationInterval: TimeConstants.ONE_HOUR, // 1 hour
     performanceThreshold: 0.7,
     explorationDecay: 0.995
   },
   training: {
     enableAutoTraining: true,
-    trainingInterval: 120000, // 2 minutes
+    trainingInterval: 2 * TimeConstants.ONE_MINUTE, // 2 minutes
     minDataPoints: 10,
     batchProcessingSize: 20,
     continuousLearning: true

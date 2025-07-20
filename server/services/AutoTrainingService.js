@@ -14,6 +14,7 @@ const { DataCollectionService } = require('./DataCollectionService');
 const { AITradingOrchestratorService } = require('./AITradingOrchestratorService');
 const { MongoDataPersistence } = require('./mongoDataPersistence');
 const { FinancialCalculationService } = require('./consolidated/FinancialCalculationService');
+const TimeConstants = require('../utils/TimeConstants');
 
 class AutoTrainingService extends BaseService {
   constructor(config = {}) {
@@ -27,7 +28,7 @@ class AutoTrainingService extends BaseService {
     this.config = {
       dataCollection: {
         enableAutoCollection: true,
-        collectionInterval: 300000, // 5 minutes
+        collectionInterval: TimeConstants.FIVE_MINUTES, // 5 minutes
         maxItemsPerCollection: 1000,
         enableHistoricalData: true,
         ...config.dataCollection
@@ -43,7 +44,7 @@ class AutoTrainingService extends BaseService {
       },
       adaptiveLearning: {
         enableAdaptation: true,
-        adaptationInterval: 3600000, // 1 hour
+        adaptationInterval: TimeConstants.ONE_HOUR, // 1 hour
         performanceThreshold: 0.7,
         explorationDecay: 0.995,
         ...config.adaptiveLearning

@@ -13,6 +13,9 @@
  */
 
 const mongoose = require('mongoose');
+const MongooseTransformUtil = require('../utils/MongooseTransformUtil');
+const TimeConstants = require('../utils/TimeConstants');
+const DateRangeUtil = require('../utils/DateRangeUtil');
 const { Schema } = mongoose;
 
 /**
@@ -141,10 +144,7 @@ const ScrapeQueueSchema = new Schema({
 
   // JSON transformation for API responses
   toJSON: {
-    transform: function(doc, ret) {
-      delete ret.__v;
-      return ret;
-    }
+    transform: MongooseTransformUtil.minimalTransform
   }
 });
 
@@ -324,7 +324,7 @@ ScrapeQueueSchema.statics.getPendingItems = function(limit = 20) {
  * @returns {Promise<ScrapeQueueItem[]>} Array of failed items ready for retry
  */
 ScrapeQueueSchema.statics.getFailedItemsForRetry = function(limit = 10) {
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const oneHourAgo = DateRangeUtil.getHoursAgo(1);
 
   return this.find({
     status: 'failed',
@@ -341,7 +341,7 @@ ScrapeQueueSchema.statics.getFailedItemsForRetry = function(limit = 10) {
  * @returns {Promise<ScrapeQueueItem[]>} Array of items ready for processing
  */
 ScrapeQueueSchema.statics.getItemsReadyForProcessing = function(limit = 20) {
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  const oneHourAgo = DateRangeUtil.getHoursAgo(1);
 
   return this.find({
     $or: [
@@ -396,7 +396,7 @@ ScrapeQueueSchema.statics.getQueueStats = function() {
  * @returns {Promise<Object>} Deletion result
  */
 ScrapeQueueSchema.statics.cleanupOldItems = function(olderThanDays = 30) {
-  const cutoffDate = new Date(Date.now() - (olderThanDays * 24 * 60 * 60 * 1000));
+  const cutoffDate = DateRangeUtil.getDaysAgo(olderThanDays);
 
   return this.deleteMany({
     status: 'completed',

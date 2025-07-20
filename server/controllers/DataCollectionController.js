@@ -14,6 +14,7 @@ const { validateRequest } = require('../validators/DataCollectionValidator');
 const { DataExportService } = require('../services/DataExportService');
 const { TimeFormatterUtil } = require('../utils/TimeFormatterUtil');
 const { MetricsCalculationService } = require('../services/MetricsCalculationService');
+const TimeConstants = require('../utils/TimeConstants');
 
 
 class DataCollectionController extends BaseController {
@@ -298,7 +299,7 @@ class DataCollectionController extends BaseController {
       });
 
       const format = req.query.format || 'json';
-      const timeRange = req.query.timeRange ? parseInt(req.query.timeRange) : 24 * 60 * 60 * 1000; // 24 hours
+      const timeRange = req.query.timeRange ? parseInt(req.query.timeRange) : TimeConstants.ONE_DAY; // 24 hours
 
       // Validate format
       const validFormats = ['json', 'csv'];

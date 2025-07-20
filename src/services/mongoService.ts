@@ -5,6 +5,8 @@
  * through a backend API since MongoDB cannot be directly accessed from browsers.
  */
 
+import { TimeConstants } from '../utils/TimeConstants'
+
 export interface LiveMonitoringData {
   _id?: string
   timestamp: number
@@ -100,7 +102,7 @@ export class MongoService {
   /**
    * Get aggregated statistics from MongoDB
    */
-  async getAggregatedStats(timeRange: number = 3600000): Promise<Record<string, unknown>> {
+  async getAggregatedStats(timeRange: number = TimeConstants.ONE_HOUR): Promise<Record<string, unknown>> {
     try {
       const response = await fetch(`${this.baseUrl}/aggregated-stats?timeRange=${timeRange}`)
       if (!response.ok) {

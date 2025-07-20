@@ -20,11 +20,12 @@ const {
 
 const { FinancialMetricsCalculator } = require('./FinancialMetricsCalculator');
 const { Logger } = require('./Logger');
+const TimeConstants = require('./TimeConstants');
 
 class PriceCalculator {
   constructor() {
     this.cache = new Map();
-    this.cacheTimeout = 300000; // 5 minutes cache
+    this.cacheTimeout = TimeConstants.FIVE_MINUTES;
     this.metricsCalculator = new FinancialMetricsCalculator();
     this.logger = new Logger('PriceCalculator');
   }
@@ -609,16 +610,16 @@ class PriceCalculator {
 
     switch (period) {
     case '1h':
-      targetTime = now - (60 * 60 * 1000);
+      targetTime = now - TimeConstants.ONE_HOUR;
       break;
     case '24h':
-      targetTime = now - (24 * 60 * 60 * 1000);
+      targetTime = now - TimeConstants.ONE_DAY;
       break;
     case '7d':
-      targetTime = now - (7 * 24 * 60 * 60 * 1000);
+      targetTime = now - TimeConstants.SEVEN_DAYS;
       break;
     default:
-      targetTime = now - (24 * 60 * 60 * 1000);
+      targetTime = now - TimeConstants.ONE_DAY;
     }
 
     // Find the closest price point to the target time

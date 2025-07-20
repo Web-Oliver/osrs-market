@@ -9,6 +9,7 @@
  */
 
 const { BaseValidator } = require('./BaseValidator');
+const TimeConstants = require('../utils/TimeConstants');
 
 class MonitoringValidator extends BaseValidator {
   constructor() {
@@ -80,7 +81,7 @@ class MonitoringValidator extends BaseValidator {
       return businessValidation;
     }
 
-    return { isValid: true, errors: [] };
+    return this.formatSuccessResponse(null, 'Monitoring data validation successful');
   }
 
   /**
@@ -98,23 +99,28 @@ class MonitoringValidator extends BaseValidator {
   }
 
   /**
-   * Context7 Pattern: Validate monitoring business rules
+   * Context7 Pattern: Validate monitoring business rules (Enhanced with DRY pattern)
    */
   validateMonitoringBusinessRules(data) {
     const errors = [];
 
-    // Validate timestamp is not in the future
-    if (data.timestamp > Date.now() + 60000) { // Allow 1 minute future for clock skew
-      errors.push('Timestamp cannot be more than 1 minute in the future');
+    // Enhanced timestamp validation using BaseValidator method
+    const timestampValidation = this.validateTimestampEnhanced(
+      data.timestamp, 
+      'timestamp', 
+      true, // allow future (within limits)
+      TimeConstants.ONE_DAY
+    );
+    
+    if (!timestampValidation.isValid) {
+      errors.push(timestampValidation.error);
     }
 
-    // Validate timestamp is not too old
-    if (data.timestamp < Date.now() - 24 * 60 * 60 * 1000) { // 24 hours ago
-      errors.push('Timestamp cannot be more than 24 hours old');
-    }
-
-    // Validate success rate consistency
-    if (data.apiRequests > 0 && data.successRate === 0) {
+    // Validate success rate consistency with percentage validation
+    const successRateValidation = this.validatePercentage(data.successRate, 'successRate');
+    if (!successRateValidation.isValid) {
+      errors.push(successRateValidation.error);
+    } else if (data.apiRequests > 0 && successRateValidation.value === 0) {
       errors.push('Success rate cannot be 0 when API requests are made');
     }
 
@@ -133,10 +139,11 @@ class MonitoringValidator extends BaseValidator {
       errors.push('Response time seems unreasonably high (>60s)');
     }
 
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
+    if (errors.length > 0) {
+      return this.formatErrorResponse(errors, 'MONITORING_VALIDATION_ERROR');
+    }
+    
+    return this.formatSuccessResponse(null, 'Monitoring validation successful');
   }
 
   /**
@@ -144,7 +151,7 @@ class MonitoringValidator extends BaseValidator {
    */
   validateSystemStatusRequest(data) {
     // System status typically has no parameters
-    return { isValid: true, errors: [] };
+    return this.formatSuccessResponse(null, 'Monitoring data validation successful');
   }
 
   /**
@@ -152,7 +159,7 @@ class MonitoringValidator extends BaseValidator {
    */
   validateEfficiencyMetricsRequest(data) {
     // Efficiency metrics typically has no parameters
-    return { isValid: true, errors: [] };
+    return this.formatSuccessResponse(null, 'Monitoring data validation successful');
   }
 
   /**
@@ -160,66 +167,29 @@ class MonitoringValidator extends BaseValidator {
    */
   validateHealthCheckRequest(data) {
     // Health check typically has no parameters
-    return { isValid: true, errors: [] };
+    return this.formatSuccessResponse(null, 'Monitoring data validation successful');
   }
 
   /**
-   * Context7 Pattern: Validate time range for statistics
+   * Context7 Pattern: Validate time range for statistics (Enhanced with DRY pattern)
    */
   validateStatisticsTimeRange(timeRange) {
-    if (!timeRange) {
-      return { isValid: true, timeRange: 3600000 }; // Default 1 hour
-    }
-
-    const numericRange = parseInt(timeRange);
-    if (isNaN(numericRange) || numericRange < 1) {
-      return { isValid: false, error: 'Time range must be a positive number' };
-    }
-
-    // Limit to reasonable time ranges
-    const maxRange = 30 * 24 * 60 * 60 * 1000; // 30 days
-    if (numericRange > maxRange) {
-      return { isValid: false, error: 'Time range cannot exceed 30 days' };
-    }
-
-    return { isValid: true, timeRange: numericRange };
+    return super.validateTimeRange(timeRange, TimeConstants.ONE_HOUR, TimeConstants.THIRTY_DAYS);
   }
 
   /**
-   * Context7 Pattern: Validate limit parameter
+   * Context7 Pattern: Validate limit parameter (Enhanced with DRY pattern)
    */
   validateLimitParameter(limit) {
-    if (!limit) {
-      return { isValid: true, limit: 50 }; // Default limit
-    }
-
-    const numericLimit = parseInt(limit);
-    if (isNaN(numericLimit) || numericLimit < 1) {
-      return { isValid: false, error: 'Limit must be a positive number' };
-    }
-
-    if (numericLimit > 500) {
-      return { isValid: false, error: 'Limit cannot exceed 500' };
-    }
-
-    return { isValid: true, limit: numericLimit };
+    return super.validateLimit(limit, 50, 500);
   }
 
   /**
-   * Context7 Pattern: Validate rate limit status
+   * Context7 Pattern: Validate rate limit status (Enhanced with DRY pattern)
    */
   validateRateLimitStatus(status) {
     const validStatuses = ['HEALTHY', 'THROTTLED', 'COOLDOWN', 'OVERLOADED'];
-
-    if (!status || typeof status !== 'string') {
-      return { isValid: false, error: 'Rate limit status is required and must be a string' };
-    }
-
-    if (!validStatuses.includes(status)) {
-      return { isValid: false, error: `Rate limit status must be one of: ${validStatuses.join(', ')}` };
-    }
-
-    return { isValid: true, status };
+    return this.validateEnum(status, validStatuses, 'rateLimitStatus');
   }
 
   /**
@@ -247,31 +217,38 @@ class MonitoringValidator extends BaseValidator {
   }
 
   /**
-   * Context7 Pattern: Validate monitoring data ranges
+   * Context7 Pattern: Validate monitoring data ranges (Enhanced with DRY pattern)
    */
   validateDataRanges(data) {
     const errors = [];
 
-    // Validate percentage values
+    // Validate percentage values using BaseValidator
     const percentageFields = ['successRate', 'itemSelectionEfficiency', 'dataQuality'];
     percentageFields.forEach(field => {
-      if (data[field] < 0 || data[field] > 100) {
-        errors.push(`${field} must be between 0 and 100`);
+      if (data[field] !== undefined) {
+        const validation = this.validatePercentage(data[field], field);
+        if (!validation.isValid) {
+          errors.push(validation.error);
+        }
       }
     });
 
-    // Validate non-negative values
+    // Validate non-negative values using BaseValidator
     const nonNegativeFields = ['apiRequests', 'itemsProcessed', 'memoryUsage', 'responseTime'];
     nonNegativeFields.forEach(field => {
-      if (data[field] < 0) {
-        errors.push(`${field} must be non-negative`);
+      if (data[field] !== undefined) {
+        const validation = this.validateFloat(data[field], 0, Number.MAX_VALUE, field);
+        if (!validation.isValid) {
+          errors.push(validation.error);
+        }
       }
     });
 
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
+    if (errors.length > 0) {
+      return this.formatErrorResponse(errors, 'MONITORING_VALIDATION_ERROR');
+    }
+    
+    return this.formatSuccessResponse(null, 'Monitoring validation successful');
   }
 }
 

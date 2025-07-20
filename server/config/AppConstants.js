@@ -9,6 +9,8 @@
  * - Type-safe constant definitions
  */
 
+const TimeConstants = require('../utils/TimeConstants');
+
 class AppConstants {
   // =============================================================================
   // OSRS MARKET DOMAIN CONSTANTS
@@ -84,7 +86,7 @@ class AppConstants {
     MIN_LIMIT: 1,
     
     // Cleanup Configuration
-    DEFAULT_MAX_AGE: 7 * 24 * 60 * 60 * 1000, // 7 days
+    DEFAULT_MAX_AGE: TimeConstants.SEVEN_DAYS, // 7 days
     CLEANUP_BATCH_SIZE: 1000
   };
 
@@ -94,7 +96,7 @@ class AppConstants {
   
   static RATE_LIMITING = {
     // Standard Rate Limits
-    WINDOW_MS: 15 * 60 * 1000,   // 15 minutes
+    WINDOW_MS: 1TimeConstants.FIVE_MINUTES,   // 15 minutes
     MAX_REQUESTS: 100,           // Max requests per window
     
     // API-Specific Limits
@@ -117,10 +119,10 @@ class AppConstants {
   
   static CACHE = {
     // Default TTL Values (in milliseconds)
-    DEFAULT_TTL: 5 * 60 * 1000,        // 5 minutes
+    DEFAULT_TTL: TimeConstants.FIVE_MINUTES,        // 5 minutes
     MARKET_DATA_TTL: 2 * 60 * 1000,    // 2 minutes (fast-changing data)
-    ITEM_INFO_TTL: 60 * 60 * 1000,     // 1 hour (slow-changing data)
-    ANALYTICS_TTL: 10 * 60 * 1000,     // 10 minutes
+    ITEM_INFO_TTL: TimeConstants.ONE_HOUR,     // 1 hour (slow-changing data)
+    ANALYTICS_TTL: TimeConstants.TEN_MINUTES,     // 10 minutes
     
     // Cache Size Limits
     MAX_CACHE_SIZE: 1000,
@@ -227,8 +229,8 @@ class AppConstants {
     COMPRESSION_LEVEL: 6,             // zlib compression level
     
     // Temporary Files
-    TEMP_FILE_TTL: 60 * 60 * 1000,   // 1 hour
-    CLEANUP_INTERVAL: 10 * 60 * 1000  // 10 minutes
+    TEMP_FILE_TTL: TimeConstants.ONE_HOUR,   // 1 hour
+    CLEANUP_INTERVAL: TimeConstants.TEN_MINUTES  // 10 minutes
   };
 
   // =============================================================================
@@ -241,7 +243,7 @@ class AppConstants {
     MAX_ARRAY_LENGTH: 1000,
     
     // Session Configuration
-    SESSION_TIMEOUT: 24 * 60 * 60 * 1000, // 24 hours
+    SESSION_TIMEOUT: TimeConstants.ONE_DAY, // 24 hours
     
     // Encryption
     SALT_ROUNDS: 12,

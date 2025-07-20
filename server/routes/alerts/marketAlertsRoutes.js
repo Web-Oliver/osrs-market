@@ -13,6 +13,7 @@ const { getControllerFactory } = require('../../factories/ControllerFactory');
 const { ValidationMiddleware } = require('../../middleware/ValidationMiddleware');
 const { ErrorHandler } = require('../../middleware/ErrorHandler');
 const { AppConstants } = require('../../config/AppConstants');
+const TimeConstants = require('../../utils/TimeConstants');
 
 const router = express.Router();
 
@@ -172,7 +173,7 @@ router.get(
       id: alertId,
       // Alert data would be fetched here
       status: 'active',
-      createdAt: Date.now() - 86400000, // 24 hours ago
+      createdAt: Date.now() - TimeConstants.ONE_DAY,
       lastTriggered: null,
       triggerCount: 0,
       history: includeHistory ? [] : undefined,
@@ -336,7 +337,7 @@ router.get(
       userId: req.query.userId,
       status: req.query.status,
       timeRange: {
-        start: req.query.startTime ? parseInt(req.query.startTime) : Date.now() - (7 * 24 * 60 * 60 * 1000),
+        start: req.query.startTime ? parseInt(req.query.startTime) : Date.now() - TimeConstants.SEVEN_DAYS,
         end: req.query.endTime ? parseInt(req.query.endTime) : Date.now()
       }
     };
@@ -376,7 +377,7 @@ router.get(
     }
   }),
   errorHandler.asyncHandler(async (req, res) => {
-    const timeRange = parseInt(req.query.timeRange) || (24 * 60 * 60 * 1000); // 24 hours default
+    const timeRange = parseInt(req.query.timeRange) || TimeConstants.ONE_DAY; // 24 hours default
     const userId = req.query.userId;
 
     // Generate alert statistics (would integrate with analytics service)

@@ -24,6 +24,8 @@ const { MarketDataProcessingService } = require('./consolidated/MarketDataProces
 const { FinancialCalculationService } = require('./consolidated/FinancialCalculationService');
 const { ItemModel } = require('../models/ItemModel');
 const { ScrapeQueueModel } = require('../models/ScrapeQueueModel');
+const TimeConstants = require('../utils/TimeConstants');
+const DateRangeUtil = require('../utils/DateRangeUtil');
 
 class OSRSDataScraperService extends BaseService {
   constructor(dependencies = {}) {
@@ -363,9 +365,9 @@ const [pending, completed, failed] = await Promise.all([
   /**
    * SOLID: Clean up old queue items
    */
-  async cleanupQueue(maxAgeMs = 7 * 24 * 60 * 60 * 1000) {
+  async cleanupQueue(maxAgeMs = TimeConstants.SEVEN_DAYS) {
     return this.execute(async () => {
-      const cutoff = new Date(Date.now() - maxAgeMs);
+      const cutoff = DateRangeUtil.getCutoffDate(maxAgeMs);
       
       const deleted = await ScrapeQueueModel.deleteMany({
         $or: [

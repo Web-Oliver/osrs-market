@@ -8,6 +8,8 @@
  * - Memory-efficient IP tracking
  */
 
+const TimeConstants = require('./TimeConstants');
+
 class RateLimiter {
   constructor() {
     this.windows = new Map(); // IP -> Window data
@@ -21,7 +23,7 @@ class RateLimiter {
    */
   async checkLimit(key, options = {}) {
     const {
-      windowMs = 15 * 60 * 1000, // 15 minutes
+      windowMs = 3 * TimeConstants.FIVE_MINUTES, // 15 minutes
       max = 100, // requests per window
       skipFailedRequests = false,
       skipSuccessfulRequests = false

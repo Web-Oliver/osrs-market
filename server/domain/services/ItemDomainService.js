@@ -11,6 +11,7 @@ const { BaseService } = require('../../services/BaseService');
 const { ItemId } = require('../value-objects/ItemId');
 const { AlchemyInfo } = require('../value-objects/AlchemyInfo');
 const { ItemSpecifications } = require('../specifications/ItemSpecifications');
+const TimeConstants = require('../../utils/TimeConstants');
 
 /**
  * @typedef {import('../../types/domain/Item.js').ItemCreationData} ItemCreationData
@@ -37,7 +38,7 @@ class ItemDomainService extends BaseService {
       MIN_ALCHEMY_PROFIT: 50,
       HIGH_VALUE_THRESHOLD: 100000,
       NATURE_RUNE_COST: 200,
-      MAX_SYNC_AGE_MS: 24 * 60 * 60 * 1000 // 24 hours
+      MAX_SYNC_AGE_MS: TimeConstants.ONE_DAY // 24 hours
     };
   }
 

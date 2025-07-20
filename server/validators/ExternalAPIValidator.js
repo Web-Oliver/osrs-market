@@ -68,16 +68,16 @@ class ExternalAPIValidator extends BaseValidator {
       return validation;
     }
 
-    // Additional validation for itemId
-    const itemId = parseInt(data.itemId);
-    if (isNaN(itemId) || itemId < 1 || itemId > 50000) {
+    // Additional validation for itemId using BaseValidator
+    const itemIdValidation = this.validateInteger(data.itemId, 1, 50000, 'itemId');
+    if (!itemIdValidation.isValid) {
       return {
         isValid: false,
-        errors: ['Item ID must be a number between 1 and 50000']
+        errors: [itemIdValidation.error]
       };
     }
 
-    return { isValid: true, errors: [] };
+    return this.formatSuccessResponse(null, 'External API validation successful');
   }
 
   /**
@@ -90,32 +90,25 @@ class ExternalAPIValidator extends BaseValidator {
       return validation;
     }
 
-    // Additional validation for search query
-    const query = data.q ? data.q.trim() : '';
-    if (query.length < 2) {
+    // Additional validation for search query using BaseValidator
+    const queryValidation = this.validateStringLength(data.q, 2, 100, 'searchQuery');
+    if (!queryValidation.isValid) {
       return {
         isValid: false,
-        errors: ['Search query must be at least 2 characters long']
+        errors: [queryValidation.error]
       };
     }
 
-    // Check for potentially malicious patterns
-    const dangerousPatterns = [
-      /<script/i,
-      /javascript:/i,
-      /on\w+=/i,
-      /eval\(/i,
-      /expression\(/i
-    ];
-
-    if (dangerousPatterns.some(pattern => pattern.test(query))) {
+    // Enhanced security validation
+    const securityValidation = this.validateSecureString(queryValidation.value, 'searchQuery');
+    if (!securityValidation.isValid) {
       return {
         isValid: false,
-        errors: ['Search query contains invalid characters']
+        errors: [securityValidation.error]
       };
     }
 
-    return { isValid: true, errors: [] };
+    return this.formatSuccessResponse(null, 'External API validation successful');
   }
 
   /**
@@ -128,16 +121,16 @@ class ExternalAPIValidator extends BaseValidator {
       return validation;
     }
 
-    // Additional validation for itemId
-    const itemId = parseInt(data.itemId);
-    if (isNaN(itemId) || itemId < 1 || itemId > 50000) {
+    // Additional validation for itemId using BaseValidator
+    const itemIdValidation = this.validateInteger(data.itemId, 1, 50000, 'itemId');
+    if (!itemIdValidation.isValid) {
       return {
         isValid: false,
-        errors: ['Item ID must be a number between 1 and 50000']
+        errors: [itemIdValidation.error]
       };
     }
 
-    return { isValid: true, errors: [] };
+    return this.formatSuccessResponse(null, 'External API validation successful');
   }
 
   /**
@@ -172,28 +165,23 @@ class ExternalAPIValidator extends BaseValidator {
       };
     }
 
-    // Validate each item ID
-    const errors = [];
-    const validItemIds = [];
+    // Validate each item ID using BaseValidator array validation
+    const arrayValidation = this.validateArray(
+      data.itemIds,
+      1,
+      100,
+      (itemId, index) => this.validateInteger(itemId, 1, 50000, `itemId[${index}]`),
+      'itemIds'
+    );
 
-    data.itemIds.forEach((itemId, index) => {
-      const numericId = parseInt(itemId);
-
-      if (isNaN(numericId)) {
-        errors.push(`Item ID at index ${index} is not a valid number`);
-      } else if (numericId < 1 || numericId > 50000) {
-        errors.push(`Item ID at index ${index} must be between 1 and 50000`);
-      } else {
-        validItemIds.push(numericId);
-      }
-    });
-
-    if (errors.length > 0) {
+    if (!arrayValidation.isValid) {
       return {
         isValid: false,
-        errors
+        errors: arrayValidation.errors || [arrayValidation.error]
       };
     }
+
+    const validItemIds = arrayValidation.value;
 
     // Check for duplicates
     const uniqueIds = new Set(validItemIds);
@@ -204,151 +192,85 @@ class ExternalAPIValidator extends BaseValidator {
       };
     }
 
-    return { isValid: true, errors: [] };
+    return this.formatSuccessResponse(null, 'External API validation successful');
   }
 
   /**
-   * Context7 Pattern: Validate timestep parameter
+   * Context7 Pattern: Validate timestep parameter (Enhanced with DRY pattern)
    */
   validateTimestep(timestep) {
     const validTimesteps = ['5m', '1h', '6h', '24h'];
-
+    
     if (!timestep) {
       return { isValid: true, timestep: '5m' }; // Default
     }
 
-    if (typeof timestep !== 'string') {
-      return { isValid: false, error: 'Timestep must be a string' };
+    const enumValidation = this.validateEnum(timestep, validTimesteps, 'timestep', false);
+    
+    if (!enumValidation.isValid) {
+      return { isValid: false, error: enumValidation.error };
     }
 
-    if (!validTimesteps.includes(timestep)) {
-      return {
-        isValid: false,
-        error: `Timestep must be one of: ${validTimesteps.join(', ')}`
-      };
-    }
-
-    return { isValid: true, timestep };
+    return { isValid: true, timestep: enumValidation.value };
   }
 
   /**
-   * Context7 Pattern: Validate item ID parameter
+   * Context7 Pattern: Validate item ID parameter (Enhanced with DRY pattern)
    */
   validateItemId(itemId) {
-    if (!itemId) {
-      return { isValid: false, error: 'Item ID is required' };
+    const validation = super.validateInteger(itemId, 1, 50000, 'itemId');
+    
+    if (!validation.isValid) {
+      return { isValid: false, error: validation.error };
     }
 
-    const numericId = parseInt(itemId);
-
-    if (isNaN(numericId)) {
-      return { isValid: false, error: 'Item ID must be a number' };
-    }
-
-    if (numericId < 1 || numericId > 50000) {
-      return { isValid: false, error: 'Item ID must be between 1 and 50000' };
-    }
-
-    return { isValid: true, itemId: numericId };
+    return { isValid: true, itemId: validation.value };
   }
 
   /**
-   * Context7 Pattern: Validate search query
+   * Context7 Pattern: Validate search query (Enhanced with DRY pattern)
    */
   validateSearchQuery(query) {
-    if (!query) {
-      return { isValid: false, error: 'Search query is required' };
+    // First validate string length
+    const lengthValidation = this.validateStringLength(query, 2, 100, 'searchQuery');
+    if (!lengthValidation.isValid) {
+      return lengthValidation;
     }
 
-    if (typeof query !== 'string') {
-      return { isValid: false, error: 'Search query must be a string' };
+    // Then validate security
+    const securityValidation = this.validateSecureString(lengthValidation.value, 'searchQuery');
+    if (!securityValidation.isValid) {
+      return securityValidation;
     }
 
-    const trimmedQuery = query.trim();
-
-    if (trimmedQuery.length < 2) {
-      return { isValid: false, error: 'Search query must be at least 2 characters long' };
-    }
-
-    if (trimmedQuery.length > 100) {
-      return { isValid: false, error: 'Search query must not exceed 100 characters' };
-    }
-
-    // Check for potentially malicious patterns
-    const dangerousPatterns = [
-      /<script/i,
-      /javascript:/i,
-      /on\w+=/i,
-      /eval\(/i,
-      /expression\(/i,
-      /data:/i,
-      /vbscript:/i
-    ];
-
-    if (dangerousPatterns.some(pattern => pattern.test(trimmedQuery))) {
-      return { isValid: false, error: 'Search query contains invalid characters' };
-    }
-
-    return { isValid: true, query: trimmedQuery };
+    return { isValid: true, query: securityValidation.value };
   }
 
   /**
-   * Context7 Pattern: Validate limit parameter
+   * Context7 Pattern: Validate limit parameter (Enhanced with DRY pattern)
    */
   validateLimit(limit) {
-    if (!limit) {
-      return { isValid: true, limit: 20 }; // Default
-    }
-
-    const numericLimit = parseInt(limit);
-
-    if (isNaN(numericLimit)) {
-      return { isValid: false, error: 'Limit must be a number' };
-    }
-
-    if (numericLimit < 1) {
-      return { isValid: false, error: 'Limit must be at least 1' };
-    }
-
-    if (numericLimit > 100) {
-      return { isValid: false, error: 'Limit cannot exceed 100' };
-    }
-
-    return { isValid: true, limit: numericLimit };
+    return super.validateLimit(limit, 20, 100);
   }
 
   /**
-   * Context7 Pattern: Validate array of item IDs
+   * Context7 Pattern: Validate array of item IDs (Enhanced with DRY pattern)
    */
   validateItemIdArray(itemIds) {
-    if (!Array.isArray(itemIds)) {
-      return { isValid: false, error: 'Item IDs must be an array' };
+    // Use BaseValidator array validation
+    const arrayValidation = this.validateArray(
+      itemIds,
+      1,
+      100,
+      (itemId, index) => this.validateInteger(itemId, 1, 50000, `itemId[${index}]`),
+      'itemIds'
+    );
+
+    if (!arrayValidation.isValid) {
+      return arrayValidation;
     }
 
-    if (itemIds.length === 0) {
-      return { isValid: false, error: 'Item IDs array cannot be empty' };
-    }
-
-    if (itemIds.length > 100) {
-      return { isValid: false, error: 'Cannot request more than 100 items at once' };
-    }
-
-    const errors = [];
-    const validItemIds = [];
-
-    itemIds.forEach((itemId, index) => {
-      const validation = this.validateItemId(itemId);
-
-      if (!validation.isValid) {
-        errors.push(`Item ID at index ${index}: ${validation.error}`);
-      } else {
-        validItemIds.push(validation.itemId);
-      }
-    });
-
-    if (errors.length > 0) {
-      return { isValid: false, errors };
-    }
+    const validItemIds = arrayValidation.value;
 
     // Check for duplicates
     const uniqueIds = new Set(validItemIds);
@@ -381,22 +303,18 @@ class ExternalAPIValidator extends BaseValidator {
         errors.push('User-Agent header must be between 5 and 200 characters');
       }
 
-      // Check for potentially malicious patterns
-      const dangerousPatterns = [
-        /<script/i,
-        /javascript:/i,
-        /on\w+=/i
-      ];
-
-      if (dangerousPatterns.some(pattern => pattern.test(userAgent))) {
-        errors.push('User-Agent header contains invalid characters');
+      // Use BaseValidator for security validation
+      const securityValidation = this.validateSecureString(userAgent, 'User-Agent');
+      if (!securityValidation.isValid) {
+        errors.push(securityValidation.error);
       }
     }
 
-    return {
-      isValid: errors.length === 0,
-      errors
-    };
+    if (errors.length > 0) {
+      return this.formatErrorResponse(errors, 'EXTERNAL_API_VALIDATION_ERROR');
+    }
+    
+    return this.formatSuccessResponse(null, 'External API validation successful');
   }
 
   /**

@@ -11,6 +11,7 @@
 const { BaseController } = require('./BaseController');
 const { MonitoringService } = require('../services/MonitoringService');
 const { validateRequest } = require('../validators/MonitoringValidator');
+const TimeConstants = require('../utils/TimeConstants');
 
 
 class MonitoringController extends BaseController {
@@ -195,7 +196,7 @@ class MonitoringController extends BaseController {
         return ApiResponse.badRequest(res, 'Invalid cleanup parameters', validation.errors);
       }
 
-      const { maxAge = 7 * 24 * 60 * 60 * 1000 } = req.body; // 7 days default
+      const { maxAge = TimeConstants.SEVEN_DAYS } = req.body; // 7 days default
       const result = await this.monitoringService.performDataCleanup(maxAge);
 
       this.logger.info('Data cleanup completed successfully', {

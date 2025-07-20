@@ -34,20 +34,22 @@ class AITradingValidator extends BaseValidator {
 
       // Validate session name if provided
       if (data.sessionName !== undefined) {
-        if (!validator.isValidString(data.sessionName, 1, 100)) {
-          errors.push('Session name must be between 1 and 100 characters');
+        const sessionNameValidation = validator.validateStringLength(data.sessionName, 1, 100, 'sessionName', false);
+        if (!sessionNameValidation.isValid) {
+          errors.push(sessionNameValidation.error);
         }
       }
 
-      return {
-        isValid: errors.length === 0,
-        errors
-      };
+      if (errors.length > 0) {
+        return this.formatErrorResponse(errors, 'AI_TRADING_VALIDATION_ERROR');
+      }
+      
+      return this.formatSuccessResponse(null, 'AI trading session validation successful');
     } catch (error) {
-      return {
-        isValid: false,
-        errors: [`Validation error occurred: ${error.message}`]
-      };
+      return this.formatErrorResponse(
+        [`Validation error occurred: ${error.message}`], 
+        'AI_TRADING_SYSTEM_ERROR'
+      );
     }
   }
 
@@ -74,15 +76,16 @@ class AITradingValidator extends BaseValidator {
         });
       }
 
-      return {
-        isValid: errors.length === 0,
-        errors
-      };
+      if (errors.length > 0) {
+        return this.formatErrorResponse(errors, 'AI_TRADING_VALIDATION_ERROR');
+      }
+      
+      return this.formatSuccessResponse(null, 'AI trading session validation successful');
     } catch (error) {
-      return {
-        isValid: false,
-        errors: [`Validation error occurred: ${error.message}`]
-      };
+      return this.formatErrorResponse(
+        [`Validation error occurred: ${error.message}`], 
+        'AI_TRADING_SYSTEM_ERROR'
+      );
     }
   }
 
@@ -109,15 +112,16 @@ class AITradingValidator extends BaseValidator {
         });
       }
 
-      return {
-        isValid: errors.length === 0,
-        errors
-      };
+      if (errors.length > 0) {
+        return this.formatErrorResponse(errors, 'AI_TRADING_VALIDATION_ERROR');
+      }
+      
+      return this.formatSuccessResponse(null, 'AI trading session validation successful');
     } catch (error) {
-      return {
-        isValid: false,
-        errors: [`Validation error occurred: ${error.message}`]
-      };
+      return this.formatErrorResponse(
+        [`Validation error occurred: ${error.message}`], 
+        'AI_TRADING_SYSTEM_ERROR'
+      );
     }
   }
 
@@ -136,15 +140,16 @@ class AITradingValidator extends BaseValidator {
         errors.push(...configErrors);
       }
 
-      return {
-        isValid: errors.length === 0,
-        errors
-      };
+      if (errors.length > 0) {
+        return this.formatErrorResponse(errors, 'AI_TRADING_VALIDATION_ERROR');
+      }
+      
+      return this.formatSuccessResponse(null, 'AI trading session validation successful');
     } catch (error) {
-      return {
-        isValid: false,
-        errors: [`Validation error occurred: ${error.message}`]
-      };
+      return this.formatErrorResponse(
+        [`Validation error occurred: ${error.message}`], 
+        'AI_TRADING_SYSTEM_ERROR'
+      );
     }
   }
 
@@ -173,15 +178,16 @@ class AITradingValidator extends BaseValidator {
         }
       }
 
-      return {
-        isValid: errors.length === 0,
-        errors
-      };
+      if (errors.length > 0) {
+        return this.formatErrorResponse(errors, 'AI_TRADING_VALIDATION_ERROR');
+      }
+      
+      return this.formatSuccessResponse(null, 'AI trading session validation successful');
     } catch (error) {
-      return {
-        isValid: false,
-        errors: [`Validation error occurred: ${error.message}`]
-      };
+      return this.formatErrorResponse(
+        [`Validation error occurred: ${error.message}`], 
+        'AI_TRADING_SYSTEM_ERROR'
+      );
     }
   }
 
@@ -192,13 +198,15 @@ class AITradingValidator extends BaseValidator {
     const errors = [];
 
     // Validate inputSize
-    if (!this.isValidInteger(config.inputSize, 1, 100)) {
-      errors.push('Network inputSize must be an integer between 1 and 100');
+    const inputSizeValidation = this.validateInteger(config.inputSize, 1, 100, 'inputSize');
+    if (!inputSizeValidation.isValid) {
+      errors.push(`Network ${inputSizeValidation.error}`);
     }
 
     // Validate outputSize
-    if (!this.isValidInteger(config.outputSize, 1, 10)) {
-      errors.push('Network outputSize must be an integer between 1 and 10');
+    const outputSizeValidation = this.validateInteger(config.outputSize, 1, 10, 'outputSize');
+    if (!outputSizeValidation.isValid) {
+      errors.push(`Network ${outputSizeValidation.error}`);
     }
 
     // Validate hiddenLayers
@@ -210,50 +218,59 @@ class AITradingValidator extends BaseValidator {
       errors.push('Network hiddenLayers cannot exceed 10 layers');
     } else {
       config.hiddenLayers.forEach((layer, index) => {
-        if (!this.isValidInteger(layer, 1, 1000)) {
-          errors.push(`Network hiddenLayer[${index}] must be an integer between 1 and 1000`);
+        const layerValidation = this.validateInteger(layer, 1, 1000, `hiddenLayer[${index}]`);
+        if (!layerValidation.isValid) {
+          errors.push(`Network ${layerValidation.error}`);
         }
       });
     }
 
     // Validate learningRate
-    if (!this.isValidFloat(config.learningRate, 0.0001, 1)) {
-      errors.push('Network learningRate must be a float between 0.0001 and 1');
+    const learningRateValidation = this.validateFloat(config.learningRate, 0.0001, 1, 'learningRate');
+    if (!learningRateValidation.isValid) {
+      errors.push(`Network ${learningRateValidation.error}`);
     }
 
     // Validate epsilon
-    if (!this.isValidFloat(config.epsilon, 0, 1)) {
-      errors.push('Network epsilon must be a float between 0 and 1');
+    const epsilonValidation = this.validateFloat(config.epsilon, 0, 1, 'epsilon');
+    if (!epsilonValidation.isValid) {
+      errors.push(`Network ${epsilonValidation.error}`);
     }
 
     // Validate epsilonMin
-    if (!this.isValidFloat(config.epsilonMin, 0, 1)) {
-      errors.push('Network epsilonMin must be a float between 0 and 1');
+    const epsilonMinValidation = this.validateFloat(config.epsilonMin, 0, 1, 'epsilonMin');
+    if (!epsilonMinValidation.isValid) {
+      errors.push(`Network ${epsilonMinValidation.error}`);
     }
 
     // Validate epsilonDecay
-    if (!this.isValidFloat(config.epsilonDecay, 0.9, 0.9999)) {
-      errors.push('Network epsilonDecay must be a float between 0.9 and 0.9999');
+    const epsilonDecayValidation = this.validateFloat(config.epsilonDecay, 0.9, 0.9999, 'epsilonDecay');
+    if (!epsilonDecayValidation.isValid) {
+      errors.push(`Network ${epsilonDecayValidation.error}`);
     }
 
     // Validate gamma
-    if (!this.isValidFloat(config.gamma, 0, 1)) {
-      errors.push('Network gamma must be a float between 0 and 1');
+    const gammaValidation = this.validateFloat(config.gamma, 0, 1, 'gamma');
+    if (!gammaValidation.isValid) {
+      errors.push(`Network ${gammaValidation.error}`);
     }
 
     // Validate memorySize
-    if (!this.isValidInteger(config.memorySize, 100, 100000)) {
-      errors.push('Network memorySize must be an integer between 100 and 100000');
+    const memorySizeValidation = this.validateInteger(config.memorySize, 100, 100000, 'memorySize');
+    if (!memorySizeValidation.isValid) {
+      errors.push(`Network ${memorySizeValidation.error}`);
     }
 
     // Validate batchSize
-    if (!this.isValidInteger(config.batchSize, 1, 1000)) {
-      errors.push('Network batchSize must be an integer between 1 and 1000');
+    const batchSizeValidation = this.validateInteger(config.batchSize, 1, 1000, 'batchSize');
+    if (!batchSizeValidation.isValid) {
+      errors.push(`Network ${batchSizeValidation.error}`);
     }
 
     // Validate tau
-    if (!this.isValidFloat(config.tau, 0.0001, 0.1)) {
-      errors.push('Network tau must be a float between 0.0001 and 0.1');
+    const tauValidation = this.validateFloat(config.tau, 0.0001, 0.1, 'tau');
+    if (!tauValidation.isValid) {
+      errors.push(`Network ${tauValidation.error}`);
     }
 
     return errors;
@@ -272,15 +289,17 @@ class AITradingValidator extends BaseValidator {
 
     // Validate learningFrequency
     if (config.learningFrequency !== undefined) {
-      if (!this.isValidInteger(config.learningFrequency, 1, 1000)) {
-        errors.push('Adaptive learningFrequency must be an integer between 1 and 1000');
+      const learningFreqValidation = this.validateInteger(config.learningFrequency, 1, 1000, 'learningFrequency');
+      if (!learningFreqValidation.isValid) {
+        errors.push(`Adaptive ${learningFreqValidation.error}`);
       }
     }
 
     // Validate performanceThreshold
     if (config.performanceThreshold !== undefined) {
-      if (!this.isValidFloat(config.performanceThreshold, 0, 1)) {
-        errors.push('Adaptive performanceThreshold must be a float between 0 and 1');
+      const perfThresholdValidation = this.validateFloat(config.performanceThreshold, 0, 1, 'performanceThreshold');
+      if (!perfThresholdValidation.isValid) {
+        errors.push(`Adaptive ${perfThresholdValidation.error}`);
       }
     }
 
@@ -299,13 +318,15 @@ class AITradingValidator extends BaseValidator {
     const errors = [];
 
     // Validate item ID
-    if (!this.isValidInteger(item.id, 1, 999999)) {
-      errors.push(`Item[${index}].id must be an integer between 1 and 999999`);
+    const itemIdValidation = this.validateItemId(item.id, `Item[${index}].id`);
+    if (!itemIdValidation.isValid) {
+      errors.push(itemIdValidation.error);
     }
 
     // Validate item name
-    if (!this.isValidString(item.name, 1, 100)) {
-      errors.push(`Item[${index}].name must be between 1 and 100 characters`);
+    const itemNameValidation = this.validateStringLength(item.name, 1, 100, `Item[${index}].name`);
+    if (!itemNameValidation.isValid) {
+      errors.push(itemNameValidation.error);
     }
 
     // Validate price data
@@ -340,15 +361,17 @@ class AITradingValidator extends BaseValidator {
 
     // Validate high price
     if (priceData.high !== undefined && priceData.high !== null) {
-      if (!this.isValidInteger(priceData.high, 1, 2147483647)) {
-        errors.push(`Item[${itemIndex}].priceData.high must be an integer between 1 and 2147483647`);
+      const highPriceValidation = this.validateInteger(priceData.high, 1, 2147483647, `Item[${itemIndex}].priceData.high`);
+      if (!highPriceValidation.isValid) {
+        errors.push(highPriceValidation.error);
       }
     }
 
     // Validate low price
     if (priceData.low !== undefined && priceData.low !== null) {
-      if (!this.isValidInteger(priceData.low, 1, 2147483647)) {
-        errors.push(`Item[${itemIndex}].priceData.low must be an integer between 1 and 2147483647`);
+      const lowPriceValidation = this.validateInteger(priceData.low, 1, 2147483647, `Item[${itemIndex}].priceData.low`);
+      if (!lowPriceValidation.isValid) {
+        errors.push(lowPriceValidation.error);
       }
     }
 
@@ -357,16 +380,18 @@ class AITradingValidator extends BaseValidator {
       errors.push(`Item[${itemIndex}].priceData.high cannot be less than low price`);
     }
 
-    // Validate timestamps
+    // Validate timestamps with enhanced validation
     if (priceData.highTime !== undefined && priceData.highTime !== null) {
-      if (!this.isValidInteger(priceData.highTime, 0, Date.now() + 86400000)) {
-        errors.push(`Item[${itemIndex}].priceData.highTime must be a valid timestamp`);
+      const highTimeValidation = this.validateTimestampEnhanced(priceData.highTime, `Item[${itemIndex}].priceData.highTime`, true);
+      if (!highTimeValidation.isValid) {
+        errors.push(highTimeValidation.error);
       }
     }
 
     if (priceData.lowTime !== undefined && priceData.lowTime !== null) {
-      if (!this.isValidInteger(priceData.lowTime, 0, Date.now() + 86400000)) {
-        errors.push(`Item[${itemIndex}].priceData.lowTime must be a valid timestamp`);
+      const lowTimeValidation = this.validateTimestampEnhanced(priceData.lowTime, `Item[${itemIndex}].priceData.lowTime`, true);
+      if (!lowTimeValidation.isValid) {
+        errors.push(lowTimeValidation.error);
       }
     }
 
@@ -407,33 +432,39 @@ class AITradingValidator extends BaseValidator {
       errors.push('Trading action is required and must be an object');
     } else {
       // Validate action type
-      if (!['BUY', 'SELL', 'HOLD'].includes(action.type)) {
-        errors.push('Trading action type must be BUY, SELL, or HOLD');
+      const actionTypeValidation = validator.validateEnum(action.type, ['BUY', 'SELL', 'HOLD'], 'type');
+      if (!actionTypeValidation.isValid) {
+        errors.push(`Trading action ${actionTypeValidation.error}`);
       }
 
       // Validate item ID
-      if (!validator.isValidInteger(action.itemId, 1, 999999)) {
-        errors.push('Trading action itemId must be an integer between 1 and 999999');
+      const itemIdValidation = validator.validateItemId(action.itemId, 'itemId');
+      if (!itemIdValidation.isValid) {
+        errors.push(`Trading action ${itemIdValidation.error}`);
       }
 
       // Validate quantity
-      if (!validator.isValidInteger(action.quantity, 1, 1000000)) {
-        errors.push('Trading action quantity must be an integer between 1 and 1000000');
+      const quantityValidation = validator.validateInteger(action.quantity, 1, 1000000, 'quantity');
+      if (!quantityValidation.isValid) {
+        errors.push(`Trading action ${quantityValidation.error}`);
       }
 
       // Validate price
-      if (!validator.isValidInteger(action.price, 1, 2147483647)) {
-        errors.push('Trading action price must be an integer between 1 and 2147483647');
+      const priceValidation = validator.validateInteger(action.price, 1, 2147483647, 'price');
+      if (!priceValidation.isValid) {
+        errors.push(`Trading action ${priceValidation.error}`);
       }
 
       // Validate confidence
-      if (!validator.isValidFloat(action.confidence, 0, 1)) {
-        errors.push('Trading action confidence must be a float between 0 and 1');
+      const confidenceValidation = validator.validateFloat(action.confidence, 0, 1, 'confidence');
+      if (!confidenceValidation.isValid) {
+        errors.push(`Trading action ${confidenceValidation.error}`);
       }
 
       // Validate reason
-      if (!validator.isValidString(action.reason, 1, 200)) {
-        errors.push('Trading action reason must be between 1 and 200 characters');
+      const reasonValidation = validator.validateStringLength(action.reason, 1, 200, 'reason');
+      if (!reasonValidation.isValid) {
+        errors.push(`Trading action ${reasonValidation.error}`);
       }
     }
 
@@ -444,18 +475,22 @@ class AITradingValidator extends BaseValidator {
   }
 
   /**
-   * Context7 Pattern: Utility validation methods
+   * Context7 Pattern: Utility validation methods (DEPRECATED - Use BaseValidator methods)
+   * These methods are kept for backward compatibility but should be migrated to BaseValidator
    */
   isValidInteger(value, min = Number.MIN_SAFE_INTEGER, max = Number.MAX_SAFE_INTEGER) {
-    return Number.isInteger(value) && value >= min && value <= max;
+    const validation = this.validateInteger(value, min, max, 'value');
+    return validation.isValid;
   }
 
   isValidFloat(value, min = Number.MIN_VALUE, max = Number.MAX_VALUE) {
-    return typeof value === 'number' && !isNaN(value) && value >= min && value <= max;
+    const validation = this.validateFloat(value, min, max, 'value');
+    return validation.isValid;
   }
 
   isValidString(value, minLength = 0, maxLength = Infinity) {
-    return typeof value === 'string' && value.length >= minLength && value.length <= maxLength;
+    const validation = this.validateStringLength(value, minLength, maxLength, 'value', false);
+    return validation.isValid;
   }
 }
 

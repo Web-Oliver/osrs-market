@@ -15,6 +15,7 @@ const { DataTransformer } = require('../utils/DataTransformer');
 const { AppConstants } = require('../config/AppConstants');
 const { DatabaseUtility } = require('../utils/DatabaseUtility');
 const { QueryBuilderService } = require('../services/QueryBuilderService');
+const DateRangeUtil = require('../utils/DateRangeUtil');
 
 // DOMAIN ENTITIES INTEGRATION
 const { Item } = require('../domain/entities/Item');
@@ -176,7 +177,7 @@ class ItemRepository extends BaseService {
    */
   async getItemsRequiringSync(maxAge) {
     return this.execute(async () => {
-      const cutoff = new Date(Date.now() - maxAge);
+      const cutoff = DateRangeUtil.getCutoffDate(maxAge);
 
       this.logger.debug('Getting items requiring sync', {
         cutoff,

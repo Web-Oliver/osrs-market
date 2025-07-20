@@ -14,6 +14,7 @@ const { ValidationMiddleware } = require('../../middleware/ValidationMiddleware'
 const { ErrorHandler } = require('../../middleware/ErrorHandler');
 const { DataExportService } = require('../../services/DataExportService');
 const { AppConstants } = require('../../config/AppConstants');
+const TimeConstants = require('../../utils/TimeConstants');
 
 const router = express.Router();
 
@@ -285,8 +286,8 @@ router.get(
         downloadUrl: `/api/market-data/export/download/${jobId}`,
         expiresAt: Date.now() + AppConstants.EXPORT.TEMP_FILE_TTL
       },
-      createdAt: Date.now() - 300000, // 5 minutes ago
-      completedAt: Date.now() - 60000, // 1 minute ago
+      createdAt: Date.now() - TimeConstants.FIVE_MINUTES,
+      completedAt: Date.now() - TimeConstants.ONE_MINUTE,
       processingTime: 240000 // 4 minutes
     };
 

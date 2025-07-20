@@ -12,6 +12,7 @@
 const { ErrorHandler } = require('../middleware/ErrorHandler');
 const { AppConstants } = require('../config/AppConstants');
 const { Logger } = require('./Logger');
+const TimeConstants = require('./TimeConstants');
 
 class DatabaseUtility {
   constructor() {
@@ -375,10 +376,10 @@ class DatabaseUtility {
    */
   static buildMarketAnalysisPipeline(itemId, timeRange = '24h') {
     const timeRanges = {
-      '1h': new Date(Date.now() - 60 * 60 * 1000),
-      '24h': new Date(Date.now() - 24 * 60 * 60 * 1000),
-      '7d': new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-      '30d': new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+      '1h': TimeConstants.getPastTime(TimeConstants.ONE_HOUR),
+      '24h': TimeConstants.getPastTime(TimeConstants.ONE_DAY),
+      '7d': TimeConstants.getPastTime(TimeConstants.SEVEN_DAYS),
+      '30d': TimeConstants.getPastTime(TimeConstants.THIRTY_DAYS)
     };
 
     const startTime = timeRanges[timeRange] || timeRanges['24h'];

@@ -7,6 +7,8 @@
  * - Clean Architecture: Domain layer independent of infrastructure
  */
 
+const TimeConstants = require('../../utils/TimeConstants');
+
 /**
  * @typedef {import('../entities/Item.js').Item} Item
  * @typedef {import('../../types/domain/Item.js').ItemSearchCriteria} ItemSearchCriteria
@@ -98,7 +100,7 @@ class IItemRepository {
    * @returns {Promise<Item[]>} Array of items needing sync
    * @throws {Error} If operation fails
    */
-  async getItemsRequiringSync(maxAge = 24 * 60 * 60 * 1000) {
+  async getItemsRequiringSync(maxAge = TimeConstants.ONE_DAY) {
 
     throw new Error('IItemRepository.getItemsRequiringSync must be implemented');
   }

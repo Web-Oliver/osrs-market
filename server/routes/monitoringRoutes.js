@@ -12,7 +12,6 @@ const express = require('express');
 const { getControllerFactory } = require('../factories/ControllerFactory');
 const { RequestMiddleware } = require('../middleware/RequestMiddleware');
 const { ErrorMiddleware } = require('../middleware/ErrorMiddleware');
-const { validateRequest } = require('../validators/MonitoringValidator');
 
 const router = express.Router();
 

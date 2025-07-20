@@ -47,7 +47,7 @@ class MarketDataScheduler extends BaseService {
     // Then run every 5 minutes (300,000 ms)
     this.intervalId = setInterval(() => {
       this.performSync();
-    }, 5 * 60 * 1000);
+    }, TimeConstants.FIVE_MINUTES);
 
     this.logger.info('✅ Market data scheduler started - syncing 5m + 1h data every 5 minutes');
   }
@@ -113,7 +113,7 @@ class MarketDataScheduler extends BaseService {
       syncCount: this.syncCount,
       errorCount: this.errorCount,
       lastSyncTime: this.lastSyncTime,
-      nextSyncTime: this.isRunning ? (this.lastSyncTime + (5 * 60 * 1000)) : null,
+      nextSyncTime: this.isRunning ? (this.lastSyncTime + (TimeConstants.FIVE_MINUTES)) : null,
       uptime: this.isRunning ? Date.now() - (this.lastSyncTime || Date.now()) : 0,
       successRate: this.syncCount > 0 ? ((this.syncCount - this.errorCount) / this.syncCount * 100).toFixed(2) : 0
     };

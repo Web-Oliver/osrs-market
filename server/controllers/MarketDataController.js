@@ -11,6 +11,7 @@
 const { BaseController } = require('./BaseController');
 const { MarketDataService } = require('../services/MarketDataService');
 const { validateRequest } = require('../validators/MarketDataValidator');
+const TimeConstants = require('../utils/TimeConstants');
 
 class MarketDataController extends BaseController {
   constructor(dependencies = {}) {
@@ -66,7 +67,7 @@ class MarketDataController extends BaseController {
       {
         validator: () => validateRequest.getMarketDataSummary(req.query),
         parseParams: (req) => {
-          const { timeRange = 24 * 60 * 60 * 1000 } = req.query;
+          const { timeRange = TimeConstants.ONE_DAY } = req.query;
           return parseInt(timeRange);
         }
       }
@@ -204,7 +205,7 @@ class MarketDataController extends BaseController {
       {
         operationName: 'fetch popular items',
         parseParams: (req) => {
-          const { limit = 50, timeRange = 7 * 24 * 60 * 60 * 1000, sortBy = 'volume' } = req.query;
+          const { limit = 50, timeRange = TimeConstants.SEVEN_DAYS, sortBy = 'volume' } = req.query;
           return {
             limit: parseInt(limit),
             timeRange: parseInt(timeRange),
@@ -332,7 +333,7 @@ class MarketDataController extends BaseController {
     
     // Default to last 24 hours
     const currentTime = Date.now();
-    const defaultStartTime = currentTime - (24 * 60 * 60 * 1000);
+    const defaultStartTime = currentTime - TimeConstants.ONE_DAY;
     return { startTime: defaultStartTime, endTime: currentTime };
   }
 
