@@ -19,6 +19,32 @@ class MonitoringController extends BaseController {
     
     // SOLID: Dependency Injection (DIP) - Eliminates direct dependency violation
     this.monitoringService = dependencies.monitoringService || new MonitoringService();
+    
+    // Initialize endpoints after service is set
+    this.initializeEndpoints();
+  }
+
+  initializeEndpoints() {
+    // Endpoints that require the service to be initialized
+    this.getSystemStatus = this.createGetEndpoint(
+      this.monitoringService.getSystemStatus,
+      { operationName: 'fetch system status' }
+    );
+    
+    this.getEfficiencyMetrics = this.createGetEndpoint(
+      this.monitoringService.getEfficiencyMetrics,
+      { operationName: 'fetch efficiency metrics' }
+    );
+    
+    this.getHealthStatus = this.createGetEndpoint(
+      this.monitoringService.getHealthStatus,
+      { operationName: 'fetch health status' }
+    );
+    
+    this.getAggregatedStats = this.createGetEndpoint(
+      this.monitoringService.getAggregatedStats,
+      { operationName: 'fetch aggregated stats' }
+    );
   }
 
   /**
@@ -150,32 +176,7 @@ class MonitoringController extends BaseController {
     }
   }
 
-  /**
-   * Context7 Pattern: Get system status
-   * GET /api/system-status
-   */
-  getSystemStatus = this.createGetEndpoint(
-    this.monitoringService.getSystemStatus,
-    { operationName: 'fetch system status' }
-  );
-
-  /**
-   * Context7 Pattern: Get efficiency metrics
-   * GET /api/efficiency-metrics
-   */
-  getEfficiencyMetrics = this.createGetEndpoint(
-    this.monitoringService.getEfficiencyMetrics,
-    { operationName: 'fetch efficiency metrics' }
-  );
-
-  /**
-   * Context7 Pattern: Get health status
-   * GET /api/health
-   */
-  getHealthStatus = this.createGetEndpoint(
-    this.monitoringService.getHealthStatus,
-    { operationName: 'perform health check' }
-  );
+  // Endpoints are now initialized in constructor via initializeEndpoints()
 
   /**
    * Context7 Pattern: Perform data cleanup

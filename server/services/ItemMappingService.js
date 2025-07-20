@@ -13,6 +13,7 @@ const { BaseService } = require('./BaseService');
 const { ItemRepository } = require('../repositories/ItemRepository');
 const { OSRSWikiService } = require('./OSRSWikiService');
 const { DataTransformer } = require('../utils/DataTransformer');
+const { FinancialCalculationService } = require('./consolidated/FinancialCalculationService');
 
 // Enhanced Domain Components
 const { Item } = require('../domain/entities/Item');
@@ -33,6 +34,7 @@ class ItemMappingService extends BaseService {
     this.itemRepository = new ItemRepository();
     this.osrsWikiService = new OSRSWikiService();
     this.dataTransformer = new DataTransformer();
+    this.financialCalculator = new FinancialCalculationService();
 
     // Enhanced Domain Components
     this.domainService = new ItemDomainService();
@@ -48,9 +50,9 @@ class ItemMappingService extends BaseService {
    * Context7 Pattern: One-time import of all item mapping data
    * This is the main method for initial data population
    */
-  async importAllItemMappings() {
+  async importAllItemMappings(options = {}) {
     return this.execute(async () => {
-this.logger.info('Starting complete item mapping import');
+      this.logger.info('Starting complete item mapping import');
 
       const startTime = Date.now();
       const forceReimport = options.force || false;
@@ -125,109 +127,105 @@ this.logger.info('Starting complete item mapping import');
    * Context7 Pattern: Transform raw API data to our schema format
    */
   transformMappingData(mappingData) {
-    this.execute(async () => {
-this.logger.debug('Transforming mapping data', {
-        itemCount: mappingData.length
-      });
+    this.logger.debug('Transforming mapping data', {
+      itemCount: mappingData.length
+    });
 
-      const transformedItems = mappingData.map(apiItem => ({
-        itemId: apiItem.id,
-        name: apiItem.name || 'Unknown Item',
-        examine: apiItem.examine || 'No description available',
-        members: Boolean(apiItem.members),
-        lowalch: Math.max(0, parseInt(apiItem.lowalch) || 0),
-        highalch: Math.max(0, parseInt(apiItem.highalch) || 0),
-        tradeable_on_ge: Boolean(apiItem.tradeable_on_ge),
-        stackable: Boolean(apiItem.stackable),
-        noted: Boolean(apiItem.noted),
-        value: Math.max(1, parseInt(apiItem.value) || 1),
-        buy_limit: apiItem.limit ? parseInt(apiItem.limit) : null,
-        weight: parseFloat(apiItem.weight) || 0,
-        icon: apiItem.icon || null,
-        dataSource: 'osrs_wiki',
-        lastSyncedAt: new Date(),
-        status: 'active'
-      }));
+    const transformedItems = mappingData.map(apiItem => ({
+      itemId: apiItem.id,
+      name: apiItem.name || 'Unknown Item',
+      examine: apiItem.examine || 'No description available',
+      members: Boolean(apiItem.members),
+      lowalch: Math.max(0, parseInt(apiItem.lowalch) || 0),
+      highalch: Math.max(0, parseInt(apiItem.highalch) || 0),
+      tradeable_on_ge: Boolean(apiItem.tradeable_on_ge),
+      stackable: Boolean(apiItem.stackable),
+      noted: Boolean(apiItem.noted),
+      value: Math.max(1, parseInt(apiItem.value) || 1),
+      buy_limit: apiItem.limit ? parseInt(apiItem.limit) : null,
+      weight: parseFloat(apiItem.weight) || 0,
+      icon: apiItem.icon || null,
+      dataSource: 'osrs_wiki',
+      lastSyncedAt: new Date(),
+      status: 'active'
+    }));
 
-      this.logger.debug('Data transformation completed', {
-        transformedCount: transformedItems.length
-      });
+    this.logger.debug('Data transformation completed', {
+      transformedCount: transformedItems.length
+    });
 
-      return transformedItems;
-    }, 'operation', { logSuccess: false })
+    return transformedItems;
   }
 
   /**
    * Context7 Pattern: Validate transformed data before import
    */
   validateMappingData(items) {
-    this.execute(async () => {
-this.logger.debug('Validating mapping data', {
-        itemCount: items.length
-      });
+    this.logger.debug('Validating mapping data', {
+      itemCount: items.length
+    });
 
-      const errors = [];
-      const seenIds = new Set();
+    const errors = [];
+    const seenIds = new Set();
 
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        const context = `Item ${i + 1} (ID: ${item.itemId})`;
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const context = `Item ${i + 1} (ID: ${item.itemId})`;
 
-        // Check required fields
-        if (!item.itemId || !Number.isInteger(item.itemId) || item.itemId <= 0) {
-          errors.push(`${context}: Invalid or missing itemId`);
-        }
-
-        if (!item.name || typeof item.name !== 'string' || item.name.trim().length === 0) {
-          errors.push(`${context}: Invalid or missing name`);
-        }
-
-        // Check for duplicates
-        if (seenIds.has(item.itemId)) {
-          errors.push(`${context}: Duplicate itemId found`);
-        } else {
-          seenIds.add(item.itemId);
-        }
-
-        // Validate alchemy values
-        if (item.highalch < item.lowalch) {
-          errors.push(`${context}: High alch value cannot be less than low alch value`);
-        }
-
-        // Validate numeric fields
-        if (item.value < 0 || item.lowalch < 0 || item.highalch < 0) {
-          errors.push(`${context}: Negative values not allowed`);
-        }
-
-        // Stop after too many errors to prevent log spam
-        if (errors.length > 100) {
-          errors.push('... and more (validation stopped due to too many errors)');
-          break;
-        }
+      // Check required fields
+      if (!item.itemId || !Number.isInteger(item.itemId) || item.itemId <= 0) {
+        errors.push(`${context}: Invalid or missing itemId`);
       }
 
-      const isValid = errors.length === 0;
+      if (!item.name || typeof item.name !== 'string' || item.name.trim().length === 0) {
+        errors.push(`${context}: Invalid or missing name`);
+      }
 
-      this.logger.debug('Data validation completed', {
-        isValid,
-        errorCount: errors.length,
-        validItems: items.length - errors.length
-      });
+      // Check for duplicates
+      if (seenIds.has(item.itemId)) {
+        errors.push(`${context}: Duplicate itemId found`);
+      } else {
+        seenIds.add(item.itemId);
+      }
 
-      return {
-        isValid,
-        errors,
-        validItemCount: isValid ? items.length : items.length - errors.length
-      };
-    }, 'operation', { logSuccess: false })
+      // Validate alchemy values
+      if (item.highalch < item.lowalch) {
+        errors.push(`${context}: High alch value cannot be less than low alch value`);
+      }
+
+      // Validate numeric fields
+      if (item.value < 0 || item.lowalch < 0 || item.highalch < 0) {
+        errors.push(`${context}: Negative values not allowed`);
+      }
+
+      // Stop after too many errors to prevent log spam
+      if (errors.length > 100) {
+        errors.push('... and more (validation stopped due to too many errors)');
+        break;
+      }
+    }
+
+    const isValid = errors.length === 0;
+
+    this.logger.debug('Data validation completed', {
+      isValid,
+      errorCount: errors.length,
+      validItems: items.length - errors.length
+    });
+
+    return {
+      isValid,
+      errors,
+      validItemCount: isValid ? items.length : items.length - errors.length
+    };
   }
 
   /**
    * Context7 Pattern: Import items in batches for performance
    */
-  async batchImportItems() {
+  async batchImportItems(items) {
     return this.execute(async () => {
-this.logger.info('Starting batch import', {
+      this.logger.info('Starting batch import', {
         totalItems: items.length,
         batchSize: this.SYNC_BATCH_SIZE
       });
@@ -264,15 +262,32 @@ this.logger.info('Starting batch import', {
             modified: batchResult.modified,
             errors: batchResult.errors.length
           });
+        } catch (error) {
+          this.logger.error('Failed to process batch', { 
+            batchNumber, 
+            error: error.message 
+          });
+          errors.push({ batch: batchNumber, error: error.message });
+        }
+      }
+
+      this.logger.info('Batch import completed', {
+        totalItems: items.length,
+        imported,
+        updated,
+        errors: errors.length
+      });
+
+      return { imported, updated, errors };
     }, 'batchImportItems', { logSuccess: true });
   }
 
   /**
-   * Context7 Pattern: Get item by ID with BaseService caching
+   * Context7 Pattern: Search items by name with BaseService caching
    */
-  async getItemById() {
+  async searchItemsByName(searchTerm, options = {}) {
     return this.execute(async () => {
-this.logger.debug('Searching items', { searchTerm, options });
+      this.logger.debug('Searching items', { searchTerm, options });
 
       // Apply business rules
       const searchOptions = {
@@ -287,15 +302,15 @@ this.logger.debug('Searching items', { searchTerm, options });
       const enrichedItems = items.map(item => this.enrichItemData(item));
 
       return enrichedItems;
-    }, 'getItemById', { logSuccess: true });
+    }, 'searchItemsByName', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get high-value items with business rules
    */
-  async getHighValueItems() {
+  async getHighValueItems(options = {}) {
     return this.execute(async () => {
-const businessOptions = {
+      const businessOptions = {
         minValue: options.minValue || this.HIGH_VALUE_THRESHOLD,
         limit: Math.min(options.limit || 50, 100),
         members: options.members
@@ -315,9 +330,9 @@ const businessOptions = {
   /**
    * Context7 Pattern: Get items by category with business classification
    */
-  async getItemsByCategory() {
+  async getItemsByCategory(category, options = {}) {
     return this.execute(async () => {
-const items = await this.itemRepository.getItemsByCategory(category, options);
+      const items = await this.itemRepository.getItemsByCategory(category, options);
       return items.map(item => this.enrichItemData(item));
     }, 'getItemsByCategory', { logSuccess: true });
   }
@@ -325,9 +340,9 @@ const items = await this.itemRepository.getItemsByCategory(category, options);
   /**
    * Context7 Pattern: Get items with pagination and business rules
    */
-  async getItems() {
+  async getItems(options = {}) {
     return this.execute(async () => {
-// Apply business validation to options
+      // Apply business validation to options
       const validatedOptions = {
         page: Math.max(1, options.page || 1),
         limit: Math.min(100, Math.max(1, options.limit || 20)),
@@ -354,13 +369,20 @@ const items = await this.itemRepository.getItemsByCategory(category, options);
     try {
       const itemObj = item.toObject ? item.toObject() : item;
 
-      // Calculate business metrics
-      const alchemyProfit = Math.max(0, itemObj.highalch - itemObj.value - 200); // Nature rune cost
+      // CONSOLIDATED: Use FinancialCalculationService (eliminates duplicate logic)
+      const alchemyProfit = this.financialCalculator.calculateAlchemyProfit(
+        itemObj.highalch, 
+        itemObj.value
+      );
       const isProfitableAlchemy = alchemyProfit > 0;
-      const profitMargin = itemObj.value > 0 ? (alchemyProfit / itemObj.value) * 100 : 0;
-
-      // Business value score (combines value and profit potential)
-      const businessValue = itemObj.value + (alchemyProfit * 2);
+      const profitMargin = this.financialCalculator.calculateProfitMarginPercentage(
+        alchemyProfit, 
+        itemObj.value
+      );
+      const businessValue = this.financialCalculator.calculateBusinessValue(
+        itemObj.value, 
+        alchemyProfit
+      );
 
       // Category classification
       const category = this.classifyItem(itemObj);
@@ -370,7 +392,7 @@ const items = await this.itemRepository.getItemsByCategory(category, options);
         // Business calculations
         alchemyProfit,
         isProfitableAlchemy,
-        profitMargin: Math.round(profitMargin * 100) / 100,
+        profitMargin,
         businessValue,
         category,
         // Convenience flags
@@ -460,7 +482,7 @@ const stats = await this.itemRepository.getStatistics();
    */
   async getItemBusinessInsights() {
     return this.execute(async () => {
-this.logger.debug('Generating business insights');
+      this.logger.debug('Generating business insights');
 
       // Get all active items as domain entities
       const items = await this.adapter.findEnhanced({ status: 'active' });
@@ -514,9 +536,9 @@ this.logger.debug('Generating business insights');
   /**
    * Find items by business specifications
    */
-  async findItemsByBusinessCriteria() {
+  async findItemsByBusinessCriteria(criteriaName, params = {}) {
     return this.execute(async () => {
-this.logger.debug('Finding items by business criteria', { criteriaName, params });
+      this.logger.debug('Finding items by business criteria', { criteriaName, params });
 
       const items = await this.adapter.findEnhanced({ status: 'active' });
       const filtered = this.domainService.findItemsByCriteria(items, criteriaName, params);

@@ -353,8 +353,7 @@ app.get('*', (req, res) => {
 });
 
 // Context7 optimized error handling middleware using ErrorHandler
-const errorHandler = new ErrorHandler();
-app.use(errorHandler.globalErrorHandler());
+app.use(ErrorHandler.handle);
 
 /**
  * OSRS Data Scraper API endpoints

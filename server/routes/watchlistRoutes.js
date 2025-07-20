@@ -10,7 +10,7 @@
  */
 
 const express = require('express');
-const WatchlistController = require('../controllers/WatchlistController');
+const { WatchlistController } = require('../controllers/WatchlistController');
 const { RequestMiddleware } = require('../middleware/RequestMiddleware');
 const { ErrorMiddleware } = require('../middleware/ErrorMiddleware');
 const { Logger } = require('../utils/Logger');

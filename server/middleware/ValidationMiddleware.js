@@ -18,6 +18,46 @@ class ValidationMiddleware {
   }
 
   /**
+   * Context7 Pattern: Validate request using schema
+   * Creates validation middleware for specific validation schema
+   */
+  validate(schema, options = {}) {
+    return ValidationMiddleware.create(
+      (req) => this.validateSchema(req, schema),
+      options
+    );
+  }
+
+  /**
+   * Context7 Pattern: Validate request against schema
+   * Internal method for schema validation
+   */
+  validateSchema(req, schema) {
+    const errors = [];
+    
+    // Validate each section of the schema
+    for (const [section, sectionSchema] of Object.entries(schema)) {
+      const data = req[section];
+      if (!data) continue;
+      
+      for (const [field, rules] of Object.entries(sectionSchema)) {
+        const value = data[field];
+        const fieldResult = this.validateField(value, rules, `${section}.${field}`);
+        
+        if (!fieldResult.isValid) {
+          errors.push(...fieldResult.errors);
+        }
+      }
+    }
+    
+    return {
+      isValid: errors.length === 0,
+      errors,
+      sanitized: req
+    };
+  }
+
+  /**
    * Context7 Pattern: Create validation middleware
    * SOLID Principle: Single responsibility for validation
    * @param {Function} validator - Validation function
@@ -401,6 +441,190 @@ class ValidationMiddleware {
 
       return { isValid: true, errors: [] };
     }, { validateParams: true });
+  }
+
+  /**
+   * Context7 Pattern: Request tracking middleware
+   * Adds unique request ID and tracking metadata
+   */
+  requestTracking() {
+    return (req, res, next) => {
+      // Generate unique request ID
+      req.id = `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Add request metadata
+      req.metadata = {
+        startTime: Date.now(),
+        userAgent: req.get('User-Agent'),
+        clientIp: req.ip || req.connection.remoteAddress,
+        method: req.method,
+        url: req.url
+      };
+
+      // Add request ID to response headers
+      res.setHeader('X-Request-ID', req.id);
+
+      this.logger.debug('Request tracked', {
+        requestId: req.id,
+        method: req.method,
+        url: req.url,
+        userAgent: req.get('User-Agent')
+      });
+
+      next();
+    };
+  }
+
+  /**
+   * Context7 Pattern: Performance monitoring middleware
+   * Tracks request performance metrics
+   */
+  performanceMonitoring() {
+    return (req, res, next) => {
+      const startTime = Date.now();
+      
+      // Override res.end to capture response time
+      const originalEnd = res.end;
+      res.end = function(...args) {
+        const duration = Date.now() - startTime;
+        
+        // Log performance metrics
+        if (req.logger) {
+          req.logger.debug('Request completed', {
+            requestId: req.id,
+            method: req.method,
+            url: req.url,
+            statusCode: res.statusCode,
+            duration: `${duration}ms`
+          });
+        }
+
+        // Add performance headers
+        res.setHeader('X-Response-Time', `${duration}ms`);
+        res.setHeader('X-Timestamp', new Date().toISOString());
+
+        // Call original end method
+        originalEnd.apply(this, args);
+      };
+
+      next();
+    };
+  }
+
+  /**
+   * Context7 Pattern: Security headers middleware
+   * Adds basic security headers
+   */
+  securityHeaders() {
+    return (req, res, next) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff');
+      res.setHeader('X-Frame-Options', 'DENY');
+      res.setHeader('X-XSS-Protection', '1; mode=block');
+      res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+      
+      next();
+    };
+  }
+
+  /**
+   * Context7 Pattern: Rate limiting validation
+   * Basic rate limiting for API endpoints
+   */
+  rateLimit(options = {}) {
+    const { 
+      windowMs = 15 * 60 * 1000, // 15 minutes
+      maxRequests = 100,
+      message = 'Too many requests, please try again later'
+    } = options;
+
+    const requests = new Map();
+
+    return (req, res, next) => {
+      const key = req.ip || 'unknown';
+      const now = Date.now();
+      
+      // Clean old entries
+      for (const [ip, data] of requests.entries()) {
+        if (now - data.resetTime > windowMs) {
+          requests.delete(ip);
+        }
+      }
+
+      // Get or create request data
+      let requestData = requests.get(key);
+      if (!requestData || now - requestData.resetTime > windowMs) {
+        requestData = {
+          count: 0,
+          resetTime: now
+        };
+        requests.set(key, requestData);
+      }
+
+      // Check rate limit
+      if (requestData.count >= maxRequests) {
+        return ApiResponse.tooManyRequests(res, message, {
+          retryAfter: Math.ceil((requestData.resetTime + windowMs - now) / 1000)
+        });
+      }
+
+      // Increment counter
+      requestData.count++;
+
+      // Add rate limit headers
+      res.setHeader('X-RateLimit-Limit', maxRequests);
+      res.setHeader('X-RateLimit-Remaining', Math.max(0, maxRequests - requestData.count));
+      res.setHeader('X-RateLimit-Reset', new Date(requestData.resetTime + windowMs).toISOString());
+
+      next();
+    };
+  }
+
+  /**
+   * Context7 Pattern: Request size limit middleware
+   * Limits the size of incoming requests
+   */
+  requestSizeLimit(options = {}) {
+    const { limit = '10mb', message = 'Request entity too large' } = options;
+    
+    return (req, res, next) => {
+      // Parse limit to bytes
+      const limitBytes = this.parseSize(limit);
+      
+      // Check content-length header
+      const contentLength = parseInt(req.get('content-length') || '0');
+      
+      if (contentLength > limitBytes) {
+        return ApiResponse.badRequest(res, message, {
+          limit,
+          received: `${Math.round(contentLength / 1024)}KB`,
+          maxAllowed: `${Math.round(limitBytes / 1024)}KB`
+        });
+      }
+      
+      next();
+    };
+  }
+
+  /**
+   * Helper method to parse size strings to bytes
+   */
+  parseSize(size) {
+    if (typeof size === 'number') return size;
+    
+    const units = {
+      'b': 1,
+      'kb': 1024,
+      'mb': 1024 * 1024,
+      'gb': 1024 * 1024 * 1024
+    };
+    
+    const match = size.toLowerCase().match(/^(\d+(?:\.\d+)?)(b|kb|mb|gb)?$/);
+    if (!match) return 0;
+    
+    const value = parseFloat(match[1]);
+    const unit = match[2] || 'b';
+    
+    return Math.floor(value * (units[unit] || 1));
   }
 }
 

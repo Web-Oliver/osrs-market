@@ -20,13 +20,15 @@ class ItemMappingController extends BaseController {
     // SOLID: Dependency Injection (DIP) - Eliminates direct dependency violation
     this.itemMappingService = dependencies.itemMappingService || new ItemMappingService();
     this.itemValidator = new ItemValidator();
+    
+    // Initialize endpoints after service is set
+    this.initializeEndpoints();
   }
 
-  /**
-   * Context7 Pattern: Import all item mappings (one-time operation)
-   * POST /api/items/import
-   */
-  importMappings = this.createPostEndpoint(
+  initializeEndpoints() {
+
+    // All endpoints that require the service to be initialized
+    this.importMappings = this.createPostEndpoint(
     async(importData) => {
       const { force } = importData;
       const options = { force };
@@ -38,11 +40,7 @@ class ItemMappingController extends BaseController {
     }
   );
 
-  /**
-   * Context7 Pattern: Get single item by ID
-   * GET /api/items/:itemId
-   */
-  getItem = this.createGetEndpoint(
+    this.getItem = this.createGetEndpoint(
     async(params) => {
       const { itemId } = params;
 
@@ -68,11 +66,7 @@ class ItemMappingController extends BaseController {
     }
   );
 
-  /**
-   * Context7 Pattern: Get items with pagination and filtering
-   * GET /api/items
-   */
-  getItems = this.createPaginatedEndpoint(
+    this.getItems = this.createPaginatedEndpoint(
     async(params) => {
       return await this.itemMappingService.getItems(params);
     },
@@ -86,11 +80,7 @@ class ItemMappingController extends BaseController {
     }
   );
 
-  /**
-   * Context7 Pattern: Search items by name
-   * GET /api/items/search
-   */
-  searchItems = this.createGetEndpoint(
+    this.searchItems = this.createGetEndpoint(
     async(params) => {
       const { searchTerm, sanitizedParams } = params;
 
@@ -121,11 +111,7 @@ class ItemMappingController extends BaseController {
     }
   );
 
-  /**
-   * Context7 Pattern: Get high-value items
-   * GET /api/items/high-value
-   */
-  getHighValueItems = this.createGetEndpoint(
+    this.getHighValueItems = this.createGetEndpoint(
     async(options) => {
       const items = await this.itemMappingService.getHighValueItems(options);
       return {
@@ -163,6 +149,21 @@ class ItemMappingController extends BaseController {
       }
     }
   );
+
+    this.getSyncStatus = this.createGetEndpoint(
+      this.itemMappingService.getSyncStatus,
+      { operationName: 'get synchronization status' }
+    );
+
+    this.healthCheck = this.createGetEndpoint(
+      this.itemMappingService.healthCheck,
+      { operationName: 'health check' }
+    );
+  }
+
+  // ========================================
+  // REGULAR ASYNC METHODS (NOT ENDPOINTS)
+  // ========================================
 
   /**
    * Context7 Pattern: Get items by category
@@ -229,24 +230,6 @@ class ItemMappingController extends BaseController {
       next(error);
     }
   }
-
-  /**
-   * Context7 Pattern: Get synchronization status
-   * GET /api/items/sync/status
-   */
-  getSyncStatus = this.createGetEndpoint(
-    this.itemMappingService.getSyncStatus,
-    { operationName: 'get synchronization status' }
-  );
-
-  /**
-   * Context7 Pattern: Health check endpoint
-   * GET /api/items/health
-   */
-  healthCheck = this.createGetEndpoint(
-    this.itemMappingService.healthCheck,
-    { operationName: 'health check' }
-  );
 
   /**
    * Context7 Pattern: Create new item (admin operation)

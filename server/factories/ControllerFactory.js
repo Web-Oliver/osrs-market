@@ -127,8 +127,17 @@ class ControllerFactory {
    */
   createMonitoringController() {
     if (!this.controllerInstances.has('monitoring')) {
+      const monitoringService = this.serviceInstances.get('monitoring');
+      
+      // DEBUG: Check if MonitoringService exists
+      if (!monitoringService) {
+        console.error('❌ MonitoringService not found in serviceInstances');
+        console.log('Available services:', Array.from(this.serviceInstances.keys()));
+        throw new Error('MonitoringService not initialized in ControllerFactory');
+      }
+      
       this.controllerInstances.set('monitoring', new MonitoringController({
-        monitoringService: this.serviceInstances.get('monitoring')
+        monitoringService
       }));
     }
     return this.controllerInstances.get('monitoring');

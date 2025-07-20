@@ -168,12 +168,12 @@ router.get(
  */
 router.get(
   '/summary',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     query: {
       timeRange: { type: 'string', optional: true }
     }
   }),
-  errorMiddleware.handleAsyncError(marketDataController.getMarketDataSummary)
+  errorHandler.asyncHandler(marketDataController.getMarketDataSummary)
 );
 
 /**
@@ -182,7 +182,7 @@ router.get(
  */
 router.get(
   '/historical/:itemId',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     params: {
       itemId: { type: 'string', required: true, pattern: '^[1-9][0-9]*$' }
     },
@@ -238,7 +238,7 @@ router.get(
  */
 router.get(
   '/item/:itemId/history',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     params: {
       itemId: { type: 'string', required: true, pattern: '^[1-9][0-9]*$' }
     },
@@ -249,7 +249,7 @@ router.get(
       interval: { type: 'string', enum: ['minute', 'hour', 'day'], optional: true }
     }
   }),
-  errorMiddleware.handleAsyncError(marketDataController.getItemPriceHistory)
+  errorHandler.asyncHandler(marketDataController.getItemPriceHistory)
 );
 
 /**
@@ -259,7 +259,7 @@ router.get(
  */
 router.get(
   '/live',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     query: {
       interval: { type: 'string', optional: true, enum: ['5m', '1h'] },
       itemIds: { type: 'string', optional: true }, // comma-separated list
@@ -307,7 +307,7 @@ router.get(
  */
 router.get(
   '/:itemId',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     params: {
       itemId: { type: 'string', required: true, pattern: '^[1-9][0-9]*$' }
     },
@@ -373,7 +373,7 @@ router.get(
  */
 router.get(
   '/top-items',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     query: {
       limit: { type: 'string', optional: true },
       timeRange: { type: 'string', optional: true },
@@ -381,7 +381,7 @@ router.get(
       onlyTradeable: { type: 'boolean', optional: true }
     }
   }),
-  errorMiddleware.handleAsyncError(marketDataController.getTopTradedItems)
+  errorHandler.asyncHandler(marketDataController.getTopTradedItems)
 );
 
 /**
@@ -390,14 +390,14 @@ router.get(
  */
 router.get(
   '/popular-items',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     query: {
       limit: { type: 'string', optional: true },
       timeRange: { type: 'string', optional: true },
       sortBy: { type: 'string', enum: ['volume', 'profit', 'price'], optional: true }
     }
   }),
-  errorMiddleware.handleAsyncError(marketDataController.getPopularItems)
+  errorHandler.asyncHandler(marketDataController.getPopularItems)
 );
 
 /**
@@ -406,14 +406,14 @@ router.get(
  */
 router.get(
   '/top-flips',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     query: {
       limit: { type: 'string', optional: true },
       timeRange: { type: 'string', optional: true },
       sortBy: { type: 'string', enum: ['profitability', 'margin', 'volume'], optional: true }
     }
   }),
-  errorMiddleware.handleAsyncError(marketDataController.getTopFlips)
+  errorHandler.asyncHandler(marketDataController.getTopFlips)
 );
 
 /**
@@ -422,7 +422,7 @@ router.get(
  */
 router.get(
   '/search',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     query: {
       q: { type: 'string', required: true, minLength: 2 },
       limit: { type: 'string', optional: true },
@@ -430,7 +430,7 @@ router.get(
       sortBy: { type: 'string', enum: ['relevance', 'name', 'price'], optional: true }
     }
   }),
-  errorMiddleware.handleAsyncError(marketDataController.searchItems)
+  errorHandler.asyncHandler(marketDataController.searchItems)
 );
 
 /**
@@ -439,14 +439,14 @@ router.get(
  */
 router.get(
   '/analytics',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     query: {
       type: { type: 'string', enum: ['trends', 'volatility', 'volume', 'profit'], optional: true },
       timeRange: { type: 'string', optional: true },
       itemId: { type: 'string', optional: true }
     }
   }),
-  errorMiddleware.handleAsyncError(marketDataController.getAnalytics)
+  errorHandler.asyncHandler(marketDataController.getAnalytics)
 );
 
 /**
@@ -455,12 +455,12 @@ router.get(
  */
 router.get(
   '/categories',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     query: {
       includeStats: { type: 'boolean', optional: true }
     }
   }),
-  errorMiddleware.handleAsyncError(marketDataController.getCategories)
+  errorHandler.asyncHandler(marketDataController.getCategories)
 );
 
 /**
@@ -469,7 +469,7 @@ router.get(
  */
 router.get(
   '/recommendations',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     query: {
       strategy: { type: 'string', enum: ['conservative', 'aggressive', 'balanced'], optional: true },
       riskLevel: { type: 'string', enum: ['low', 'medium', 'high'], optional: true },
@@ -477,7 +477,7 @@ router.get(
       limit: { type: 'string', optional: true }
     }
   }),
-  errorMiddleware.handleAsyncError(marketDataController.getRecommendations)
+  errorHandler.asyncHandler(marketDataController.getRecommendations)
 );
 
 /**
@@ -486,13 +486,13 @@ router.get(
  */
 router.get(
   '/alerts',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     query: {
       type: { type: 'string', enum: ['price', 'volume', 'trend'], optional: true },
       status: { type: 'string', enum: ['active', 'triggered', 'expired'], optional: true }
     }
   }),
-  errorMiddleware.handleAsyncError(marketDataController.getAlerts)
+  errorHandler.asyncHandler(marketDataController.getAlerts)
 );
 
 /**
@@ -501,7 +501,7 @@ router.get(
  */
 router.post(
   '/alerts',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     body: {
       itemId: { type: 'number', required: true, min: 1 },
       type: { type: 'string', required: true, enum: ['price_above', 'price_below', 'volume_spike'] },
@@ -510,7 +510,7 @@ router.post(
       webhook: { type: 'string', optional: true }
     }
   }),
-  errorMiddleware.handleAsyncError(marketDataController.createAlert)
+  errorHandler.asyncHandler(marketDataController.createAlert)
 );
 
 /**
@@ -519,12 +519,12 @@ router.post(
  */
 router.delete(
   '/alerts/:alertId',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     params: {
       alertId: { type: 'string', required: true }
     }
   }),
-  errorMiddleware.handleAsyncError(marketDataController.deleteAlert)
+  errorHandler.asyncHandler(marketDataController.deleteAlert)
 );
 
 /**
@@ -533,14 +533,14 @@ router.delete(
  */
 router.get(
   '/export',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     query: {
       format: { type: 'string', enum: ['json', 'csv', 'xlsx'], optional: true },
       timeRange: { type: 'string', optional: true },
       itemIds: { type: 'string', optional: true } // comma-separated list
     }
   }),
-  errorMiddleware.handleAsyncError(marketDataController.exportData)
+  errorHandler.asyncHandler(marketDataController.exportData)
 );
 
 /**
@@ -549,14 +549,14 @@ router.get(
  */
 router.get(
   '/compare',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     query: {
       itemIds: { type: 'string', required: true }, // comma-separated list
       timeRange: { type: 'string', optional: true },
       metrics: { type: 'string', optional: true } // comma-separated list
     }
   }),
-  errorMiddleware.handleAsyncError(marketDataController.compareItems)
+  errorHandler.asyncHandler(marketDataController.compareItems)
 );
 
 /**
@@ -565,13 +565,13 @@ router.get(
  */
 router.get(
   '/portfolio',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     query: {
       items: { type: 'string', required: true }, // JSON string of items with quantities
       timeRange: { type: 'string', optional: true }
     }
   }),
-  errorMiddleware.handleAsyncError(marketDataController.getPortfolioAnalysis)
+  errorHandler.asyncHandler(marketDataController.getPortfolioAnalysis)
 );
 
 /**
@@ -668,7 +668,7 @@ router.get(
  */
 router.get(
   '/timeseries/:itemId',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     params: {
       itemId: { type: 'string', required: true, pattern: '^[1-9][0-9]*$' }
     },
@@ -739,7 +739,7 @@ router.get(
  */
 router.get(
   '/timeseries/:itemId/stored',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     params: {
       itemId: { type: 'string', required: true, pattern: '^[1-9][0-9]*$' }
     },
@@ -785,7 +785,7 @@ router.get(
  */
 router.post(
   '/timeseries/:itemId/analyze',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     params: {
       itemId: { type: 'string', required: true, pattern: '^[1-9][0-9]*$' }
     },
@@ -874,7 +874,7 @@ router.get(
  */
 router.get(
   '/prices',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     query: {
       itemIds: { type: 'string', optional: true } // comma-separated list
     }
@@ -939,13 +939,13 @@ router.post(
  */
 router.post(
   '/validate',
-  requestMiddleware.requestSizeLimit({ limit: '5mb' }),
-  requestMiddleware.validateRequest({
+  validationMiddleware.requestSizeLimit({ limit: '5mb' }),
+  validationMiddleware.validate({
     body: {
       items: { type: 'array', required: true, minItems: 1 }
     }
   }),
-  errorMiddleware.handleAsyncError(marketDataController.validateData)
+  errorHandler.asyncHandler(marketDataController.validateData)
 );
 
 /**
@@ -954,7 +954,7 @@ router.post(
  */
 router.post(
   '/manual-test',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     body: {
       itemId: { type: 'number', required: true, min: 1 },
       action: { type: 'string', required: true, enum: ['buy', 'sell', 'hold'] },
@@ -963,7 +963,7 @@ router.post(
       testMode: { type: 'boolean', optional: true }
     }
   }),
-  errorMiddleware.handleAsyncError(marketDataController.manualTest)
+  errorHandler.asyncHandler(marketDataController.manualTest)
 );
 
 /**
@@ -972,23 +972,23 @@ router.post(
  */
 router.get(
   '/manual-test/results',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     query: {
       testId: { type: 'string', optional: true },
       limit: { type: 'string', optional: true }
     }
   }),
-  errorMiddleware.handleAsyncError(marketDataController.getManualTestResults)
+  errorHandler.asyncHandler(marketDataController.getManualTestResults)
 );
 
 /**
  * Context7 Pattern: Error handling middleware
  */
-router.use(errorMiddleware.handleError);
+router.use(ErrorHandler.handle);
 
 /**
  * Context7 Pattern: 404 handler for market data routes
  */
-router.use(errorMiddleware.handleNotFound);
+router.use(ErrorHandler.notFound);
 
 module.exports = router;

@@ -68,9 +68,9 @@ class OSRSDataScraperService extends BaseService {
   /**
    * SOLID: Start scraping operation
    */
-  async startScraping() {
+  async startScraping(options = {}) {
     return this.execute(async () => {
-const {
+      const {
         itemIds = [],
         source = 'wiki',
         priority = 'normal',
@@ -99,9 +99,32 @@ const {
   /**
    * SOLID: Perform scraping operation
    */
-  async performScraping() {
+  async performScraping(options = {}) {
     return this.execute(async () => {
-const batchResults = await this.scrapeBatch(batch, source);
+      const {
+        itemIds = [],
+        source = 'wiki',
+        priority = 'normal',
+        enableProcessing = true
+      } = options;
+
+      const results = {
+        scraped: {},
+        processed: {},
+        errors: [],
+        metadata: {
+          startTime: Date.now(),
+          source,
+          totalItems: itemIds.length
+        }
+      };
+
+      // Create batches for processing
+      const batchSize = this.scrapingConfig.maxConcurrentScrapes;
+      const batches = this.createBatches(itemIds, batchSize);
+
+      for (const batch of batches) {
+        const batchResults = await this.scrapeBatch(batch, source);
         Object.assign(results.scraped, batchResults);
 
         // Process scraped data if enabled
@@ -114,22 +137,26 @@ const batchResults = await this.scrapeBatch(batch, source);
         if (this.scrapingConfig.respectRateLimit) {
           await this.delay(this.scrapingConfig.delayBetweenScrapes);
         }
+      }
+
+      results.metadata.duration = Date.now() - results.metadata.startTime;
+      return results;
     }, 'performScraping', { logSuccess: true });
   }
 
   /**
-   * SOLID: Scrape from GE (Grand Exchange) - Simplified
+   * SOLID: Scrape from GE (Grand Exchange)
    */
-  async scrapeFromGE() {
+  async scrapeFromGE(itemId) {
     return this.execute(async () => {
-// Simplified GE scraping (would use actual GE API in production)
-      const basePrice = Math.floor(Math.random() * 1000000) + 1000;
+      // Use actual GE API scraping logic here
+      const geData = await this.fetchService.fetchGEData(itemId);
       
       return {
         itemId: parseInt(itemId),
-        highPrice: basePrice * 1.05,
-        lowPrice: basePrice * 0.95,
-        volume: Math.floor(Math.random() * 500) + 50,
+        highPrice: geData.high,
+        lowPrice: geData.low,
+        volume: geData.volume,
         timestamp: Date.now(),
         source: 'ge'
       };
@@ -139,9 +166,9 @@ const batchResults = await this.scrapeBatch(batch, source);
   /**
    * SOLID: Scrape from mapping data - Delegates to FetchService
    */
-  async scrapeFromMapping() {
+  async scrapeFromMapping(itemId) {
     return this.execute(async () => {
-const mappingData = await this.fetchService.fetchMappingData();
+      const mappingData = await this.fetchService.fetchMappingData();
       
       const itemMapping = mappingData.find(item => item.id === parseInt(itemId));
       if (!itemMapping) {
@@ -162,9 +189,9 @@ const mappingData = await this.fetchService.fetchMappingData();
   /**
    * SOLID: Process scraped data - Delegates to ProcessingService
    */
-  async processScrapedData() {
+  async processScrapedData(scrapedData, source) {
     return this.execute(async () => {
-// Convert scraped data to format expected by processing service
+      // Convert scraped data to format expected by processing service
       const formattedData = {
         data: scrapedData
       };
@@ -190,9 +217,9 @@ const mappingData = await this.fetchService.fetchMappingData();
   /**
    * SOLID: Add items to scraping queue
    */
-  async addToScrapingQueue() {
+  async addToScrapingQueue(items, options = {}) {
     return this.execute(async () => {
-const { priority = 'normal', source = 'wiki' } = options;
+      const { priority = 'normal', source = 'wiki' } = options;
 
       const queueItems = items.map(item => ({
         itemId: typeof item === 'object' ? item.itemId || item.id : item,
@@ -219,9 +246,9 @@ const { priority = 'normal', source = 'wiki' } = options;
   /**
    * SOLID: Process scraping queue
    */
-  async processScrapingQueue() {
+  async processScrapingQueue(options = {}) {
     return this.execute(async () => {
-const { 
+      const { 
         limit = 100,
         priority = null,
         source = null 
@@ -280,6 +307,20 @@ const {
             });
             processedCount++;
           }
+        } catch (error) {
+          this.logger.error('Failed to process source group', { 
+            sourceType, 
+            error: error.message 
+          });
+        }
+      }
+
+      this.logger.info('Scraping queue processing completed', {
+        processedCount,
+        sources: Object.keys(results)
+      });
+
+      return { processedCount, results };
     }, 'processScrapingQueue', { logSuccess: true });
   }
 
@@ -322,9 +363,9 @@ const [pending, completed, failed] = await Promise.all([
   /**
    * SOLID: Clean up old queue items
    */
-  async cleanupQueue() {
+  async cleanupQueue(maxAgeMs = 7 * 24 * 60 * 60 * 1000) {
     return this.execute(async () => {
-const cutoff = new Date(Date.now() - maxAgeMs);
+      const cutoff = new Date(Date.now() - maxAgeMs);
       
       const deleted = await ScrapeQueueModel.deleteMany({
         $or: [
@@ -343,6 +384,33 @@ const cutoff = new Date(Date.now() - maxAgeMs);
   }
 
   // Helper methods
+
+  /**
+   * Scrape a batch of items from specified source
+   */
+  async scrapeBatch(itemIds, source) {
+    const results = {};
+    
+    for (const itemId of itemIds) {
+      try {
+        let itemData;
+        if (source === 'ge') {
+          itemData = await this.scrapeFromGE(itemId);
+        } else if (source === 'mapping' || source === 'wiki') {
+          itemData = await this.scrapeFromMapping(itemId);
+        } else {
+          throw new Error(`Unknown scraping source: ${source}`);
+        }
+        
+        results[itemId] = itemData;
+      } catch (error) {
+        this.logger.error('Failed to scrape item', { itemId, source, error: error.message });
+        results[itemId] = { error: error.message };
+      }
+    }
+    
+    return results;
+  }
 
   /**
    * Create batches from array

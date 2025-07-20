@@ -9,8 +9,8 @@
  * - Performance optimized queries with proper indexing
  */
 
+const { BaseService } = require('../services/BaseService');
 const { ItemModel } = require('../models/ItemModel');
-const { Logger } = require('../utils/Logger');
 const { DataTransformer } = require('../utils/DataTransformer');
 
 // DOMAIN ENTITIES INTEGRATION
@@ -19,22 +19,28 @@ const { ItemId } = require('../domain/value-objects/ItemId');
 const { ItemModelAdapter } = require('../domain/adapters/ItemModelAdapter');
 
 
-class ItemRepository {
+class ItemRepository extends BaseService {
   constructor() {
-    this.logger = new Logger('ItemRepository');
+    super('ItemRepository', {
+      enableCache: true,
+      cachePrefix: 'item_repo',
+      cacheTTL: 1800, // 30 minutes
+      enableMongoDB: true
+    });
+    
     this.dataTransformer = new DataTransformer();
     this.adapter = new ItemModelAdapter();
     this.defaultProjection = {
       __v: 0 // Exclude version key from results
-    }
+    };
   }
 
   /**
    * ENHANCED: Find item by ID returning domain entity
    */
-  async findById() {
-    return this.errorManager.handleAsync(async () => {
-// Convert to ItemId value object if needed
+  async findById(itemId, options = {}) {
+    return this.execute(async () => {
+      // Convert to ItemId value object if needed
       const id = typeof itemId === 'number' ? new ItemId(itemId) : itemId;
       this.logger.debug('Finding item by ID (ENHANCED)', { itemId: id.value });
 
@@ -60,9 +66,9 @@ class ItemRepository {
   /**
    * ENHANCED: Find multiple items by IDs returning domain entities
    */
-  async findByIds() {
-    return this.errorManager.handleAsync(async () => {
-// Convert to ItemId value objects if needed
+  async findByIds(itemIds, options = {}) {
+    return this.execute(async () => {
+      // Convert to ItemId value objects if needed
       const ids = itemIds.map(id => typeof id === 'number' ? new ItemId(id) : id);
       const values = ids.map(id => id.value);
 
@@ -90,9 +96,9 @@ class ItemRepository {
   /**
    * Context7 Pattern: Search items with text search optimization
    */
-  async searchByName() {
-    return this.errorManager.handleAsync(async () => {
-this.logger.debug('Searching items by name', {
+  async searchByName(searchTerm, options = {}) {
+    return this.execute(async () => {
+      this.logger.debug('Searching items by name', {
         searchTerm,
         options
       });
@@ -133,9 +139,9 @@ this.logger.debug('Searching items by name', {
   /**
    * Context7 Pattern: Get high-value tradeable items
    */
-  async getHighValueItems() {
-    return this.errorManager.handleAsync(async () => {
-const minValue = options.minValue || 100000;
+  async getHighValueItems(options = {}) {
+    return this.execute(async () => {
+      const minValue = options.minValue || 100000;
       const limit = options.limit || 50;
 
       this.logger.debug('Getting high-value items', {
@@ -169,9 +175,9 @@ const minValue = options.minValue || 100000;
   /**
    * Context7 Pattern: Get items requiring sync with age-based filtering
    */
-  async getItemsRequiringSync() {
-    return this.errorManager.handleAsync(async () => {
-const cutoff = new Date(Date.now() - maxAge);
+  async getItemsRequiringSync(maxAge) {
+    return this.execute(async () => {
+      const cutoff = new Date(Date.now() - maxAge);
 
       this.logger.debug('Getting items requiring sync', {
         cutoff,
@@ -199,9 +205,9 @@ const cutoff = new Date(Date.now() - maxAge);
   /**
    * ENHANCED: Bulk upsert items using domain entities with business logic
    */
-  async upsertItems() {
-    return this.errorManager.handleAsync(async () => {
-const itemCount = itemsData.length;
+  async upsertItems(itemsData) {
+    try {
+      const itemCount = itemsData.length;
       this.logger.debug('Upserting items (ENHANCED)', { itemCount });
 
       // Create domain entities for validation and business logic
@@ -217,15 +223,51 @@ const itemCount = itemsData.length;
           });
           domainItem.markSynced(); // Mark as synced since we're importing fresh data
           domainItems.push(domainItem);
-    }, 'upsertItems', { logSuccess: true });
+        } catch (error) {
+          errors.push({ itemData, error: error.message });
+          this.logger.warn('Failed to create domain item', { itemData, error: error.message });
+        }
+      }
+
+      // Bulk upsert using domain entities
+      const upsertResults = await Promise.allSettled(
+        domainItems.map(domainItem => 
+          ItemModel.findOneAndUpdate(
+            { itemId: domainItem.itemId.value },
+            this.adapter.toPersistence(domainItem),
+            { upsert: true, new: true }
+          )
+        )
+      );
+
+      const successCount = upsertResults.filter(result => result.status === 'fulfilled').length;
+      const failureCount = upsertResults.filter(result => result.status === 'rejected').length;
+
+      this.logger.info('Items upsert completed (ENHANCED)', {
+        total: itemCount,
+        success: successCount,
+        failures: failureCount + errors.length,
+        domainValidationErrors: errors.length
+      });
+
+      return {
+        total: itemCount,
+        success: successCount,
+        failures: failureCount + errors.length,
+        errors: errors
+      };
+    } catch (error) {
+      this.logger.error('Failed to upsert items', { error: error.message });
+      throw error;
+    }
   }
 
   /**
    * Context7 Pattern: Mark items as synced with bulk update
    */
-  async markItemsAsSynced() {
-    return this.errorManager.handleAsync(async () => {
-this.logger.debug('Marking items as synced', {
+  async markItemsAsSynced(itemIds) {
+    return this.execute(async () => {
+      this.logger.debug('Marking items as synced', {
         count: itemIds.length
       });
 
@@ -251,9 +293,9 @@ this.logger.debug('Marking items as synced', {
   /**
    * Context7 Pattern: Get items by category with filtering
    */
-  async getItemsByCategory() {
-    return this.errorManager.handleAsync(async () => {
-this.logger.debug('Getting items by category', {
+  async getItemsByCategory(category, options = {}) {
+    return this.execute(async () => {
+      this.logger.debug('Getting items by category', {
         category,
         options
       });
@@ -318,8 +360,8 @@ this.logger.debug('Getting items by category', {
    * Context7 Pattern: Get repository statistics
    */
   async getStatistics() {
-    return this.errorManager.handleAsync(async () => {
-this.logger.debug('Getting repository statistics');
+    return this.execute(async () => {
+      this.logger.debug('Getting repository statistics');
 
       const stats = await ItemModel.getStatistics();
 
@@ -332,9 +374,9 @@ this.logger.debug('Getting repository statistics');
   /**
    * Context7 Pattern: Get items with pagination
    */
-  async getPaginatedItems() {
-    return this.errorManager.handleAsync(async () => {
-const page = Math.max(1, options.page || 1);
+  async getPaginatedItems(options = {}) {
+    return this.execute(async () => {
+      const page = Math.max(1, options.page || 1);
       const limit = Math.min(100, Math.max(1, options.limit || 20));
       const skip = (page - 1) * limit;
 
@@ -400,9 +442,9 @@ const page = Math.max(1, options.page || 1);
   /**
    * ENHANCED: Create single item using domain entity
    */
-  async createItem() {
-    return this.errorManager.handleAsync(async () => {
-this.logger.debug('Creating new item (ENHANCED)', {
+  async createItem(itemData) {
+    return this.execute(async () => {
+      this.logger.debug('Creating new item (ENHANCED)', {
         itemId: itemData.itemId,
         name: itemData.name
       });
@@ -431,9 +473,9 @@ this.logger.debug('Creating new item (ENHANCED)', {
   /**
    * Context7 Pattern: Update item with optimistic concurrency
    */
-  async updateItem() {
-    return this.errorManager.handleAsync(async () => {
-this.logger.debug('Updating item', {
+  async updateItem(itemId, updateData) {
+    return this.execute(async () => {
+      this.logger.debug('Updating item', {
         itemId,
         updateFields: Object.keys(updateData)
       });
@@ -472,9 +514,9 @@ this.logger.debug('Updating item', {
   /**
    * Context7 Pattern: Soft delete item (mark as removed)
    */
-  async deleteItem() {
-    return this.errorManager.handleAsync(async () => {
-this.logger.debug('Soft deleting item', { itemId });
+  async deleteItem(itemId) {
+    return this.execute(async () => {
+      this.logger.debug('Soft deleting item', { itemId });
 
       const deletedItem = await ItemModel.findOneAndUpdate(
         { itemId, status: 'active' },

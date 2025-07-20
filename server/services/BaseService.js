@@ -11,6 +11,7 @@
 
 const { Logger } = require('../utils/Logger');
 const { CacheManager } = require('../utils/CacheManager');
+const { createErrorManager } = require('../utils/ErrorManager');
 class BaseService {
   constructor(serviceName, options = {}) {
     if (!serviceName) {
@@ -19,7 +20,7 @@ class BaseService {
 
     this.serviceName = serviceName;
     this.logger = new Logger(serviceName);
-    // Error handling moved to centralized manager
+    this.errorManager = createErrorManager(this.logger);
     this.startTime = Date.now();
     this.options = {
       // Default options

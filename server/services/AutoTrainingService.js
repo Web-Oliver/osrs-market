@@ -12,6 +12,8 @@
 const { BaseService } = require('./BaseService');
 const { DataCollectionService } = require('./DataCollectionService');
 const { AITradingOrchestratorService } = require('./AITradingOrchestratorService');
+const { MongoDataPersistence } = require('./mongoDataPersistence');
+const { FinancialCalculationService } = require('./consolidated/FinancialCalculationService');
 
 class AutoTrainingService extends BaseService {
   constructor(config = {}) {
@@ -73,6 +75,7 @@ class AutoTrainingService extends BaseService {
     this.aiOrchestrator = null;
     this.mongoPersistence = null;
     this.trainingMetrics = new Map(); // Initialize training metrics storage
+    this.financialCalculator = new FinancialCalculationService();
 
     this.logger.info('🔄 Auto Training Service initialized', {
       enableAutoTraining: this.config.training.enableAutoTraining,
@@ -87,7 +90,7 @@ class AutoTrainingService extends BaseService {
    */
   async start() {
     return this.execute(async () => {
-// Initialize MongoDB persistence for historical data access
+      // Initialize MongoDB persistence for historical data access
       const mongoConfig = {
         connectionString: process.env.MONGODB_CONNECTION_STRING || 'mongodb://localhost:27017',
         databaseName: process.env.MONGODB_DATABASE || 'osrs_market_data'
@@ -114,6 +117,25 @@ class AutoTrainingService extends BaseService {
         this.trainingIntervalId = setInterval(async() => {
           try {
             await this.performTrainingCycle();
+          } catch (error) {
+            this.logger.error('Training cycle failed', { error: error.message });
+          }
+        }, this.config.training.trainingInterval);
+      }
+
+      this.isRunning = true;
+      this.logger.info('Auto training service started successfully', {
+        sessionId: this.sessionId,
+        autoTraining: this.config.training.enableAutoTraining,
+        interval: this.config.training.trainingInterval
+      });
+
+      return {
+        success: true,
+        sessionId: this.sessionId,
+        isRunning: this.isRunning,
+        config: this.config.training
+      };
     }, 'start', { logSuccess: true });
   }
 
@@ -159,7 +181,7 @@ class AutoTrainingService extends BaseService {
    */
   async performTrainingCycle() {
     return this.execute(async () => {
-if (!this.dataCollector || !this.aiOrchestrator) {
+      if (!this.dataCollector || !this.aiOrchestrator) {
         throw new Error('Services not initialized');
       }
 
@@ -194,15 +216,90 @@ if (!this.dataCollector || !this.aiOrchestrator) {
 
       // Process items in batches to avoid overwhelming the system
       const batchSize = this.config.training.batchProcessingSize;
+      let processedBatches = 0;
+      
       for (let i = 0; i < selectedItems.length; i += batchSize) {
         const batch = selectedItems.slice(i, i + batchSize);
 
         try {
           await this.aiOrchestrator.processMarketData(batch);
+          processedBatches++;
 
           // Small delay between batches to prevent API rate limiting
           await this.delay(1000);
+        } catch (error) {
+          this.logger.error('Failed to process training batch', {
+            batchIndex: Math.floor(i / batchSize),
+            batchSize: batch.length,
+            error: error.message
+          });
+        }
+      }
+
+      this.logger.info('Training cycle completed', {
+        totalItems: selectedItems.length,
+        processedBatches,
+        totalBatches: Math.ceil(selectedItems.length / batchSize)
+      });
+
+      return {
+        success: true,
+        itemsProcessed: selectedItems.length,
+        batchesProcessed: processedBatches
+      };
     }, 'performTrainingCycle', { logSuccess: true });
+  }
+
+  /**
+   * Context7 Pattern: Select training items based on business criteria
+   */
+  selectTrainingItems(historicalData) {
+    this.logger.debug('Selecting training items', {
+      totalItems: historicalData.length,
+      config: this.config.itemSelection
+    });
+
+    const filtered = historicalData.filter(item => {
+      // Volume threshold
+      if (item.volume < this.config.itemSelection.volumeThreshold) {
+        return false;
+      }
+
+      // Price range
+      const avgPrice = item.priceHistory.length > 0 
+        ? item.priceHistory.reduce((sum, p) => sum + p.price, 0) / item.priceHistory.length
+        : 0;
+      
+      if (avgPrice < this.config.itemSelection.priceRangeMin || 
+          avgPrice > this.config.itemSelection.priceRangeMax) {
+        return false;
+      }
+
+      // CONSOLIDATED: Use FinancialCalculationService for spread calculation
+      const latestPrice = item.priceHistory[item.priceHistory.length - 1];
+      if (latestPrice) {
+        const spread = this.financialCalculator.calculateSpreadPercentage(
+          latestPrice.high, 
+          latestPrice.low
+        );
+        if (spread < this.config.itemSelection.spreadThreshold) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    // Limit to max items
+    const selected = filtered.slice(0, this.config.itemSelection.maxItemsToTrade);
+
+    this.logger.debug('Training items selected', {
+      filtered: filtered.length,
+      selected: selected.length,
+      selectionRate: `${((selected.length / historicalData.length) * 100).toFixed(1)}%`
+    });
+
+    return selected;
   }
 
   /**

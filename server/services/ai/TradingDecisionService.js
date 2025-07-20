@@ -31,11 +31,11 @@ class TradingDecisionService extends BaseService {
   }
 
   /**
-   * Process market data and make trading decisions
+   * Process market data and make trading decisions following Context7 patterns
    */
-  async processMarketData() {
+  async processMarketData(items, sessionConfig) {
     return this.execute(async () => {
-const decisions = [];
+      const decisions = [];
       const startTime = Date.now();
 
       this.logger.debug('Processing market data for trading decisions', {
@@ -49,6 +49,22 @@ const decisions = [];
           if (decision) {
             decisions.push(decision);
           }
+        } catch (error) {
+          this.logger.warn('Failed to make decision for item', { 
+            itemId, 
+            error: error.message 
+          });
+        }
+      }
+
+      const duration = Date.now() - startTime;
+      this.logger.info('Trading decisions processed', {
+        totalItems: Object.keys(items).length,
+        decisionsGenerated: decisions.length,
+        duration
+      });
+
+      return decisions;
     }, 'processMarketData', { logSuccess: true });
   }
 
@@ -163,32 +179,29 @@ const decisions = [];
   }
 
   /**
-   * Assess trading risk
+   * CONSOLIDATED: Assess trading risk using FinancialCalculationService
    */
   assessRisk(itemData, prediction) {
-    let riskScore = 0;
+    // CONSOLIDATED: Use FinancialCalculationService for risk calculation
+    let baseRiskScore = 0;
+    
+    if (this.financialCalculator && this.financialCalculator.calculateRiskScore) {
+      baseRiskScore = this.financialCalculator.calculateRiskScore(itemData);
+    } else {
+      // Fallback if service not available
+      baseRiskScore = itemData.riskScore || 50;
+    }
 
-    // Volume risk
-    if (itemData.volume < 100) riskScore += 20;
-    else if (itemData.volume < 500) riskScore += 10;
+    // Add AI-specific risk factors
+    let aiRiskAdjustment = 0;
+    if (prediction.confidence < 0.6) aiRiskAdjustment += 20;
+    else if (prediction.confidence < 0.8) aiRiskAdjustment += 10;
 
-    // Volatility risk  
-    if (itemData.volatility > 50) riskScore += 25;
-    else if (itemData.volatility > 25) riskScore += 15;
-
-    // Price risk
-    if (itemData.highPrice > 1000000000) riskScore += 15; // >1B high risk
-
-    // AI confidence risk
-    if (prediction.confidence < 0.6) riskScore += 20;
-    else if (prediction.confidence < 0.8) riskScore += 10;
-
-    // Market risk
-    if (itemData.riskScore) riskScore += itemData.riskScore * 0.3;
+    const totalRiskScore = Math.min(100, Math.max(0, baseRiskScore + aiRiskAdjustment));
 
     return {
-      score: Math.min(100, Math.max(0, riskScore)),
-      level: riskScore < 30 ? 'LOW' : riskScore < 60 ? 'MEDIUM' : 'HIGH',
+      score: totalRiskScore,
+      level: totalRiskScore < 30 ? 'LOW' : totalRiskScore < 60 ? 'MEDIUM' : 'HIGH',
       factors: {
         volume: itemData.volume < 500,
         volatility: itemData.volatility > 25,

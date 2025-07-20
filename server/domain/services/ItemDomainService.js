@@ -181,7 +181,7 @@ class ItemDomainService extends BaseService {
       enriched.dataSource = 'manual';
     }
 
-    this.#logger.debug('Item data enriched', {
+    this.logger.debug('Item data enriched', {
       itemId: enriched.itemId,
       name: enriched.name
     });
@@ -261,7 +261,7 @@ class ItemDomainService extends BaseService {
       stats.minValue = 0;
     }
 
-    this.#logger.debug('Item statistics calculated', {
+    this.logger.debug('Item statistics calculated', {
       totalItems: stats.totalItems,
       categories: Object.keys(stats.categoryBreakdown).length
     });
@@ -337,7 +337,7 @@ class ItemDomainService extends BaseService {
 
     const filtered = items.filter(item => specification.isSatisfiedBy(item));
 
-    this.#logger.debug('Items filtered by criteria', {
+    this.logger.debug('Items filtered by criteria', {
       criteriaName,
       totalItems: items.length,
       filteredItems: filtered.length,
@@ -372,7 +372,7 @@ class ItemDomainService extends BaseService {
       }
     }
 
-    this.#logger.info('Batch validation completed', {
+    this.logger.info('Batch validation completed', {
       total: itemsData.length,
       valid: valid.length,
       invalid: invalid.length

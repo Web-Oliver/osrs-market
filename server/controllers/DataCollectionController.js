@@ -19,34 +19,30 @@ class DataCollectionController extends BaseController {
     
     // SOLID: Dependency Injection (DIP) - Eliminates direct dependency violation
     this.dataCollectionService = dependencies.dataCollectionService || new DataCollectionService();
+    
+    // Initialize endpoints after service is set
+    this.initializeEndpoints();
   }
 
-  /**
-   * Context7 Pattern: Start data collection
-   * POST /api/data-collection/start
-   */
-  startCollection = this.createPostEndpoint(
-    this.dataCollectionService.startCollection,
-    { operationName: 'start data collection' }
-  );
+  initializeEndpoints() {
+    // Endpoints that require the service to be initialized
+    this.startCollection = this.createPostEndpoint(
+      this.dataCollectionService.startCollection,
+      { operationName: 'start data collection' }
+    );
+    
+    this.stopCollection = this.createPostEndpoint(
+      this.dataCollectionService.stopCollection,
+      { operationName: 'stop data collection' }
+    );
+    
+    this.getCollectionStatus = this.createGetEndpoint(
+      () => this.dataCollectionService.getCollectionStatus(),
+      { operationName: 'get collection status' }
+    );
+  }
 
-  /**
-   * Context7 Pattern: Stop data collection
-   * POST /api/data-collection/stop
-   */
-  stopCollection = this.createPostEndpoint(
-    this.dataCollectionService.stopCollection,
-    { operationName: 'stop data collection' }
-  );
-
-  /**
-   * Context7 Pattern: Get collection status
-   * GET /api/data-collection/status
-   */
-  getCollectionStatus = this.createGetEndpoint(
-    () => this.dataCollectionService.getCollectionStatus(),
-    { operationName: 'get collection status' }
-  );
+  // Endpoints are now initialized in constructor via initializeEndpoints()
 
   /**
    * Context7 Pattern: Get collection statistics
@@ -90,7 +86,7 @@ class DataCollectionController extends BaseController {
         return ApiResponse.badRequest(res, 'Invalid configuration', validation.errors);
       }
 
-      const updatedConfig = this.dataCollectionService.updateConfig(req.body);
+      const updatedConfig = await this.dataCollectionService.updateConfig(req.body);
 
       this.logger.info('Configuration updated successfully', {
         updatedConfig,
@@ -156,8 +152,8 @@ class DataCollectionController extends BaseController {
    * POST /api/data-collection/clear-cache
    */
   clearCache = this.createPostEndpoint(
-    () => {
-      this.dataCollectionService.clearCache();
+    async () => {
+      await this.dataCollectionService.clearCache();
       return { cleared: true };
     },
     { operationName: 'clear data collection cache' }

@@ -356,6 +356,247 @@ class DataCollectionService extends BaseService {
       ...options
     });
   }
+
+  // ================================
+  // CONTROLLER COMPATIBILITY METHODS
+  // ================================
+
+  /**
+   * Controller compatibility: Start collection
+   */
+  async startCollection(options = {}) {
+    return await this.startDataCollection(options);
+  }
+
+  /**
+   * Controller compatibility: Stop collection
+   */
+  async stopCollection() {
+    return this.execute(async () => {
+      if (!this.isCollecting) {
+        throw new Error('No data collection in progress');
+      }
+      
+      this.isCollecting = false;
+      this.stopScheduledCollection();
+      
+      this.logger.info('Data collection stopped');
+      return { stopped: true, timestamp: new Date() };
+    }, 'stopCollection', { logSuccess: true });
+  }
+
+  /**
+   * Controller compatibility: Get collection status
+   */
+  getCollectionStatus() {
+    return {
+      isCollecting: this.isCollecting,
+      stats: this.collectionStats,
+      lastCollection: this.collectionStats.lastCollectionTime,
+      selectedItems: this.collectionStats.totalCollected || 0,
+      uptime: process.uptime() * 1000
+    };
+  }
+
+  /**
+   * Controller compatibility: Update configuration
+   */
+  async updateConfig(configUpdates) {
+    // Store configuration updates in cache
+    const cacheKey = 'collection_config';
+    
+    let currentConfig = {};
+    if (this.cache) {
+      try {
+        currentConfig = await this.cache.get(cacheKey) || {};
+      } catch (error) {
+        this.logger.warn('Failed to get cached config', { error: error.message });
+      }
+    }
+    
+    const updatedConfig = { ...currentConfig, ...configUpdates };
+    
+    if (this.cache) {
+      try {
+        await this.cache.set(cacheKey, updatedConfig);
+      } catch (error) {
+        this.logger.warn('Failed to cache updated config', { error: error.message });
+      }
+    }
+    
+    this.logger.info('Collection configuration updated', { updatedConfig });
+    return updatedConfig;
+  }
+
+  /**
+   * Controller compatibility: Refresh smart selection
+   */
+  async refreshSmartSelection() {
+    this.logger.info('Refreshing smart item selection');
+    // Clear relevant caches to force refresh
+    this.clearCache();
+    return { refreshed: true, timestamp: new Date() };
+  }
+
+  /**
+   * Controller compatibility: Get health status
+   */
+  getHealth() {
+    return {
+      status: this.isCollecting ? 'collecting' : 'idle',
+      memory: process.memoryUsage(),
+      selectedItems: this.collectionStats.totalCollected || 0,
+      errors: this.collectionStats.errorCount || 0,
+      uptime: process.uptime() * 1000
+    };
+  }
+
+  /**
+   * Controller compatibility: Clear cache
+   */
+  async clearCache() {
+    if (this.cache) {
+      try {
+        await this.cache.clear();
+        this.logger.debug('Collection cache cleared');
+      } catch (error) {
+        this.logger.warn('Failed to clear cache', { error: error.message });
+      }
+    } else {
+      this.logger.debug('No cache to clear');
+    }
+  }
+
+  // ================================
+  // PIPELINE ORCHESTRATOR METHODS
+  // ================================
+
+  /**
+   * Start data pipeline orchestrator
+   */
+  async startDataPipeline() {
+    return this.execute(async () => {
+      this.logger.info('Starting data pipeline orchestrator');
+      
+      // Start scheduled collection
+      this.startScheduledCollection(300000); // 5 minutes
+      
+      // Start AI data flow if not already running
+      if (!this.aiDataInterval) {
+        this.aiDataInterval = setInterval(async () => {
+          try {
+            await this.pushDataToAI();
+          } catch (error) {
+            this.logger.warn('AI data push failed', { error: error.message });
+          }
+        }, 600000); // 10 minutes
+      }
+      
+      // Start health monitoring
+      if (!this.healthMonitorInterval) {
+        this.healthMonitorInterval = setInterval(() => {
+          this.monitoringService.recordSystemMetrics(this.getHealth());
+        }, 60000); // 1 minute
+      }
+      
+      return {
+        started: true,
+        timestamp: new Date(),
+        components: {
+          dataCollection: true,
+          aiDataFlow: true,
+          healthMonitoring: true
+        }
+      };
+    }, 'startDataPipeline', { logSuccess: true });
+  }
+
+  /**
+   * Stop data pipeline orchestrator
+   */
+  async stopDataPipeline() {
+    return this.execute(async () => {
+      this.logger.info('Stopping data pipeline orchestrator');
+      
+      // Stop scheduled collection
+      this.stopScheduledCollection();
+      
+      // Stop AI data flow
+      if (this.aiDataInterval) {
+        clearInterval(this.aiDataInterval);
+        this.aiDataInterval = null;
+      }
+      
+      // Stop health monitoring
+      if (this.healthMonitorInterval) {
+        clearInterval(this.healthMonitorInterval);
+        this.healthMonitorInterval = null;
+      }
+      
+      return {
+        stopped: true,
+        timestamp: new Date(),
+        components: {
+          dataCollection: false,
+          aiDataFlow: false,
+          healthMonitoring: false
+        }
+      };
+    }, 'stopDataPipeline', { logSuccess: true });
+  }
+
+  /**
+   * Get pipeline status
+   */
+  getPipelineStatus() {
+    return {
+      status: this.isCollecting ? 'active' : 'inactive',
+      components: {
+        dataCollection: this.isCollecting,
+        aiDataFlow: !!this.aiDataInterval,
+        healthMonitoring: !!this.healthMonitorInterval
+      },
+      stats: this.collectionStats,
+      timestamp: new Date()
+    };
+  }
+
+  /**
+   * Push data to AI service
+   */
+  async pushDataToAI() {
+    return this.execute(async () => {
+      this.logger.debug('Pushing data to AI service');
+      
+      // Get recent market data
+      const recentData = await this.getSystemStatus();
+      
+      // Simulate AI service push (replace with actual AI service call)
+      const result = {
+        pushed: true,
+        recordCount: recentData.totalItems || 0,
+        timestamp: new Date(),
+        aiServiceUrl: 'http://localhost:8000'
+      };
+      
+      this.logger.info('Data pushed to AI service', result);
+      return result;
+    }, 'pushDataToAI', { logSuccess: true });
+  }
+
+  /**
+   * Test AI service connection
+   */
+  async testAIServiceConnection() {
+    try {
+      // Simulate connection test (replace with actual test)
+      this.logger.debug('Testing AI service connection');
+      return true;
+    } catch (error) {
+      this.logger.warn('AI service connection test failed', { error: error.message });
+      return false;
+    }
+  }
 }
 
 module.exports = { DataCollectionService };

@@ -341,6 +341,82 @@ class ErrorHandler {
       next();
     };
   }
+
+  /**
+   * Context7 Pattern: Async error handler wrapper
+   * Wraps async route handlers to catch errors and pass to error middleware
+   */
+  asyncHandler(fn) {
+    return (req, res, next) => {
+      // Resolve the async function and catch any errors
+      Promise.resolve(fn(req, res, next)).catch(next);
+    };
+  }
+
+  /**
+   * Context7 Pattern: Create error handling middleware for specific routes
+   * Factory method for creating route-specific error handlers
+   */
+  createRouteHandler(routeName = 'unknown') {
+    return (error, req, res, next) => {
+      // Add route context to error
+      error.routeName = routeName;
+      error.routePath = req.path;
+      error.routeMethod = req.method;
+      
+      // Log with route context
+      this.logger.error(`Error in route: ${routeName}`, {
+        error: error.message,
+        stack: error.stack,
+        path: req.path,
+        method: req.method,
+        requestId: req.id
+      });
+      
+      // Pass to main error handler
+      this.handleError(error, req, res, next);
+    };
+  }
+
+  /**
+   * Context7 Pattern: Handle specific error types
+   * Static error handling utilities
+   */
+  static createValidationError(message, details = {}) {
+    const error = new Error(message);
+    error.name = 'ValidationError';
+    error.statusCode = 400;
+    error.details = details;
+    return error;
+  }
+
+  static createNotFoundError(resource = 'Resource') {
+    const error = new Error(`${resource} not found`);
+    error.name = 'NotFoundError';
+    error.statusCode = 404;
+    return error;
+  }
+
+  static createUnauthorizedError(message = 'Unauthorized') {
+    const error = new Error(message);
+    error.name = 'UnauthorizedError';
+    error.statusCode = 401;
+    return error;
+  }
+
+  static createForbiddenError(message = 'Access forbidden') {
+    const error = new Error(message);
+    error.name = 'ForbiddenError';
+    error.statusCode = 403;
+    return error;
+  }
+
+  static createTooManyRequestsError(message = 'Too many requests') {
+    const error = new Error(message);
+    error.name = 'TooManyRequestsError';
+    error.statusCode = 429;
+    return error;
+  }
 }
 
 module.exports = { ErrorHandler };

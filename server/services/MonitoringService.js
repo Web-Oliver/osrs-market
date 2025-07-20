@@ -133,7 +133,7 @@ this.logger.debug('Fetching aggregated statistics', { timeRange });
    */
   async getSystemStatus() {
     return this.execute(async () => {
-this.logger.debug('Fetching system status');
+      this.logger.debug('Fetching system status');
 
       const [dbSummary, healthCheck] = await Promise.all([
         this.getDatabaseSummary(),
@@ -203,7 +203,7 @@ this.logger.debug('Fetching system status');
    */
   async getEfficiencyMetrics() {
     return this.execute(async () => {
-this.logger.debug('Fetching efficiency metrics');
+      this.logger.debug('Fetching efficiency metrics');
 
       const metrics = {
         smartSelection: {

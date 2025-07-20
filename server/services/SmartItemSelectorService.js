@@ -11,6 +11,7 @@
 
 const { BaseService } = require('./BaseService');
 const { OSRSWikiService } = require('./OSRSWikiService');
+const { FinancialCalculationService } = require('./consolidated/FinancialCalculationService');
 
 class SmartItemSelectorService extends BaseService {
   constructor() {
@@ -22,6 +23,7 @@ class SmartItemSelectorService extends BaseService {
     });
 
     this.osrsWikiService = new OSRSWikiService();
+    this.financialCalculator = new FinancialCalculationService();
   }
 
   /**
@@ -123,8 +125,11 @@ class SmartItemSelectorService extends BaseService {
         const fiveMinPrice = fiveMinData[itemIdStr];
 
         if (itemInfo && latestPrice.high && fiveMinPrice?.avgHighPrice) {
-          const priceChange = latestPrice.high - fiveMinPrice.avgHighPrice;
-          const priceChangePercent = (priceChange / fiveMinPrice.avgHighPrice) * 100;
+          // CONSOLIDATED: Use FinancialCalculationService for price change calculation
+          const priceChangePercent = this.financialCalculator.calculatePriceChangePercentage(
+            latestPrice.high, 
+            fiveMinPrice.avgHighPrice
+          );
 
           // Filter for significant price changes (5% or more)
           if (Math.abs(priceChangePercent) >= 5) {

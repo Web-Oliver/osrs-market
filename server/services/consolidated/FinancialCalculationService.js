@@ -215,6 +215,131 @@ class FinancialCalculationService extends IFinancialCalculator {
   }
 
   /**
+   * CONSOLIDATED: Calculate alchemy profit (eliminates 4+ duplicate implementations)
+   * Used by: ItemMappingService, ItemDomainService, TradingDecisionService, AutoTrainingService
+   */
+  calculateAlchemyProfit(highalch, value, includeRuneCost = true) {
+    if (!highalch || !value || highalch <= 0 || value <= 0) {
+      return 0;
+    }
+
+    const natureRuneCost = includeRuneCost ? 200 : 0; // Nature rune cost
+    const profit = Math.max(0, highalch - value - natureRuneCost);
+    
+    return Math.round(profit * 100) / 100;
+  }
+
+  /**
+   * CONSOLIDATED: Calculate profit margin percentage
+   * Used by: Multiple services for profit margin calculations
+   */
+  calculateProfitMarginPercentage(profit, investment) {
+    if (!investment || investment <= 0) {
+      return 0;
+    }
+    
+    const margin = (profit / investment) * 100;
+    return Math.round(margin * 100) / 100;
+  }
+
+  /**
+   * CONSOLIDATED: Calculate business value score
+   * Combines item value with profit potential
+   */
+  calculateBusinessValue(value, alchemyProfit, multiplier = 2) {
+    if (!value || value <= 0) {
+      return 0;
+    }
+    
+    const adjustedProfit = alchemyProfit || 0;
+    return Math.round((value + (adjustedProfit * multiplier)) * 100) / 100;
+  }
+
+  /**
+   * CONSOLIDATED: Calculate spread percentage
+   * Used by: TradingDecisionService, AutoTrainingService, SmartItemSelectorService
+   */
+  calculateSpreadPercentage(highPrice, lowPrice) {
+    if (!highPrice || !lowPrice || lowPrice <= 0) {
+      return 0;
+    }
+
+    if (highPrice < lowPrice) {
+      [highPrice, lowPrice] = [lowPrice, highPrice]; // Swap if needed
+    }
+
+    const spread = ((highPrice - lowPrice) / lowPrice) * 100;
+    return Math.round(spread * 100) / 100;
+  }
+
+  /**
+   * CONSOLIDATED: Calculate price change percentage
+   * Used by: SmartItemSelectorService, TradingAnalysisService, MonitoringService
+   */
+  calculatePriceChangePercentage(currentPrice, previousPrice) {
+    if (!currentPrice || !previousPrice || previousPrice <= 0) {
+      return 0;
+    }
+
+    const change = currentPrice - previousPrice;
+    const changePercent = (change / previousPrice) * 100;
+    return Math.round(changePercent * 100) / 100;
+  }
+
+  /**
+   * CONSOLIDATED: Calculate price momentum
+   * Used for trend analysis across multiple services
+   */
+  calculatePriceMomentum(prices, periods = 3) {
+    if (!Array.isArray(prices) || prices.length < periods + 1) {
+      return 0;
+    }
+
+    const recent = prices.slice(-periods);
+    const older = prices.slice(-periods * 2, -periods);
+    
+    if (older.length === 0) return 0;
+
+    const recentAvg = recent.reduce((sum, price) => sum + price, 0) / recent.length;
+    const olderAvg = older.reduce((sum, price) => sum + price, 0) / older.length;
+
+    return this.calculatePriceChangePercentage(recentAvg, olderAvg);
+  }
+
+  /**
+   * CONSOLIDATED: Calculate risk score
+   * Used by: TradingDecisionService, RiskManagementService, AutoTrainingService
+   */
+  calculateRiskScore(itemData) {
+    let riskScore = 0;
+
+    // Volume risk
+    if (!itemData.volume || itemData.volume < 100) riskScore += 30;
+    else if (itemData.volume < 500) riskScore += 20;
+    else if (itemData.volume < 1000) riskScore += 10;
+
+    // Volatility risk  
+    const volatility = itemData.volatility || 0;
+    if (volatility > 50) riskScore += 25;
+    else if (volatility > 25) riskScore += 15;
+    else if (volatility > 10) riskScore += 5;
+
+    // Price level risk
+    const price = itemData.highPrice || itemData.price || 0;
+    if (price > 1000000000) riskScore += 20; // Very expensive items
+    else if (price < 1000) riskScore += 15; // Very cheap items (potential manipulation)
+
+    // Spread risk
+    if (itemData.highPrice && itemData.lowPrice) {
+      const spread = this.calculateSpreadPercentage(itemData.highPrice, itemData.lowPrice);
+      if (spread > 20) riskScore += 20;
+      else if (spread > 10) riskScore += 10;
+    }
+
+    return Math.min(100, Math.max(0, riskScore)); // Clamp between 0-100
+  }
+
+  /**
    * CONSOLIDATED: Calculate all financial metrics
    * Master method that consolidates all calculations
    */

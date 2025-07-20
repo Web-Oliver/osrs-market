@@ -100,9 +100,9 @@ class PythonRLClientService extends BaseService {
    * @param {Array} features - Market features for prediction
    * @returns {Promise<Object>} Prediction result with action and confidence
    */
-  async predict() {
+  async predict(features) {
     return this.execute(async () => {
-this.logger.debug('Requesting prediction from Python RL service', {
+      this.logger.debug('Requesting prediction from Python RL service', {
         featureCount: features.length,
         features: features.slice(0, 5) // Log first 5 features for debugging
       });
@@ -138,7 +138,6 @@ this.logger.debug('Requesting prediction from Python RL service', {
       };
     }, 'predict', { logSuccess: true });
   }
-  }
 
   /**
    * Context7 Pattern: Train model using Python RL service
@@ -146,9 +145,9 @@ this.logger.debug('Requesting prediction from Python RL service', {
    * @param {Array} trainingData - Training experiences
    * @returns {Promise<Object>} Training result with metrics
    */
-  async train() {
+  async train(trainingData) {
     return this.execute(async () => {
-this.logger.debug('Sending training data to Python RL service', {
+      this.logger.debug('Sending training data to Python RL service', {
         experienceCount: trainingData.length,
         dataSize: JSON.stringify(trainingData).length
       });
@@ -181,7 +180,6 @@ this.logger.debug('Sending training data to Python RL service', {
       };
     }, 'train', { logSuccess: true });
   }
-  }
 
   /**
    * Context7 Pattern: Save model using Python RL service
@@ -189,9 +187,9 @@ this.logger.debug('Sending training data to Python RL service', {
    * @param {string} modelId - Unique identifier for the model
    * @returns {Promise<Object>} Save result with model metadata
    */
-  async saveModel() {
+  async saveModel(modelId) {
     return this.execute(async () => {
-this.logger.debug('Requesting model save from Python RL service', {
+      this.logger.debug('Requesting model save from Python RL service', {
         modelId
       });
 
@@ -220,7 +218,6 @@ this.logger.debug('Requesting model save from Python RL service', {
       };
     }, 'saveModel', { logSuccess: true });
   }
-  }
 
   /**
    * Context7 Pattern: Load model using Python RL service
@@ -228,9 +225,9 @@ this.logger.debug('Requesting model save from Python RL service', {
    * @param {string} modelId - Unique identifier for the model
    * @returns {Promise<Object>} Load result with model metadata
    */
-  async loadModel() {
+  async loadModel(modelId) {
     return this.execute(async () => {
-this.logger.debug('Requesting model load from Python RL service', {
+      this.logger.debug('Requesting model load from Python RL service', {
         modelId
       });
 
@@ -259,7 +256,6 @@ this.logger.debug('Requesting model load from Python RL service', {
       };
     }, 'loadModel', { logSuccess: true });
   }
-  }
 
   /**
    * Context7 Pattern: Get training status from Python RL service
@@ -268,7 +264,7 @@ this.logger.debug('Requesting model load from Python RL service', {
    */
   async getTrainingStatus() {
     return this.execute(async () => {
-this.logger.debug('Requesting training status from Python RL service');
+      this.logger.debug('Requesting training status from Python RL service');
 
       const response = await this.makeRequest('GET', '/api/v1/training/training/stats');
       const status = response.data;
@@ -295,7 +291,6 @@ this.logger.debug('Requesting training status from Python RL service');
       };
     }, 'getTrainingStatus', { logSuccess: true });
   }
-  }
 
   /**
    * Context7 Pattern: Get model performance metrics
@@ -303,9 +298,9 @@ this.logger.debug('Requesting training status from Python RL service');
    * @param {string} modelId - Optional model ID to get specific metrics
    * @returns {Promise<Object>} Performance metrics
    */
-  async getModelMetrics() {
+  async getModelMetrics(modelId) {
     return this.execute(async () => {
-this.logger.debug('Requesting model metrics from Python RL service', {
+      this.logger.debug('Requesting model metrics from Python RL service', {
         modelId
       });
 
@@ -333,7 +328,6 @@ this.logger.debug('Requesting model metrics from Python RL service', {
         timestamp: metrics.timestamp || Date.now()
       };
     }, 'getModelMetrics', { logSuccess: true });
-  }
   }
 
   /**
@@ -364,7 +358,6 @@ this.logger.debug('Performing health check on Python RL service');
       };
     }, 'healthCheck', { logSuccess: true });
   }
-  }
 
   /**
    * Context7 Pattern: Make HTTP request with retry logic and circuit breaker
@@ -374,9 +367,9 @@ this.logger.debug('Performing health check on Python RL service');
    * @param {Object} data - Request data
    * @returns {Promise<Object>} HTTP response
    */
-  async makeRequest() {
+  async makeRequest(method, endpoint, data = null) {
     return this.execute(async () => {
-const requestConfig = {
+      const requestConfig = {
           method: method.toLowerCase(),
           url: endpoint
         };
@@ -398,7 +391,6 @@ const requestConfig = {
 
         return response;
     }, 'makeRequest', { logSuccess: true });
-  }
   }
 }
 
