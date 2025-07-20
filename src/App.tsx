@@ -6,13 +6,14 @@ import LiveMonitoringDashboard from './components/LiveMonitoringDashboard'
 import ItemsAnalysis from './components/ItemsAnalysis'
 import SystemOverview from './components/SystemOverview'
 import AITradingVisualizer from './components/AITradingVisualizer'
+import { AITrainingVisualizer } from './components/AITrainingVisualizer'
 import LiveMarketFeed from './components/LiveMarketFeed'
 import { NotificationToast } from './components/NotificationToast'
 import { useNotifications } from './hooks/useNotifications'
 import './App.css'
 
 function App() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'analysis' | 'ai-viz' | 'live-feed' | 'manual' | 'ai' | 'auto' | 'monitoring'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'analysis' | 'ai-viz' | 'training-viz' | 'live-feed' | 'manual' | 'ai' | 'auto' | 'monitoring'>('overview')
   const { notifications, showSuccess, showError, showWarning, showInfo, dismissNotification } = useNotifications()
 
   return (
@@ -62,6 +63,16 @@ function App() {
                 }`}
               >
                 🧠 AI Intelligence
+              </button>
+              <button
+                onClick={() => setActiveTab('training-viz')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'training-viz'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                🔥 Training Visualizer
               </button>
               <button
                 onClick={() => setActiveTab('live-feed')}
@@ -118,10 +129,11 @@ function App() {
         </div>
       </header>
       
-      <main className={activeTab === 'analysis' || activeTab === 'overview' || activeTab === 'ai-viz' || activeTab === 'live-feed' ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'}>
+      <main className={activeTab === 'analysis' || activeTab === 'overview' || activeTab === 'ai-viz' || activeTab === 'training-viz' || activeTab === 'live-feed' ? '' : 'max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8'}>
         {activeTab === 'overview' && <SystemOverview />}
         {activeTab === 'analysis' && <ItemsAnalysis />}
         {activeTab === 'ai-viz' && <AITradingVisualizer />}
+        {activeTab === 'training-viz' && <AITrainingVisualizer />}
         {activeTab === 'live-feed' && <LiveMarketFeed />}
         {activeTab === 'manual' && <TradingDashboard />}
         {activeTab === 'ai' && <AITradingDashboard />}

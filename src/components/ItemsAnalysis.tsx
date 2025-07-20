@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Search, Eye, Star, Filter, BarChart3, Activity, Grid, List, Map } from 'lucide-react';
+import { Search, Star, Filter, BarChart3, Activity, Grid, List, Map } from 'lucide-react';
 import PriceChart from './PriceChart';
 import MetricsCard from './MetricsCard';
 import MarketHeatmap from './MarketHeatmap';
@@ -54,20 +54,20 @@ const ItemsAnalysis: React.FC = () => {
         
         // Get popular tradeable items
         const itemsResponse = await fetch('/api/items?limit=50');
-        let itemsData = await itemsResponse.json();
+        const itemsData = await itemsResponse.json();
         
         if (itemsData.success) {
           // Extract items array from response (handle different API response formats)
           const items = itemsData.data.items || itemsData.data || [];
           
-          // Get all item IDs for bulk market data fetch
-          const itemIds = items
+          // Get all item IDs for bulk market data fetch (used for reference only)
+          const _itemIds = items
             .filter(item => item && (item.itemId || item.id))
             .map(item => item.itemId || item.id)
             .filter(Boolean);
           
           // Fetch ALL market data from backend in ONE call
-          let allMarketData = {};
+          const allMarketData = {};
           try {
             const marketResponse = await fetch('/api/market-data/live');
             if (marketResponse.ok) {
@@ -139,7 +139,7 @@ const ItemsAnalysis: React.FC = () => {
 
   // Filter and sort items - backend handles all calculations
   const filteredAndSortedItems = useMemo(() => {
-    let filtered = items.filter(item => {
+    const filtered = items.filter(item => {
       const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = selectedCategory === 'all' || 
         (selectedCategory === 'members' && item.members) ||

@@ -1,6 +1,6 @@
 /**
  * 🧠 Neural Trading Agent Service - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Service Layer for Neural Network Trading Agent
  * - Implements Deep Q-Network (DQN) for trading decisions
  * - Handles neural network prediction and training
@@ -27,7 +27,7 @@ class NeuralTradingAgentService {
       batchSize: 32,
       tau: 0.001
     };
-    
+
     this.memory = [];
     this.onlineNetwork = [];
     this.targetNetwork = [];
@@ -36,7 +36,7 @@ class NeuralTradingAgentService {
     this.totalEpisodes = 0;
 
     this.initializeNetworks();
-    
+
     this.logger.info('🧠 Neural Trading Agent initialized', {
       config: this.config,
       networkArchitecture: `${this.config.inputSize} -> ${this.config.hiddenLayers.join(' -> ')} -> ${this.config.outputSize}`
@@ -51,7 +51,7 @@ class NeuralTradingAgentService {
       this.onlineNetwork = this.createNetwork();
       this.targetNetwork = this.createNetwork();
       this.updateTargetNetwork();
-      
+
       this.logger.debug('✅ Neural networks initialized successfully');
     } catch (error) {
       this.logger.error('❌ Error initializing neural networks', error);
@@ -69,7 +69,7 @@ class NeuralTradingAgentService {
     for (let i = 0; i < layers.length - 1; i++) {
       const weights = [];
       const connectionCount = layers[i] * layers[i + 1];
-      
+
       for (let j = 0; j < connectionCount; j++) {
         // Xavier initialization
         weights.push((Math.random() - 0.5) * 2 * Math.sqrt(6 / (layers[i] + layers[i + 1])));
@@ -87,7 +87,7 @@ class NeuralTradingAgentService {
     try {
       const stateVector = this.encodeState(state);
       const qValues = this.forwardPass(this.onlineNetwork, stateVector);
-      
+
       let action;
       let confidence;
 
@@ -147,7 +147,7 @@ class NeuralTradingAgentService {
    */
   forwardPass(network, input) {
     let current = [...input];
-    
+
     for (let layerIndex = 0; layerIndex < network.length; layerIndex++) {
       const weights = network[layerIndex];
       const inputSize = current.length;
@@ -174,7 +174,7 @@ class NeuralTradingAgentService {
   getRandomAction(itemId) {
     const actions = ['BUY', 'SELL', 'HOLD'];
     const actionType = actions[Math.floor(Math.random() * actions.length)];
-    
+
     return {
       type: actionType,
       itemId,
@@ -191,7 +191,7 @@ class NeuralTradingAgentService {
   getBestAction(itemId, qValues) {
     const actionIndex = qValues.indexOf(Math.max(...qValues));
     const actions = ['BUY', 'SELL', 'HOLD'];
-    
+
     return {
       type: actions[actionIndex] || 'HOLD',
       itemId,
@@ -218,8 +218,12 @@ class NeuralTradingAgentService {
     risk += (action.quantity / 100) * 0.2;
 
     // Market condition risk
-    if (state.trend === 'DOWN' && action.type === 'BUY') risk += 0.3;
-    if (state.trend === 'UP' && action.type === 'SELL') risk += 0.3;
+    if (state.trend === 'DOWN' && action.type === 'BUY') {
+      risk += 0.3;
+    }
+    if (state.trend === 'UP' && action.type === 'SELL') {
+      risk += 0.3;
+    }
 
     return Math.min(1, Math.max(0, risk));
   }
@@ -229,7 +233,7 @@ class NeuralTradingAgentService {
    */
   memorizeExperience(experience) {
     this.memory.push(experience);
-    
+
     // Keep memory within bounds
     if (this.memory.length > this.config.memorySize) {
       this.memory.shift();
@@ -257,14 +261,14 @@ class NeuralTradingAgentService {
       for (const experience of batch) {
         const currentQ = this.forwardPass(this.onlineNetwork, this.encodeState(experience.state));
         const nextQ = this.forwardPass(this.targetNetwork, this.encodeState(experience.nextState));
-        
+
         // Bellman equation: Q(s,a) = r + γ * max(Q(s',a'))
-        const targetValue = experience.reward + 
+        const targetValue = experience.reward +
           (experience.done ? 0 : this.config.gamma * Math.max(...nextQ));
-        
+
         const actionIndex = this.getActionIndex(experience.action);
         const currentValue = currentQ[actionIndex];
-        
+
         const loss = Math.pow(targetValue - currentValue, 2);
         totalLoss += loss;
 
@@ -274,7 +278,7 @@ class NeuralTradingAgentService {
 
       // Update epsilon
       this.updateEpsilon();
-      
+
       // Update target network periodically
       if (this.totalSteps % Math.floor(1 / this.config.tau) === 0) {
         this.updateTargetNetwork();
@@ -303,12 +307,12 @@ class NeuralTradingAgentService {
   sampleBatch() {
     const batch = [];
     const batchSize = Math.min(this.config.batchSize, this.memory.length);
-    
+
     for (let i = 0; i < batchSize; i++) {
       const randomIndex = Math.floor(Math.random() * this.memory.length);
       batch.push(this.memory[randomIndex]);
     }
-    
+
     return batch;
   }
 
@@ -317,10 +321,10 @@ class NeuralTradingAgentService {
    */
   getActionIndex(action) {
     switch (action.type) {
-      case 'BUY': return 0;
-      case 'SELL': return 1;
-      case 'HOLD': return 2;
-      default: return 2;
+    case 'BUY': return 0;
+    case 'SELL': return 1;
+    case 'HOLD': return 2;
+    default: return 2;
     }
   }
 
@@ -330,7 +334,7 @@ class NeuralTradingAgentService {
   updateWeights(experience, targetValue, currentValue) {
     const error = targetValue - currentValue;
     const learningRate = this.config.learningRate;
-    
+
     // Simplified gradient descent (in real implementation, use automatic differentiation)
     for (let layerIndex = 0; layerIndex < this.onlineNetwork.length; layerIndex++) {
       for (let weightIndex = 0; weightIndex < this.onlineNetwork[layerIndex].length; weightIndex++) {
@@ -513,7 +517,7 @@ class NeuralTradingAgentService {
     this.totalSteps = 0;
     this.totalEpisodes = 0;
     this.initializeNetworks();
-    
+
     this.logger.info('🔄 Neural agent reset successfully');
   }
 

@@ -1,6 +1,6 @@
 /**
  * 📈 Market Data Service - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Service Layer for Market Data Operations
  * - Business logic for OSRS market data
  * - DRY principles with reusable service methods
@@ -18,12 +18,12 @@ const { PriceCalculator } = require('../utils/PriceCalculator');
 const { FinancialMetricsCalculator } = require('../utils/FinancialMetricsCalculator');
 const { OSRSWikiService } = require('./OSRSWikiService');
 const { MarketPriceSnapshotModel } = require('../models/MarketPriceSnapshotModel');
-const { 
-  calculateProfitAfterTax, 
+const {
+  calculateProfitAfterTax,
   calculateProfitPercentageAfterTax,
   calculateGETax,
   calculateNetSellPrice,
-  isTaxFree 
+  isTaxFree
 } = require('../utils/marketConstants');
 
 // TRADING INTEGRATION
@@ -38,11 +38,11 @@ class MarketDataService {
     this.priceCalculator = new PriceCalculator();
     this.metricsCalculator = new FinancialMetricsCalculator();
     this.osrsWikiService = new OSRSWikiService();
-    
+
     // TRADING INTEGRATION
     this.itemRepository = new ItemRepository();
     this.aiTrading = new AITradingOrchestratorService();
-    
+
     // Context7 Pattern: Initialize MongoDB persistence
     this.initializeMongoDB();
   }
@@ -53,26 +53,26 @@ class MarketDataService {
   async getLiveMarketData() {
     try {
       this.logger.info('Fetching live market data from OSRS Wiki API');
-      
+
       const response = await fetch('https://prices.runescape.wiki/api/v1/osrs/latest', {
         headers: {
           'User-Agent': 'OSRS-Market-Backend - Market Analysis Tool'
         }
       });
-      
+
       if (!response.ok) {
         throw new Error(`OSRS Wiki API returned ${response.status}`);
       }
-      
+
       const wikiData = await response.json();
       const processedData = {};
-      
+
       // Convert wiki format to our market data format
       Object.entries(wikiData.data).forEach(([itemId, priceData]) => {
         if (priceData.high && priceData.low) {
           const marginGp = priceData.high - priceData.low;
           const marginPercent = (marginGp / priceData.low) * 100;
-          
+
           processedData[itemId] = {
             itemId: parseInt(itemId),
             highPrice: priceData.high,
@@ -88,10 +88,10 @@ class MarketDataService {
           };
         }
       });
-      
+
       this.logger.info(`Processed ${Object.keys(processedData).length} items from OSRS Wiki API`);
       return processedData;
-      
+
     } catch (error) {
       this.logger.error('Failed to fetch live market data from OSRS Wiki', error);
       throw error;
@@ -104,39 +104,39 @@ class MarketDataService {
   async get5MinuteMarketData() {
     try {
       this.logger.info('Fetching 5-minute market data from OSRS Wiki API');
-      
+
       const response = await fetch('https://prices.runescape.wiki/api/v1/osrs/5m', {
         headers: {
           'User-Agent': 'OSRS-Market-Backend - Market Analysis Tool'
         }
       });
-      
+
       if (!response.ok) {
         throw new Error(`OSRS Wiki 5m API returned ${response.status}`);
       }
-      
+
       const wikiData = await response.json();
       const processedData = {};
-      
+
       // Convert wiki 5m format to our market data format
       Object.entries(wikiData.data).forEach(([itemId, priceData]) => {
         if (priceData.avgHighPrice && priceData.avgLowPrice && priceData.highPriceVolume) {
           const marginGp = priceData.avgHighPrice - priceData.avgLowPrice;
           const marginPercent = (marginGp / priceData.avgLowPrice) * 100;
           const volume = priceData.highPriceVolume + priceData.lowPriceVolume;
-          
+
           // Calculate volatility based on price range and volume
           const priceRange = (marginGp / priceData.avgLowPrice) * 100;
           const volatility = Math.min(priceRange * 1.5, 100);
-          
+
           // Calculate risk score based on volatility and volume
           const volumeScore = Math.min(volume / 100, 50); // Higher volume = lower risk
           const riskScore = Math.max(5, Math.min(95, volatility - volumeScore + 25));
-          
+
           // Calculate expected profit per hour based on volume and margin
           const turnoverRate = Math.min(volume / 10, 50); // How often we can flip
           const expectedProfitPerHour = marginGp * turnoverRate;
-          
+
           processedData[itemId] = {
             itemId: parseInt(itemId),
             highPrice: priceData.avgHighPrice,
@@ -154,10 +154,10 @@ class MarketDataService {
           };
         }
       });
-      
+
       this.logger.info(`Processed ${Object.keys(processedData).length} items from OSRS Wiki 5m API`);
       return processedData;
-      
+
     } catch (error) {
       this.logger.error('Failed to fetch 5-minute market data from OSRS Wiki', error);
       throw error;
@@ -170,37 +170,37 @@ class MarketDataService {
   async get1HourMarketData() {
     try {
       this.logger.info('Fetching 1-hour market data from OSRS Wiki API');
-      
+
       const response = await fetch('https://prices.runescape.wiki/api/v1/osrs/1h', {
         headers: {
           'User-Agent': 'OSRS-Market-Backend - Market Analysis Tool'
         }
       });
-      
+
       if (!response.ok) {
         throw new Error(`OSRS Wiki 1h API returned ${response.status}`);
       }
-      
+
       const wikiData = await response.json();
       const processedData = {};
-      
+
       // Convert wiki 1h format to our market data format
       Object.entries(wikiData.data).forEach(([itemId, priceData]) => {
         if (priceData.avgHighPrice && priceData.avgLowPrice && priceData.highPriceVolume) {
           const marginGp = priceData.avgHighPrice - priceData.avgLowPrice;
           const marginPercent = priceData.avgLowPrice > 0 ? (marginGp / priceData.avgLowPrice) * 100 : 0;
           const volume = priceData.highPriceVolume + priceData.lowPriceVolume;
-          
+
           // Calculate expected profit per hour (conservative estimate for 1h data)
           const expectedProfitPerHour = marginGp * Math.min(volume / 20, 30); // More conservative for 1h data
-          
+
           // Calculate volatility and risk based on price spread
           const volatility = priceData.avgLowPrice > 0 ? (marginGp / priceData.avgLowPrice) * 100 : 0;
           const riskScore = Math.min(100, Math.max(0, volatility * 2)); // Risk increases with volatility
-          
+
           // Calculate RSI (simplified for API data)
           const rsi = 50 + (marginPercent / 2); // Simplified RSI calculation
-          
+
           processedData[itemId] = {
             itemId: parseInt(itemId),
             highPrice: priceData.avgHighPrice,
@@ -218,10 +218,10 @@ class MarketDataService {
           };
         }
       });
-      
+
       this.logger.info(`Processed ${Object.keys(processedData).length} items from 1-hour market data`);
       return processedData;
-      
+
     } catch (error) {
       this.logger.error('Failed to fetch 1-hour market data from OSRS Wiki API', error);
       throw error;
@@ -235,7 +235,7 @@ class MarketDataService {
     try {
       const marketData = await this.get5MinuteMarketData();
       const savedCount = 0;
-      
+
       // Save each item's market data to database
       for (const [itemId, data] of Object.entries(marketData)) {
         try {
@@ -259,10 +259,10 @@ class MarketDataService {
           this.logger.warn(`Failed to save market data for item ${itemId}:`, error.message);
         }
       }
-      
+
       this.logger.info(`Synced 5-minute market data for ${Object.keys(marketData).length} items`);
       return { success: true, itemCount: Object.keys(marketData).length };
-      
+
     } catch (error) {
       this.logger.error('Failed to sync 5-minute market data', error);
       throw error;
@@ -276,7 +276,7 @@ class MarketDataService {
     try {
       const marketData = await this.get1HourMarketData();
       const savedCount = 0;
-      
+
       // Save each item's market data to database
       for (const [itemId, data] of Object.entries(marketData)) {
         try {
@@ -300,10 +300,10 @@ class MarketDataService {
           this.logger.warn(`Failed to save 1-hour market data for item ${itemId}:`, error.message);
         }
       }
-      
+
       this.logger.info(`Synced 1-hour market data for ${Object.keys(marketData).length} items`);
       return { success: true, itemCount: Object.keys(marketData).length };
-      
+
     } catch (error) {
       this.logger.error('Failed to sync 1-hour market data', error);
       throw error;
@@ -321,42 +321,42 @@ class MarketDataService {
       const lastFetch = this.timeseriesCache?.get(cacheKey);
       const now = Date.now();
       const dayInMs = 24 * 60 * 60 * 1000;
-      
+
       // Only fetch once per day per item for deep analysis
       if (lastFetch && (now - lastFetch) < dayInMs) {
         this.logger.info(`Skipping timeseries fetch for item ${itemId} - already fetched today`);
         return null;
       }
-      
+
       // Rate limiting - max 1 request per minute
       if (this.lastTimeseriesRequest && (now - this.lastTimeseriesRequest) < 60000) {
         this.logger.warn('Timeseries rate limit hit - max 1 request per minute');
         throw new Error('Rate limit exceeded for timeseries API - try again in 1 minute');
       }
-      
+
       this.logger.info(`Fetching timeseries data for item ${itemId} with timestep ${timestep}`);
-      
+
       const response = await fetch(`https://prices.runescape.wiki/api/v1/osrs/timeseries?timestep=${timestep}&id=${itemId}`, {
         headers: {
           'User-Agent': 'OSRS-Market-Backend - Market Analysis Tool'
         }
       });
-      
+
       if (!response.ok) {
         throw new Error(`OSRS Wiki timeseries API returned ${response.status}`);
       }
-      
+
       const timeseriesData = await response.json();
-      
+
       // Update rate limiting tracking
       this.lastTimeseriesRequest = now;
-      
+
       // Cache the fetch time to prevent duplicate requests
       if (!this.timeseriesCache) {
         this.timeseriesCache = new Map();
       }
       this.timeseriesCache.set(cacheKey, now);
-      
+
       // Process timeseries data for analysis
       const processedTimeseries = {
         itemId: parseInt(itemId),
@@ -371,19 +371,19 @@ class MarketDataService {
         fetchedAt: now,
         source: 'osrs_wiki_timeseries'
       };
-      
+
       // Calculate additional insights from timeseries data
       if (processedTimeseries.dataPoints.length > 1) {
         processedTimeseries.insights = this.calculateTimeseriesInsights(processedTimeseries.dataPoints);
       }
-      
+
       this.logger.info(`Successfully fetched ${processedTimeseries.dataPoints.length} timeseries data points for item ${itemId}`);
-      
+
       // Save to database for historical analysis
       await this.saveTimeseriesData(processedTimeseries);
-      
+
       return processedTimeseries;
-      
+
     } catch (error) {
       this.logger.error(`Failed to fetch timeseries data for item ${itemId}`, error);
       throw error;
@@ -397,32 +397,34 @@ class MarketDataService {
     try {
       const prices = dataPoints.map(p => (p.avgHighPrice + p.avgLowPrice) / 2).filter(p => p > 0);
       const volumes = dataPoints.map(p => (p.highPriceVolume || 0) + (p.lowPriceVolume || 0)).filter(v => v > 0);
-      
-      if (prices.length === 0) return null;
-      
+
+      if (prices.length === 0) {
+        return null;
+      }
+
       // Price trend analysis
       const startPrice = prices[0];
       const endPrice = prices[prices.length - 1];
       const priceChange = endPrice - startPrice;
       const priceChangePercent = startPrice > 0 ? (priceChange / startPrice) * 100 : 0;
-      
+
       // Volatility calculation
       const avgPrice = prices.reduce((sum, p) => sum + p, 0) / prices.length;
       const priceVariances = prices.map(p => Math.pow(p - avgPrice, 2));
       const volatility = Math.sqrt(priceVariances.reduce((sum, v) => sum + v, 0) / priceVariances.length);
       const volatilityPercent = avgPrice > 0 ? (volatility / avgPrice) * 100 : 0;
-      
+
       // Volume analysis
       const avgVolume = volumes.length > 0 ? volumes.reduce((sum, v) => sum + v, 0) / volumes.length : 0;
       const maxVolume = volumes.length > 0 ? Math.max(...volumes) : 0;
-      
+
       // Trend strength (simple momentum)
       const recentPrices = prices.slice(-10); // Last 10 data points
       const olderPrices = prices.slice(0, 10); // First 10 data points
       const recentAvg = recentPrices.reduce((sum, p) => sum + p, 0) / recentPrices.length;
       const olderAvg = olderPrices.reduce((sum, p) => sum + p, 0) / olderPrices.length;
       const trendStrength = olderAvg > 0 ? ((recentAvg - olderAvg) / olderAvg) * 100 : 0;
-      
+
       return {
         priceChange: priceChange,
         priceChangePercent: priceChangePercent,
@@ -435,7 +437,7 @@ class MarketDataService {
         dataQuality: prices.length / dataPoints.length, // Ratio of valid price points
         analyzedAt: Date.now()
       };
-      
+
     } catch (error) {
       this.logger.error('Failed to calculate timeseries insights', error);
       return null;
@@ -450,7 +452,7 @@ class MarketDataService {
       if (!this.mongoService) {
         await this.initializeMongoDB();
       }
-      
+
       const collection = 'market_timeseries';
       const document = {
         itemId: timeseriesData.itemId,
@@ -461,18 +463,18 @@ class MarketDataService {
         source: timeseriesData.source,
         createdAt: new Date()
       };
-      
+
       // Use upsert to prevent duplicates
-      const filter = { 
-        itemId: timeseriesData.itemId, 
+      const filter = {
+        itemId: timeseriesData.itemId,
         timestep: timeseriesData.timestep,
         fetchedAt: timeseriesData.fetchedAt
       };
-      
+
       await this.mongoService.upsert(collection, filter, document);
-      
+
       this.logger.info(`Saved timeseries data for item ${timeseriesData.itemId} to database`);
-      
+
     } catch (error) {
       this.logger.error('Failed to save timeseries data to database', error);
       throw error;
@@ -487,19 +489,19 @@ class MarketDataService {
       if (!this.mongoService) {
         await this.initializeMongoDB();
       }
-      
+
       const collection = 'market_timeseries';
       const filter = { itemId: parseInt(itemId), timestep: timestep };
-      const options = { 
-        sort: { fetchedAt: -1 }, 
-        limit: limit 
+      const options = {
+        sort: { fetchedAt: -1 },
+        limit: limit
       };
-      
+
       const results = await this.mongoService.find(collection, filter, options);
-      
+
       this.logger.info(`Retrieved ${results.length} timeseries records for item ${itemId}`);
       return results;
-      
+
     } catch (error) {
       this.logger.error(`Failed to get stored timeseries data for item ${itemId}`, error);
       throw error;
@@ -518,7 +520,7 @@ class MarketDataService {
 
       this.mongoService = new MongoDataPersistence(mongoConfig);
       await this.mongoService.connect();
-      
+
       this.logger.info('MongoDB persistence initialized successfully');
     } catch (error) {
       this.logger.error('Failed to initialize MongoDB persistence', error);
@@ -535,7 +537,7 @@ class MarketDataService {
 
       const cacheKey = this.generateCacheKey('market_data', options);
       const cachedData = this.cache.get(cacheKey);
-      
+
       if (cachedData) {
         this.logger.debug('Returning cached market data');
         return cachedData;
@@ -552,12 +554,12 @@ class MarketDataService {
 
       // Context7 Pattern: Transform data for consistent API response
       const transformedData = this.dataTransformer.transformMarketData(data);
-      
+
       // Context7 Pattern: Apply additional business logic
       const enrichedData = this.enrichMarketData(transformedData, options);
-      
+
       this.cache.set(cacheKey, enrichedData);
-      
+
       this.logger.debug('Successfully fetched market data', {
         recordCount: enrichedData.length,
         source: this.mongoService ? 'mongodb' : 'fallback'
@@ -581,18 +583,18 @@ class MarketDataService {
       });
 
       const startTime = Date.now();
-      
+
       // Context7 Pattern: Validate and enrich data
       const enrichedItems = this.enrichMarketDataForSave(data.items, data.metadata);
-      
+
       if (this.mongoService) {
         await this.mongoService.saveMarketData(enrichedItems, data.collectionSource);
-        
+
         // Context7 Pattern: Invalidate cache on data change
         this.cache.deletePattern('market_data_*');
-        
+
         const processingTime = Date.now() - startTime;
-        
+
         this.logger.debug('Successfully saved market data', {
           itemsSaved: enrichedItems.length,
           processingTime,
@@ -630,7 +632,7 @@ class MarketDataService {
 
       const cacheKey = `market_summary_${timeRange}`;
       const cachedSummary = this.cache.get(cacheKey);
-      
+
       if (cachedSummary) {
         this.logger.debug('Returning cached market data summary');
         return cachedSummary;
@@ -648,9 +650,9 @@ class MarketDataService {
 
       // Context7 Pattern: Add calculated metrics
       const enhancedSummary = this.calculateSummaryMetrics(summary, timeRange);
-      
+
       this.cache.set(cacheKey, enhancedSummary);
-      
+
       this.logger.debug('Successfully fetched market data summary', {
         timeRange,
         totalItems: enhancedSummary.totalItems
@@ -672,7 +674,7 @@ class MarketDataService {
 
       const cacheKey = this.generateCacheKey('item_history', options);
       const cachedHistory = this.cache.get(cacheKey);
-      
+
       if (cachedHistory) {
         this.logger.debug('Returning cached item price history');
         return cachedHistory;
@@ -689,9 +691,9 @@ class MarketDataService {
 
       // Context7 Pattern: Calculate price trends and indicators
       const enrichedHistory = this.calculatePriceTrends(history, options);
-      
+
       this.cache.set(cacheKey, enrichedHistory);
-      
+
       this.logger.debug('Successfully fetched item price history', {
         itemId: options.itemId,
         recordCount: enrichedHistory.length
@@ -713,7 +715,7 @@ class MarketDataService {
 
       const cacheKey = this.generateCacheKey('top_items', options);
       const cachedItems = this.cache.get(cacheKey);
-      
+
       if (cachedItems) {
         this.logger.debug('Returning cached top traded items');
         return cachedItems;
@@ -730,9 +732,9 @@ class MarketDataService {
 
       // Context7 Pattern: Calculate trading metrics and rankings
       const rankedItems = this.calculateItemRankings(topItems, options);
-      
+
       this.cache.set(cacheKey, rankedItems);
-      
+
       this.logger.debug('Successfully fetched top traded items', {
         itemCount: rankedItems.length,
         sortBy: options.sortBy
@@ -754,7 +756,7 @@ class MarketDataService {
 
       const cacheKey = this.generateCacheKey('search', options);
       const cachedResults = this.cache.get(cacheKey);
-      
+
       if (cachedResults) {
         this.logger.debug('Returning cached search results');
         return cachedResults;
@@ -771,9 +773,9 @@ class MarketDataService {
 
       // Context7 Pattern: Calculate relevance scores
       const scoredResults = this.calculateRelevanceScores(results, options);
-      
+
       this.cache.set(cacheKey, scoredResults);
-      
+
       this.logger.debug('Successfully searched items', {
         searchTerm: options.searchTerm,
         resultCount: scoredResults.length
@@ -924,20 +926,28 @@ class MarketDataService {
     const nameLower = name.toLowerCase();
 
     let score = 0;
-    
+
     // Exact match gets highest score
-    if (nameLower === searchLower) score += 100;
-    
+    if (nameLower === searchLower) {
+      score += 100;
+    }
+
     // Starts with search term
-    if (nameLower.startsWith(searchLower)) score += 50;
-    
+    if (nameLower.startsWith(searchLower)) {
+      score += 50;
+    }
+
     // Contains search term
-    if (nameLower.includes(searchLower)) score += 25;
-    
+    if (nameLower.includes(searchLower)) {
+      score += 25;
+    }
+
     // Word boundary matches
     const words = searchLower.split(' ');
     words.forEach(word => {
-      if (nameLower.includes(word)) score += 10;
+      if (nameLower.includes(word)) {
+        score += 10;
+      }
     });
 
     return score;
@@ -950,9 +960,15 @@ class MarketDataService {
     const name = (item.itemName || item.name || '').toLowerCase();
     const searchLower = searchTerm.toLowerCase();
 
-    if (name === searchLower) return 'exact';
-    if (name.startsWith(searchLower)) return 'prefix';
-    if (name.includes(searchLower)) return 'contains';
+    if (name === searchLower) {
+      return 'exact';
+    }
+    if (name.startsWith(searchLower)) {
+      return 'prefix';
+    }
+    if (name.includes(searchLower)) {
+      return 'contains';
+    }
     return 'partial';
   }
 
@@ -1035,32 +1051,32 @@ class MarketDataService {
   async fetchLiveMarketData(options) {
     try {
       this.logger.debug('Fetching live market data from OSRS Wiki API', { options });
-      
+
       const latestPrices = await this.osrsWikiService.getLatestPrices();
       const itemMapping = await this.osrsWikiService.getItemMapping();
-      
+
       const marketData = [];
       const priceData = latestPrices.data || {};
-      
+
       // Get bulk data efficiently
       const itemIds = options.itemIds || [
-        4151,  // Abyssal whip
+        4151, // Abyssal whip
         11802, // Armadyl godsword
-        4712,  // Dragon bones
-        139,   // Cooked lobster
-        560,   // Death rune
-        561,   // Nature rune
-        562,   // Law rune
-        563,   // Cosmic rune
-        565,   // Blood rune
-        566    // Soul rune
+        4712, // Dragon bones
+        139, // Cooked lobster
+        560, // Death rune
+        561, // Nature rune
+        562, // Law rune
+        563, // Cosmic rune
+        565, // Blood rune
+        566 // Soul rune
       ];
 
       // Use bulk item data method for efficiency
       const bulkResult = await this.osrsWikiService.getBulkItemData(
         itemIds.slice(0, options.limit || 50)
       );
-      
+
       // Transform bulk result to market data format
       for (const item of bulkResult.items) {
         if (!item.error && item.priceData) {
@@ -1079,12 +1095,12 @@ class MarketDataService {
           });
         }
       }
-      
+
       this.logger.info('Successfully fetched live market data', {
         itemCount: marketData.length,
         source: 'osrs_wiki_api'
       });
-      
+
       return marketData;
     } catch (error) {
       this.logger.error('Error fetching live market data', error);
@@ -1098,12 +1114,12 @@ class MarketDataService {
   async fetchLiveItemHistory(options) {
     try {
       this.logger.debug('Fetching live item history from OSRS Wiki API', { options });
-      
+
       const timeseriesData = await this.osrsWikiService.getTimeseries(
         options.itemId,
         options.timestep || '5m'
       );
-      
+
       const history = (timeseriesData.data || []).map(point => ({
         timestamp: point.timestamp * 1000, // Convert to milliseconds
         itemId: options.itemId,
@@ -1114,13 +1130,13 @@ class MarketDataService {
         volume: point.highPriceVolume || 0,
         source: 'osrs_wiki_timeseries'
       }));
-      
+
       this.logger.info('Successfully fetched live item history', {
         itemId: options.itemId,
         dataPoints: history.length,
         source: 'osrs_wiki_api'
       });
-      
+
       return history;
     } catch (error) {
       this.logger.error('Error fetching live item history', error, { options });
@@ -1134,27 +1150,27 @@ class MarketDataService {
   async fetchLiveTopItems(options) {
     try {
       this.logger.debug('Fetching live top items from OSRS Wiki API', { options });
-      
+
       const latestPrices = await this.osrsWikiService.getLatestPrices();
       const itemMapping = await this.osrsWikiService.getItemMapping();
-      
+
       const topItems = [];
       const priceData = latestPrices.data || {};
-      
+
       // Get high-value items based on price - filter first, then bulk fetch
       const highValueItemIds = [];
-      
+
       for (const [itemIdStr, prices] of Object.entries(priceData)) {
         const itemId = parseInt(itemIdStr);
         if (prices.high && prices.high > 100000) { // Items worth more than 100k
           highValueItemIds.push(itemId);
         }
       }
-      
+
       // Use bulk fetch for efficiency (limit to reasonable number)
       const limitedItemIds = highValueItemIds.slice(0, Math.min(options.limit || 50, 100));
       const bulkResult = await this.osrsWikiService.getBulkItemData(limitedItemIds);
-      
+
       const highValueItems = [];
       for (const item of bulkResult.items) {
         if (!item.error && item.priceData && item.priceData.high > 100000) {
@@ -1168,26 +1184,26 @@ class MarketDataService {
           });
         }
       }
-      
+
       // Sort by price and take top items
       const sortedItems = highValueItems
         .sort((a, b) => {
           switch (options.sortBy) {
-            case 'price':
-              return b.price - a.price;
-            case 'volume':
-              return b.volume - a.volume;
-            default:
-              return b.price - a.price;
+          case 'price':
+            return b.price - a.price;
+          case 'volume':
+            return b.volume - a.volume;
+          default:
+            return b.price - a.price;
           }
         })
         .slice(0, options.limit || 10);
-      
+
       this.logger.info('Successfully fetched live top items', {
         itemCount: sortedItems.length,
         source: 'osrs_wiki_api'
       });
-      
+
       return sortedItems;
     } catch (error) {
       this.logger.error('Error fetching live top items', error, { options });
@@ -1201,16 +1217,16 @@ class MarketDataService {
   async searchItemsLive(options) {
     try {
       this.logger.debug('Searching items using OSRS Wiki API', { options });
-      
+
       const searchResults = await this.osrsWikiService.searchItems(
         options.searchTerm,
         options.limit || 10
       );
-      
+
       // Get price data for search results using bulk fetch
       const itemIds = searchResults.results.map(item => item.id);
       const bulkResult = await this.osrsWikiService.getBulkItemData(itemIds);
-      
+
       // Create lookup map for efficient matching
       const itemDataMap = new Map();
       for (const item of bulkResult.items) {
@@ -1218,7 +1234,7 @@ class MarketDataService {
           itemDataMap.set(item.id, item);
         }
       }
-      
+
       const results = searchResults.results.map(searchItem => {
         const itemData = itemDataMap.get(searchItem.id);
         return {
@@ -1230,13 +1246,13 @@ class MarketDataService {
           source: 'osrs_wiki_search_bulk'
         };
       });
-      
+
       this.logger.info('Successfully searched items', {
         searchTerm: options.searchTerm,
         resultCount: results.length,
         source: 'osrs_wiki_api'
       });
-      
+
       return results;
     } catch (error) {
       this.logger.error('Error searching items', error, { options });
@@ -1246,10 +1262,10 @@ class MarketDataService {
 
   /**
    * Context7 Pattern: Save market snapshot with upsert functionality
-   * 
+   *
    * Implementation of Step 0.2 requirement - uses findOneAndUpdate with upsert
    * to prevent duplicate entries based on itemId, timestamp, and interval
-   * 
+   *
    * @param {Partial<IMarketPriceSnapshot>} data - Market snapshot data
    * @returns {Promise<IMarketPriceSnapshot>} Saved or updated market snapshot
    * @throws {Error} If validation fails or database error occurs
@@ -1296,13 +1312,13 @@ class MarketDataService {
         try {
           // Get historical data for this item (last 30 data points for trend analysis)
           const historicalData = await this.getHistoricalDataForCalculation(data.itemId, data.interval);
-          
+
           // Use FinancialMetricsCalculator to calculate all metrics
           const calculatedMetrics = this.metricsCalculator.calculateAllMetrics(data, historicalData);
-          
+
           // Merge all calculated metrics into the data object
           Object.assign(data, calculatedMetrics);
-          
+
           this.logger.debug('All derived metrics calculated', {
             itemId: data.itemId,
             sellPrice: data.highPrice,
@@ -1321,25 +1337,25 @@ class MarketDataService {
           });
         } catch (metricsError) {
           this.logger.error('Error calculating derived metrics, using fallback calculations', metricsError);
-          
+
           // Fallback to basic calculations if FinancialMetricsCalculator fails
           const buyPrice = data.lowPrice;
           const sellPrice = data.highPrice;
-          
+
           // Calculate GE tax details
           data.geTaxAmount = calculateGETax(sellPrice);
           data.isTaxFree = isTaxFree(sellPrice);
           data.netSellPrice = calculateNetSellPrice(sellPrice);
-          
+
           // Calculate profit margins
           data.grossProfitGp = sellPrice - buyPrice;
           data.grossProfitPercent = buyPrice > 0 ? ((sellPrice - buyPrice) / buyPrice) * 100 : 0;
           data.marginGp = calculateProfitAfterTax(buyPrice, sellPrice);
           data.marginPercent = calculateProfitPercentageAfterTax(buyPrice, sellPrice);
-          
+
           // Calculate profit per GE slot (assuming 1 item per slot for now)
           data.profitPerGeSlot = data.marginGp;
-          
+
           this.logger.debug('Fallback GE tax calculations completed', {
             itemId: data.itemId,
             sellPrice,
@@ -1356,15 +1372,15 @@ class MarketDataService {
       // Use findOneAndUpdate with upsert for atomic operation
       // This prevents race conditions and ensures data consistency
       const options = {
-        upsert: true,           // Create if not exists
-        new: true,              // Return updated document
-        runValidators: false,   // Disable mongoose validators to avoid cross-field validation issues
+        upsert: true, // Create if not exists
+        new: true, // Return updated document
+        runValidators: false, // Disable mongoose validators to avoid cross-field validation issues
         setDefaultsOnInsert: true // Apply defaults on insert
       };
 
       const snapshot = await MarketPriceSnapshotModel.findOneAndUpdate(
         filter,
-        data,  // Use direct assignment instead of $set to avoid validation issues
+        data, // Use direct assignment instead of $set to avoid validation issues
         options
       );
 
@@ -1397,7 +1413,7 @@ class MarketDataService {
 
   /**
    * Context7 Pattern: Get historical data for metric calculation
-   * 
+   *
    * Helper method to retrieve recent historical data for an item
    * to support trend analysis and technical indicators
    */
@@ -1405,9 +1421,9 @@ class MarketDataService {
     try {
       // Get recent snapshots for this item in the same interval
       const recentSnapshots = await MarketPriceSnapshotModel
-        .find({ 
-          itemId, 
-          interval 
+        .find({
+          itemId,
+          interval
         })
         .sort({ timestamp: -1 })
         .limit(limit)
@@ -1438,10 +1454,10 @@ class MarketDataService {
 
   /**
    * Context7 Pattern: Get market snapshots with filtering capabilities
-   * 
+   *
    * Implementation of Step 0.2 requirement - supports optional filtering
    * by interval, startDate, and endDate for flexible querying
-   * 
+   *
    * @param {number} itemId - The item ID to query
    * @param {string} [interval] - Optional interval filter ('latest', '5m', '1h', etc.)
    * @param {number} [startDate] - Optional start timestamp (Unix timestamp)
@@ -1635,12 +1651,12 @@ class MarketDataService {
 
       const risk = riskThresholds[riskLevel];
       const now = Date.now();
-      
+
       // Time horizon mappings
       const timeRanges = {
         short: 2 * 60 * 60 * 1000, // 2 hours
         medium: 8 * 60 * 60 * 1000, // 8 hours
-        long: 24 * 60 * 60 * 1000   // 24 hours
+        long: 24 * 60 * 60 * 1000 // 24 hours
       };
 
       const timeRange = timeRanges[timeHorizon];
@@ -1682,21 +1698,21 @@ class MarketDataService {
                     case: { $and: [
                       { $lt: ['$latestData.riskScore', 30] },
                       { $gt: ['$latestData.marginPercent', 5] }
-                    ]},
+                    ] },
                     then: 'Strong Buy'
                   },
                   {
                     case: { $and: [
                       { $lt: ['$latestData.riskScore', 50] },
                       { $gt: ['$latestData.marginPercent', 3] }
-                    ]},
+                    ] },
                     then: 'Buy'
                   },
                   {
                     case: { $and: [
                       { $lt: ['$latestData.riskScore', 70] },
                       { $gt: ['$latestData.marginPercent', 2] }
-                    ]},
+                    ] },
                     then: 'Hold'
                   }
                 ],
@@ -1773,9 +1789,15 @@ class MarketDataService {
       ];
 
       const filteredAlerts = mockAlerts.filter(alert => {
-        if (type && alert.type !== type) return false;
-        if (status && alert.status !== status) return false;
-        if (userId && alert.userId !== userId) return false;
+        if (type && alert.type !== type) {
+          return false;
+        }
+        if (status && alert.status !== status) {
+          return false;
+        }
+        if (userId && alert.userId !== userId) {
+          return false;
+        }
         return true;
       });
 
@@ -1864,74 +1886,74 @@ class MarketDataService {
       let pipeline = [];
 
       switch (type) {
-        case 'trends':
-          pipeline = [
-            {
-              $match: {
-                timestamp: { $gte: startTime },
-                interval: { $in: ['5m', '1h'] }
-              }
-            },
-            {
-              $group: {
-                _id: {
-                  itemId: '$itemId',
-                  hour: { $hour: { $toDate: '$timestamp' } }
-                },
-                avgPrice: { $avg: { $add: ['$highPrice', '$lowPrice'] } },
-                avgVolume: { $avg: '$volume' },
-                count: { $sum: 1 }
-              }
-            },
-            {
-              $sort: { '_id.hour': 1 }
-            },
-            {
-              $limit: 100
+      case 'trends':
+        pipeline = [
+          {
+            $match: {
+              timestamp: { $gte: startTime },
+              interval: { $in: ['5m', '1h'] }
             }
-          ];
-          break;
-        case 'volume':
-          pipeline = [
-            {
-              $match: {
-                timestamp: { $gte: startTime },
-                interval: { $in: ['5m', '1h'] }
-              }
-            },
-            {
-              $group: {
-                _id: '$itemId',
-                totalVolume: { $sum: '$volume' },
-                avgVolume: { $avg: '$volume' },
-                maxVolume: { $max: '$volume' },
-                minVolume: { $min: '$volume' }
-              }
-            },
-            {
-              $sort: { totalVolume: -1 }
-            },
-            {
-              $limit: 50
+          },
+          {
+            $group: {
+              _id: {
+                itemId: '$itemId',
+                hour: { $hour: { $toDate: '$timestamp' } }
+              },
+              avgPrice: { $avg: { $add: ['$highPrice', '$lowPrice'] } },
+              avgVolume: { $avg: '$volume' },
+              count: { $sum: 1 }
             }
-          ];
-          break;
-        default:
-          pipeline = [
-            {
-              $match: {
-                timestamp: { $gte: startTime }
-              }
-            },
-            {
-              $group: {
-                _id: null,
-                totalRecords: { $sum: 1 },
-                avgPrice: { $avg: { $add: ['$highPrice', '$lowPrice'] } },
-                avgVolume: { $avg: '$volume' }
-              }
+          },
+          {
+            $sort: { '_id.hour': 1 }
+          },
+          {
+            $limit: 100
+          }
+        ];
+        break;
+      case 'volume':
+        pipeline = [
+          {
+            $match: {
+              timestamp: { $gte: startTime },
+              interval: { $in: ['5m', '1h'] }
             }
-          ];
+          },
+          {
+            $group: {
+              _id: '$itemId',
+              totalVolume: { $sum: '$volume' },
+              avgVolume: { $avg: '$volume' },
+              maxVolume: { $max: '$volume' },
+              minVolume: { $min: '$volume' }
+            }
+          },
+          {
+            $sort: { totalVolume: -1 }
+          },
+          {
+            $limit: 50
+          }
+        ];
+        break;
+      default:
+        pipeline = [
+          {
+            $match: {
+              timestamp: { $gte: startTime }
+            }
+          },
+          {
+            $group: {
+              _id: null,
+              totalRecords: { $sum: 1 },
+              avgPrice: { $avg: { $add: ['$highPrice', '$lowPrice'] } },
+              avgVolume: { $avg: '$volume' }
+            }
+          }
+        ];
       }
 
       if (itemId) {
@@ -2047,7 +2069,7 @@ class MarketDataService {
       const now = Date.now();
       const startTime = now - timeRange;
 
-      let filter = {
+      const filter = {
         timestamp: { $gte: startTime }
       };
 
@@ -2062,22 +2084,22 @@ class MarketDataService {
         .exec();
 
       let exportData;
-      
+
       switch (format) {
-        case 'csv':
-          const csvHeaders = 'itemId,timestamp,highPrice,lowPrice,volume,interval,source\n';
-          const csvRows = data.map(item => 
-            `${item.itemId},${item.timestamp},${item.highPrice},${item.lowPrice},${item.volume},${item.interval},${item.source}`
-          ).join('\n');
-          exportData = csvHeaders + csvRows;
-          break;
-        case 'xlsx':
-          // For now, return JSON format for xlsx
-          // In production, you would use a library like xlsx to generate actual Excel files
-          exportData = JSON.stringify(data, null, 2);
-          break;
-        default:
-          exportData = JSON.stringify(data, null, 2);
+      case 'csv':
+        const csvHeaders = 'itemId,timestamp,highPrice,lowPrice,volume,interval,source\n';
+        const csvRows = data.map(item =>
+          `${item.itemId},${item.timestamp},${item.highPrice},${item.lowPrice},${item.volume},${item.interval},${item.source}`
+        ).join('\n');
+        exportData = csvHeaders + csvRows;
+        break;
+      case 'xlsx':
+        // For now, return JSON format for xlsx
+        // In production, you would use a library like xlsx to generate actual Excel files
+        exportData = JSON.stringify(data, null, 2);
+        break;
+      default:
+        exportData = JSON.stringify(data, null, 2);
       }
 
       this.logger.info('Successfully exported data', {
@@ -2240,10 +2262,10 @@ class MarketDataService {
         },
         items: portfolioItems,
         performance: {
-          bestPerformer: portfolioItems.reduce((best, item) => 
+          bestPerformer: portfolioItems.reduce((best, item) =>
             item.profitPercent > best.profitPercent ? item : best, portfolioItems[0] || {}
           ),
-          worstPerformer: portfolioItems.reduce((worst, item) => 
+          worstPerformer: portfolioItems.reduce((worst, item) =>
             item.profitPercent < worst.profitPercent ? item : worst, portfolioItems[0] || {}
           )
         }
@@ -2369,7 +2391,7 @@ class MarketDataService {
       }
 
       // Calculate potential profit/loss
-      const profitLoss = testData.action === 'buy' 
+      const profitLoss = testData.action === 'buy'
         ? (currentPrice - testData.price) * testData.quantity
         : (testData.price - currentPrice) * testData.quantity;
 
@@ -2399,12 +2421,12 @@ class MarketDataService {
       const allTestsKey = 'all_manual_tests';
       let allTests = this.cache.get(allTestsKey) || [];
       allTests.unshift(testResult);
-      
+
       // Keep only last 100 tests
       if (allTests.length > 100) {
         allTests = allTests.slice(0, 100);
       }
-      
+
       this.cache.set(allTestsKey, allTests);
 
       this.logger.info('Successfully processed manual test', {
@@ -2434,7 +2456,7 @@ class MarketDataService {
         // Get specific test result
         const cacheKey = `manual_test_${testId}`;
         const testResult = this.cache.get(cacheKey);
-        
+
         if (!testResult) {
           this.logger.warn('Test result not found', { testId });
           return [];
@@ -2460,8 +2482,8 @@ class MarketDataService {
         totalTests: results.length,
         totalProfitLoss: results.reduce((sum, test) => sum + (test.profitLoss || 0), 0),
         successfulTests: results.filter(test => (test.profitLoss || 0) > 0).length,
-        averageProfitLoss: results.length > 0 
-          ? results.reduce((sum, test) => sum + (test.profitLoss || 0), 0) / results.length 
+        averageProfitLoss: results.length > 0
+          ? results.reduce((sum, test) => sum + (test.profitLoss || 0), 0) / results.length
           : 0
       };
 

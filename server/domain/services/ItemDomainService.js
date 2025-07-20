@@ -1,13 +1,12 @@
 /**
  * 🏛️ Item Domain Service - Complex business logic coordination
- * 
+ *
  * Context7 Pattern: Domain Service for business operations that don't belong to entities
  * - DRY: Centralized complex business logic
  * - SOLID: Single responsibility for item domain operations
  * - Domain-driven design: Keeps business logic in domain layer
  */
 
-const { Item } = require('../entities/Item');
 const { ItemId } = require('../value-objects/ItemId');
 const { AlchemyInfo } = require('../value-objects/AlchemyInfo');
 const { ItemSpecifications } = require('../specifications/ItemSpecifications');
@@ -117,12 +116,12 @@ class ItemDomainService {
 
     // Business rule warnings
     if (highalch > 0 && value > 0) {
-      const alchemyInfo = new AlchemyInfo({ 
-        lowalch, 
-        highalch, 
-        natureRuneCost: this.#businessRules.NATURE_RUNE_COST 
+      const alchemyInfo = new AlchemyInfo({
+        lowalch,
+        highalch,
+        natureRuneCost: this.#businessRules.NATURE_RUNE_COST
       });
-      
+
       const profit = alchemyInfo.calculateProfit(value);
       if (profit < 0 && highalch > lowalch) {
         warnings.push('Item alchemy is not profitable at current value');
@@ -281,59 +280,59 @@ class ItemDomainService {
     let specification;
 
     switch (criteriaName) {
-      case 'highValueTradeable':
-        specification = ItemSpecifications.highValueTradeable(
-          params.valueThreshold || this.#businessRules.HIGH_VALUE_THRESHOLD
-        );
-        break;
+    case 'highValueTradeable':
+      specification = ItemSpecifications.highValueTradeable(
+        params.valueThreshold || this.#businessRules.HIGH_VALUE_THRESHOLD
+      );
+      break;
 
-      case 'profitableAlchemy':
-        specification = ItemSpecifications.profitableAlchemy(
-          params.minimumProfit || this.#businessRules.MIN_ALCHEMY_PROFIT
-        );
-        break;
+    case 'profitableAlchemy':
+      specification = ItemSpecifications.profitableAlchemy(
+        params.minimumProfit || this.#businessRules.MIN_ALCHEMY_PROFIT
+      );
+      break;
 
-      case 'freeToPlayTradeable':
-        specification = ItemSpecifications.freeToPlayTradeable();
-        break;
+    case 'freeToPlayTradeable':
+      specification = ItemSpecifications.freeToPlayTradeable();
+      break;
 
-      case 'flippingCandidates':
-        specification = ItemSpecifications.flippingCandidates();
-        break;
+    case 'flippingCandidates':
+      specification = ItemSpecifications.flippingCandidates();
+      break;
 
-      case 'needsDataRefresh':
-        specification = ItemSpecifications.needsDataRefresh(
-          params.maxAge || this.#businessRules.MAX_SYNC_AGE_MS
-        );
-        break;
+    case 'needsDataRefresh':
+      specification = ItemSpecifications.needsDataRefresh(
+        params.maxAge || this.#businessRules.MAX_SYNC_AGE_MS
+      );
+      break;
 
-      case 'lowValueStackable':
-        specification = ItemSpecifications.lowValueStackable(params.maxValue);
-        break;
+    case 'lowValueStackable':
+      specification = ItemSpecifications.lowValueStackable(params.maxValue);
+      break;
 
-      case 'highEndMembersEquipment':
-        specification = ItemSpecifications.highEndMembersEquipment(
-          params.valueThreshold || 1000000
-        );
-        break;
+    case 'highEndMembersEquipment':
+      specification = ItemSpecifications.highEndMembersEquipment(
+        params.valueThreshold || 1000000
+      );
+      break;
 
-      case 'newPlayerFriendly':
-        specification = ItemSpecifications.newPlayerFriendly();
-        break;
+    case 'newPlayerFriendly':
+      specification = ItemSpecifications.newPlayerFriendly();
+      break;
 
-      case 'bulkTradingItems':
-        specification = ItemSpecifications.bulkTradingItems();
-        break;
+    case 'bulkTradingItems':
+      specification = ItemSpecifications.bulkTradingItems();
+      break;
 
-      case 'recentlyUpdatedHighValue':
-        specification = ItemSpecifications.recentlyUpdatedHighValue(
-          params.maxAge,
-          params.valueThreshold || this.#businessRules.HIGH_VALUE_THRESHOLD
-        );
-        break;
+    case 'recentlyUpdatedHighValue':
+      specification = ItemSpecifications.recentlyUpdatedHighValue(
+        params.maxAge,
+        params.valueThreshold || this.#businessRules.HIGH_VALUE_THRESHOLD
+      );
+      break;
 
-      default:
-        throw new Error(`Unknown criteria: ${criteriaName}`);
+    default:
+      throw new Error(`Unknown criteria: ${criteriaName}`);
     }
 
     const filtered = items.filter(item => specification.isSatisfiedBy(item));
@@ -401,7 +400,7 @@ class ItemDomainService {
     // Name similarity (simple contains check)
     const name1 = item1.name.toLowerCase();
     const name2 = item2.name.toLowerCase();
-    
+
     if (name1 === name2) {
       similarity += weights.name;
       reasons.push('Identical names');
@@ -417,7 +416,7 @@ class ItemDomainService {
     }
 
     // Alchemy similarity
-    if (item1.alchemy.lowalch === item2.alchemy.lowalch && 
+    if (item1.alchemy.lowalch === item2.alchemy.lowalch &&
         item1.alchemy.highalch === item2.alchemy.highalch) {
       similarity += weights.alchemy;
       reasons.push('Identical alchemy values');

@@ -1,6 +1,6 @@
 /**
  * 🛡️ Item Validator - Context7 Validation Layer
- * 
+ *
  * Context7 Pattern: Input Validation and Data Integrity
  * - SOLID: Single Responsibility - Item data validation
  * - DRY: Reusable validation rules and error handling
@@ -14,7 +14,7 @@ const { Logger } = require('../utils/Logger');
 class ItemValidator {
   constructor() {
     this.logger = new Logger('ItemValidator');
-    
+
     // Context7 Pattern: Validation constants
     this.CONSTRAINTS = {
       ITEM_ID: {
@@ -47,7 +47,7 @@ class ItemValidator {
     };
 
     this.ALLOWED_CATEGORIES = [
-      'runes', 'potions', 'food', 'smithing', 'woodcutting', 
+      'runes', 'potions', 'food', 'smithing', 'woodcutting',
       'farming', 'high_value', 'members', 'free', 'general'
     ];
 
@@ -64,7 +64,7 @@ class ItemValidator {
   validateItemCreation(itemData) {
     try {
       this.logger.debug('Validating item creation data');
-      
+
       const errors = [];
       const warnings = [];
 
@@ -169,7 +169,7 @@ class ItemValidator {
   validateItemUpdate(itemId, updateData) {
     try {
       this.logger.debug('Validating item update data', { itemId });
-      
+
       const errors = [];
       const warnings = [];
 
@@ -182,7 +182,7 @@ class ItemValidator {
       const immutableFields = ['itemId', 'createdAt', 'version'];
       const attemptedImmutableUpdates = Object.keys(updateData)
         .filter(field => immutableFields.includes(field));
-      
+
       if (attemptedImmutableUpdates.length > 0) {
         errors.push(`Cannot update immutable fields: ${attemptedImmutableUpdates.join(', ')}`);
       }
@@ -240,7 +240,7 @@ class ItemValidator {
   validateSearchParams(params) {
     try {
       this.logger.debug('Validating search parameters');
-      
+
       const errors = [];
       const sanitized = {};
 
@@ -402,7 +402,7 @@ class ItemValidator {
   validateSortParam(sort) {
     try {
       const errors = [];
-      let sanitizedSort = {};
+      const sanitizedSort = {};
 
       if (typeof sort === 'string') {
         // Handle string format like "name:asc" or "value:desc"
@@ -446,7 +446,7 @@ class ItemValidator {
         sanitizedSort: errors.length === 0 ? sanitizedSort : null
       };
 
-    } catch (error) {
+    } catch {
       return {
         isValid: false,
         errors: ['Invalid sort parameter format']
@@ -457,43 +457,43 @@ class ItemValidator {
   // Context7 Pattern: Individual field validators
 
   isValidItemId(itemId) {
-    return Number.isInteger(itemId) && 
-           itemId >= this.CONSTRAINTS.ITEM_ID.MIN && 
+    return Number.isInteger(itemId) &&
+           itemId >= this.CONSTRAINTS.ITEM_ID.MIN &&
            itemId <= this.CONSTRAINTS.ITEM_ID.MAX;
   }
 
   isValidName(name) {
-    return typeof name === 'string' && 
-           name.trim().length >= this.CONSTRAINTS.NAME.MIN_LENGTH && 
+    return typeof name === 'string' &&
+           name.trim().length >= this.CONSTRAINTS.NAME.MIN_LENGTH &&
            name.trim().length <= this.CONSTRAINTS.NAME.MAX_LENGTH;
   }
 
   isValidExamine(examine) {
-    return !examine || (typeof examine === 'string' && 
+    return !examine || (typeof examine === 'string' &&
            examine.length <= this.CONSTRAINTS.EXAMINE.MAX_LENGTH);
   }
 
   isValidValue(value) {
-    return Number.isInteger(value) && 
-           value >= this.CONSTRAINTS.VALUE.MIN && 
+    return Number.isInteger(value) &&
+           value >= this.CONSTRAINTS.VALUE.MIN &&
            value <= this.CONSTRAINTS.VALUE.MAX;
   }
 
   isValidWeight(weight) {
-    return typeof weight === 'number' && 
-           weight >= this.CONSTRAINTS.WEIGHT.MIN && 
+    return typeof weight === 'number' &&
+           weight >= this.CONSTRAINTS.WEIGHT.MIN &&
            weight <= this.CONSTRAINTS.WEIGHT.MAX;
   }
 
   isValidBuyLimit(buyLimit) {
-    return buyLimit === null || (Number.isInteger(buyLimit) && 
-           buyLimit >= this.CONSTRAINTS.BUY_LIMIT.MIN && 
+    return buyLimit === null || (Number.isInteger(buyLimit) &&
+           buyLimit >= this.CONSTRAINTS.BUY_LIMIT.MIN &&
            buyLimit <= this.CONSTRAINTS.BUY_LIMIT.MAX);
   }
 
   isValidSearchTerm(searchTerm) {
-    return typeof searchTerm === 'string' && 
-           searchTerm.trim().length >= this.CONSTRAINTS.SEARCH_TERM.MIN_LENGTH && 
+    return typeof searchTerm === 'string' &&
+           searchTerm.trim().length >= this.CONSTRAINTS.SEARCH_TERM.MIN_LENGTH &&
            searchTerm.trim().length <= this.CONSTRAINTS.SEARCH_TERM.MAX_LENGTH;
   }
 
@@ -503,27 +503,57 @@ class ItemValidator {
     const sanitized = {};
 
     // Copy and sanitize string fields
-    if (itemData.name) sanitized.name = this.sanitizeString(itemData.name);
-    if (itemData.examine) sanitized.examine = this.sanitizeString(itemData.examine);
-    if (itemData.icon) sanitized.icon = this.sanitizeString(itemData.icon);
+    if (itemData.name) {
+      sanitized.name = this.sanitizeString(itemData.name);
+    }
+    if (itemData.examine) {
+      sanitized.examine = this.sanitizeString(itemData.examine);
+    }
+    if (itemData.icon) {
+      sanitized.icon = this.sanitizeString(itemData.icon);
+    }
 
     // Copy numeric fields
-    if (itemData.itemId !== undefined) sanitized.itemId = parseInt(itemData.itemId);
-    if (itemData.value !== undefined) sanitized.value = parseInt(itemData.value);
-    if (itemData.lowalch !== undefined) sanitized.lowalch = parseInt(itemData.lowalch);
-    if (itemData.highalch !== undefined) sanitized.highalch = parseInt(itemData.highalch);
-    if (itemData.weight !== undefined) sanitized.weight = parseFloat(itemData.weight);
-    if (itemData.buy_limit !== undefined) sanitized.buy_limit = itemData.buy_limit ? parseInt(itemData.buy_limit) : null;
+    if (itemData.itemId !== undefined) {
+      sanitized.itemId = parseInt(itemData.itemId);
+    }
+    if (itemData.value !== undefined) {
+      sanitized.value = parseInt(itemData.value);
+    }
+    if (itemData.lowalch !== undefined) {
+      sanitized.lowalch = parseInt(itemData.lowalch);
+    }
+    if (itemData.highalch !== undefined) {
+      sanitized.highalch = parseInt(itemData.highalch);
+    }
+    if (itemData.weight !== undefined) {
+      sanitized.weight = parseFloat(itemData.weight);
+    }
+    if (itemData.buy_limit !== undefined) {
+      sanitized.buy_limit = itemData.buy_limit ? parseInt(itemData.buy_limit) : null;
+    }
 
     // Copy boolean fields
-    if (itemData.members !== undefined) sanitized.members = Boolean(itemData.members);
-    if (itemData.tradeable_on_ge !== undefined) sanitized.tradeable_on_ge = Boolean(itemData.tradeable_on_ge);
-    if (itemData.stackable !== undefined) sanitized.stackable = Boolean(itemData.stackable);
-    if (itemData.noted !== undefined) sanitized.noted = Boolean(itemData.noted);
+    if (itemData.members !== undefined) {
+      sanitized.members = Boolean(itemData.members);
+    }
+    if (itemData.tradeable_on_ge !== undefined) {
+      sanitized.tradeable_on_ge = Boolean(itemData.tradeable_on_ge);
+    }
+    if (itemData.stackable !== undefined) {
+      sanitized.stackable = Boolean(itemData.stackable);
+    }
+    if (itemData.noted !== undefined) {
+      sanitized.noted = Boolean(itemData.noted);
+    }
 
     // Copy other fields as-is
-    if (itemData.dataSource) sanitized.dataSource = itemData.dataSource;
-    if (itemData.status) sanitized.status = itemData.status;
+    if (itemData.dataSource) {
+      sanitized.dataSource = itemData.dataSource;
+    }
+    if (itemData.status) {
+      sanitized.status = itemData.status;
+    }
 
     return sanitized;
   }
@@ -533,7 +563,9 @@ class ItemValidator {
   }
 
   parseBooleanParam(param) {
-    if (typeof param === 'boolean') return param;
+    if (typeof param === 'boolean') {
+      return param;
+    }
     if (typeof param === 'string') {
       const lower = param.toLowerCase();
       return lower === 'true' || lower === '1' || lower === 'yes';

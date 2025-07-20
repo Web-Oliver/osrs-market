@@ -1,6 +1,6 @@
 /**
  * 📊 Market Price Snapshot Model Tests - Context7 Pattern
- * 
+ *
  * Context7 Pattern: Comprehensive Model Testing
  * - Schema validation tests
  * - Index verification tests
@@ -15,7 +15,7 @@ const { ItemModel } = require('../../models/ItemModel');
 describe('MarketPriceSnapshotModel', () => {
   let testItem;
 
-  beforeAll(async () => {
+  beforeAll(async() => {
     // Connect to test database
     if (mongoose.connection.readyState === 0) {
       await mongoose.connect('mongodb://localhost:27017/osrs_market_test');
@@ -38,7 +38,7 @@ describe('MarketPriceSnapshotModel', () => {
   });
 
 
-  afterAll(async () => {
+  afterAll(async() => {
     // Clean up test data
     await MarketPriceSnapshotModel.deleteMany({});
     await ItemModel.deleteMany({});
@@ -46,12 +46,12 @@ describe('MarketPriceSnapshotModel', () => {
   });
 
   describe('Schema Validation', () => {
-    afterEach(async () => {
+    afterEach(async() => {
       // Clean up snapshots after each test in this block
       await MarketPriceSnapshotModel.deleteMany({});
     });
 
-    test('should create a valid market price snapshot', async () => {
+    test('should create a valid market price snapshot', async() => {
       const snapshot = new MarketPriceSnapshotModel({
         itemId: testItem.itemId,
         timestamp: Date.now(),
@@ -71,7 +71,7 @@ describe('MarketPriceSnapshotModel', () => {
       expect(snapshot.source).toBe('osrs_wiki_api');
     });
 
-    test('should reject invalid interval values', async () => {
+    test('should reject invalid interval values', async() => {
       const snapshot = new MarketPriceSnapshotModel({
         itemId: testItem.itemId,
         timestamp: Date.now(),
@@ -84,7 +84,7 @@ describe('MarketPriceSnapshotModel', () => {
       await expect(snapshot.save()).rejects.toThrow();
     });
 
-    test('should reject negative prices', async () => {
+    test('should reject negative prices', async() => {
       const snapshot = new MarketPriceSnapshotModel({
         itemId: testItem.itemId,
         timestamp: Date.now(),
@@ -97,7 +97,7 @@ describe('MarketPriceSnapshotModel', () => {
       await expect(snapshot.save()).rejects.toThrow();
     });
 
-    test('should reject high price less than low price', async () => {
+    test('should reject high price less than low price', async() => {
       const snapshot = new MarketPriceSnapshotModel({
         itemId: testItem.itemId,
         timestamp: Date.now(),
@@ -110,7 +110,7 @@ describe('MarketPriceSnapshotModel', () => {
       await expect(snapshot.save()).rejects.toThrow();
     });
 
-    test('should validate advanced calculated metrics', async () => {
+    test('should validate advanced calculated metrics', async() => {
       const snapshot = new MarketPriceSnapshotModel({
         itemId: testItem.itemId,
         timestamp: Date.now(),
@@ -127,7 +127,7 @@ describe('MarketPriceSnapshotModel', () => {
       await expect(snapshot.save()).resolves.toBeDefined();
     });
 
-    test('should reject invalid RSI values', async () => {
+    test('should reject invalid RSI values', async() => {
       const snapshot = new MarketPriceSnapshotModel({
         itemId: testItem.itemId,
         timestamp: Date.now(),
@@ -145,7 +145,7 @@ describe('MarketPriceSnapshotModel', () => {
   describe('Instance Methods', () => {
     let snapshot;
 
-    beforeEach(async () => {
+    beforeEach(async() => {
       snapshot = await MarketPriceSnapshotModel.create({
         itemId: testItem.itemId,
         timestamp: Date.now(),
@@ -157,7 +157,7 @@ describe('MarketPriceSnapshotModel', () => {
       });
     });
 
-    afterEach(async () => {
+    afterEach(async() => {
       // Clean up snapshots after each test in this block
       await MarketPriceSnapshotModel.deleteMany({});
     });
@@ -176,7 +176,7 @@ describe('MarketPriceSnapshotModel', () => {
 
     test('should detect active trading correctly', () => {
       expect(snapshot.isActiveTrading()).toBe(true);
-      
+
       snapshot.volume = 0;
       expect(snapshot.isActiveTrading()).toBe(false);
     });
@@ -188,12 +188,12 @@ describe('MarketPriceSnapshotModel', () => {
   });
 
   describe('Static Methods', () => {
-    afterEach(async () => {
+    afterEach(async() => {
       // Clean up snapshots after each test in this block
       await MarketPriceSnapshotModel.deleteMany({});
     });
 
-    beforeEach(async () => {
+    beforeEach(async() => {
       // Create test snapshots
       await MarketPriceSnapshotModel.create([
         {
@@ -217,34 +217,34 @@ describe('MarketPriceSnapshotModel', () => {
       ]);
     });
 
-    test('should get latest snapshot for item', async () => {
+    test('should get latest snapshot for item', async() => {
       const latest = await MarketPriceSnapshotModel.getLatestSnapshot(testItem.itemId);
       expect(latest).toBeDefined();
       expect(latest.itemId).toBe(testItem.itemId);
       expect(latest.highPrice).toBe(10);
     });
 
-    test('should get snapshots in time range', async () => {
+    test('should get snapshots in time range', async() => {
       const endTime = Date.now() + 1000;
       const startTime = Date.now() - 7200000; // 2 hours ago
-      
+
       const snapshots = await MarketPriceSnapshotModel.getSnapshotsInTimeRange(
         testItem.itemId,
         startTime,
         endTime
       );
-      
+
       expect(snapshots.length).toBe(2);
       expect(snapshots[0].timestamp).toBeLessThan(snapshots[1].timestamp);
     });
 
-    test('should get high volume snapshots', async () => {
+    test('should get high volume snapshots', async() => {
       const highVolume = await MarketPriceSnapshotModel.getHighVolumeSnapshots(400000);
       expect(highVolume.length).toBe(1);
       expect(highVolume[0].volume).toBe(500000);
     });
 
-    test('should get snapshots by source', async () => {
+    test('should get snapshots by source', async() => {
       const bySource = await MarketPriceSnapshotModel.getSnapshotsBySource('osrs_wiki_api');
       expect(bySource.length).toBe(2);
       expect(bySource[0].source).toBe('osrs_wiki_api');
@@ -252,12 +252,12 @@ describe('MarketPriceSnapshotModel', () => {
   });
 
   describe('Virtual Properties', () => {
-    afterEach(async () => {
+    afterEach(async() => {
       // Clean up snapshots after each test in this block
       await MarketPriceSnapshotModel.deleteMany({});
     });
 
-    test('should expose virtual properties', async () => {
+    test('should expose virtual properties', async() => {
       const snapshot = await MarketPriceSnapshotModel.create({
         itemId: testItem.itemId,
         timestamp: Date.now(),
@@ -275,16 +275,16 @@ describe('MarketPriceSnapshotModel', () => {
   });
 
   describe('Indexes', () => {
-    afterEach(async () => {
+    afterEach(async() => {
       // Clean up snapshots after each test in this block
       await MarketPriceSnapshotModel.deleteMany({});
     });
 
-    test('should have proper compound index on itemId, interval, timestamp', async () => {
+    test('should have proper compound index on itemId, interval, timestamp', async() => {
       const indexes = await MarketPriceSnapshotModel.collection.getIndexes();
-      
+
       const compoundIndex = indexes['idx_item_interval_timestamp_unique'];
-      
+
       expect(compoundIndex).toBeDefined();
       // Check if it's an array with index definition [[key, order], ...]
       if (Array.isArray(compoundIndex)) {
@@ -294,7 +294,7 @@ describe('MarketPriceSnapshotModel', () => {
       }
     });
 
-    test('should enforce unique constraint on compound index', async () => {
+    test('should enforce unique constraint on compound index', async() => {
       const timestamp = Date.now();
       const itemId = testItem.itemId;
       const interval = 'latest';
@@ -325,12 +325,12 @@ describe('MarketPriceSnapshotModel', () => {
   });
 
   describe('Integration with ItemModel', () => {
-    afterEach(async () => {
+    afterEach(async() => {
       // Clean up snapshots after each test in this block
       await MarketPriceSnapshotModel.deleteMany({});
     });
 
-    test('should reference item data correctly', async () => {
+    test('should reference item data correctly', async() => {
       // Ensure testItem exists in the database
       const existingItem = await ItemModel.findOne({ itemId: testItem.itemId });
       if (!existingItem) {
@@ -348,7 +348,7 @@ describe('MarketPriceSnapshotModel', () => {
           weight: 0.007
         });
       }
-      
+
       const snapshot = await MarketPriceSnapshotModel.create({
         itemId: testItem.itemId,
         timestamp: Date.now(),
@@ -361,7 +361,7 @@ describe('MarketPriceSnapshotModel', () => {
 
       // Since itemId is a number, we can manually lookup the item
       const item = await ItemModel.findOne({ itemId: snapshot.itemId });
-      
+
       expect(item).toBeDefined();
       expect(item).not.toBeNull();
       expect(item.name).toBe('Fire rune');

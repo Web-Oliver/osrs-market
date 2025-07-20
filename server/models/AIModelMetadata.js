@@ -1,6 +1,6 @@
 /**
  * 🤖 AI Model Metadata Schema - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Mongoose Model for AI Model Metadata Storage
  * - Stores metadata about trained AI models
  * - Tracks model performance metrics and versions
@@ -13,7 +13,7 @@ const mongoose = require('mongoose');
 
 /**
  * AI Model Metadata Schema
- * 
+ *
  * Stores comprehensive metadata about AI models including:
  * - Model identification and versioning
  * - Performance metrics and statistics
@@ -30,14 +30,14 @@ const AIModelMetadataSchema = new mongoose.Schema({
     trim: true,
     maxlength: 100
   },
-  
+
   version: {
     type: String,
     required: true,
     trim: true,
     maxlength: 50
   },
-  
+
   // Training information
   trainingDate: {
     type: Date,
@@ -45,18 +45,18 @@ const AIModelMetadataSchema = new mongoose.Schema({
     default: Date.now,
     index: true
   },
-  
+
   trainingDuration: {
     type: Number, // Duration in milliseconds
     min: 0
   },
-  
+
   trainingEpisodes: {
     type: Number,
     min: 0,
     default: 0
   },
-  
+
   // Performance metrics
   performanceMetrics: {
     roi: {
@@ -107,7 +107,7 @@ const AIModelMetadataSchema = new mongoose.Schema({
       default: 0
     }
   },
-  
+
   // Technical metrics
   technicalMetrics: {
     modelSize: {
@@ -139,7 +139,7 @@ const AIModelMetadataSchema = new mongoose.Schema({
       default: 0.001
     }
   },
-  
+
   // Model configuration
   modelConfig: {
     architecture: {
@@ -156,7 +156,7 @@ const AIModelMetadataSchema = new mongoose.Schema({
       default: {}
     }
   },
-  
+
   // Storage information
   storagePath: {
     type: String,
@@ -164,18 +164,18 @@ const AIModelMetadataSchema = new mongoose.Schema({
     trim: true,
     maxlength: 500
   },
-  
+
   storageSize: {
     type: Number, // Size in bytes
     min: 0
   },
-  
+
   checksum: {
     type: String,
     trim: true,
     maxlength: 128
   },
-  
+
   // Deployment status
   status: {
     type: String,
@@ -184,17 +184,17 @@ const AIModelMetadataSchema = new mongoose.Schema({
     default: 'testing',
     index: true
   },
-  
+
   deployedAt: {
     type: Date,
     index: true
   },
-  
+
   archivedAt: {
     type: Date,
     index: true
   },
-  
+
   // Validation metrics
   validationMetrics: {
     backtestPeriod: {
@@ -214,7 +214,7 @@ const AIModelMetadataSchema = new mongoose.Schema({
       max: 1
     }
   },
-  
+
   // Usage statistics
   usageStats: {
     totalPredictions: {
@@ -237,7 +237,7 @@ const AIModelMetadataSchema = new mongoose.Schema({
       default: 0
     }
   },
-  
+
   // Metadata
   createdBy: {
     type: String,
@@ -245,26 +245,26 @@ const AIModelMetadataSchema = new mongoose.Schema({
     maxlength: 100,
     default: 'system'
   },
-  
+
   description: {
     type: String,
     trim: true,
     maxlength: 1000
   },
-  
+
   tags: [{
     type: String,
     trim: true,
     maxlength: 50
   }],
-  
+
   // Timestamps
   createdAt: {
     type: Date,
     default: Date.now,
     index: true
   },
-  
+
   updatedAt: {
     type: Date,
     default: Date.now,
@@ -341,13 +341,13 @@ AIModelMetadataSchema.methods.archive = function() {
 AIModelMetadataSchema.methods.calculateEfficiencyScore = function() {
   const metrics = this.performanceMetrics;
   const technical = this.technicalMetrics;
-  
+
   // Weighted score calculation
   const profitabilityScore = (metrics.roi || 0) * 0.3;
   const accuracyScore = (metrics.accuracy || 0) * 0.25;
   const winRateScore = (metrics.winRate || 0) * 0.25;
   const efficiencyScore = technical.averageReward ? (technical.averageReward * 0.2) : 0;
-  
+
   return Math.max(0, Math.min(1, profitabilityScore + accuracyScore + winRateScore + efficiencyScore));
 };
 
@@ -432,7 +432,7 @@ AIModelMetadataSchema.statics.getModelStatistics = function() {
 AIModelMetadataSchema.statics.findModelsForCleanup = function(daysOld = 30) {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - daysOld);
-  
+
   return this.find({
     status: 'archived',
     archivedAt: { $lt: cutoffDate }
@@ -452,7 +452,9 @@ AIModelMetadataSchema.virtual('ageInDays').get(function() {
  * Days since last use
  */
 AIModelMetadataSchema.virtual('daysSinceLastUse').get(function() {
-  if (!this.usageStats.lastUsedAt) return null;
+  if (!this.usageStats.lastUsedAt) {
+    return null;
+  }
   return Math.floor((Date.now() - this.usageStats.lastUsedAt.getTime()) / (24 * 60 * 60 * 1000));
 });
 

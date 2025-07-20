@@ -1,6 +1,6 @@
 /**
  * 🔧 Request Middleware - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Middleware Layer
  * - Request logging and tracking
  * - Security headers and CORS
@@ -31,7 +31,7 @@ class RequestMiddleware {
       // Context7 Pattern: Add unique request ID
       req.id = uuidv4();
       req.startTime = Date.now();
-      
+
       // Context7 Pattern: Enhanced request logging
       this.logger.info('Incoming request', {
         requestId: req.id,
@@ -49,7 +49,7 @@ class RequestMiddleware {
       const logger = this.logger;
       res.send = function(data) {
         const duration = Date.now() - req.startTime;
-        
+
         logger.info('Response sent', {
           requestId: req.id,
           statusCode: res.statusCode,
@@ -74,7 +74,7 @@ class RequestMiddleware {
       req.id = uuidv4();
       req.startTime = Date.now();
       req.serviceName = serviceName;
-      
+
       // Context7 Pattern: Enhanced request logging with service context
       this.logger.info(`[${serviceName}] Incoming request`, {
         requestId: req.id,
@@ -93,7 +93,7 @@ class RequestMiddleware {
       const logger = this.logger;
       res.send = function(data) {
         const duration = Date.now() - req.startTime;
-        
+
         logger.info(`[${serviceName}] Response sent`, {
           requestId: req.id,
           service: serviceName,
@@ -117,7 +117,7 @@ class RequestMiddleware {
     return (req, res, next) => {
       // Context7 Pattern: Apply security headers
       this.securityHeadersManager.applyHeaders(res);
-      
+
       this.logger.debug('Security headers applied', {
         requestId: req.id,
         headers: this.securityHeadersManager.getAppliedHeaders()
@@ -143,7 +143,7 @@ class RequestMiddleware {
 
     return (req, res, next) => {
       const origin = req.headers.origin;
-      
+
       // Context7 Pattern: Dynamic origin checking
       if (corsOptions.origin.includes(origin) || corsOptions.origin.includes('*')) {
         res.header('Access-Control-Allow-Origin', origin);
@@ -161,7 +161,7 @@ class RequestMiddleware {
           origin,
           method: req.headers['access-control-request-method']
         });
-        
+
         return res.status(200).end();
       }
 
@@ -189,7 +189,7 @@ class RequestMiddleware {
 
     const rateLimitOptions = { ...defaultOptions, ...options };
 
-    return async (req, res, next) => {
+    return async(req, res, next) => {
       try {
         const key = `rate_limit:${req.ip}`;
         const result = await this.rateLimiter.checkLimit(key, rateLimitOptions);
@@ -228,7 +228,7 @@ class RequestMiddleware {
           requestId: req.id,
           ip: req.ip
         });
-        
+
         // Context7 Pattern: Fail open for availability
         next();
       }
@@ -243,7 +243,7 @@ class RequestMiddleware {
       try {
         // Context7 Pattern: Validate request body, query, and params
         const validation = this.validateRequestData(req, schema);
-        
+
         if (!validation.isValid) {
           this.logger.warn('Request validation failed', {
             requestId: req.id,
@@ -269,7 +269,7 @@ class RequestMiddleware {
         this.logger.error('Request validation middleware error', error, {
           requestId: req.id
         });
-        
+
         return res.status(500).json({
           error: 'Internal server error',
           message: 'Request validation failed'
@@ -288,11 +288,11 @@ class RequestMiddleware {
         if (req.body) {
           req.body = this.sanitizeObject(req.body);
         }
-        
+
         if (req.query) {
           req.query = this.sanitizeObject(req.query);
         }
-        
+
         if (req.params) {
           req.params = this.sanitizeObject(req.params);
         }
@@ -309,7 +309,7 @@ class RequestMiddleware {
         this.logger.error('Request sanitization error', error, {
           requestId: req.id
         });
-        
+
         return res.status(500).json({
           error: 'Internal server error',
           message: 'Request sanitization failed'
@@ -325,7 +325,7 @@ class RequestMiddleware {
     return (req, res, next) => {
       // Context7 Pattern: Start performance monitoring
       const monitor = this.performanceMonitor.startMonitoring(req.id);
-      
+
       req.performanceMonitor = monitor;
 
       // Context7 Pattern: Monitor response
@@ -333,7 +333,7 @@ class RequestMiddleware {
       const logger = this.logger;
       res.send = function(data) {
         const metrics = monitor.finish();
-        
+
         if (metrics) {
           logger.info('Performance metrics', {
             requestId: req.id,
@@ -348,9 +348,9 @@ class RequestMiddleware {
           // Context7 Pattern: Add performance headers
           res.set({
             'X-Response-Time': `${metrics.duration}ms`,
-          'X-Memory-Usage': `${metrics.memoryUsage}MB`,
-          'X-Request-ID': req.id
-        });
+            'X-Memory-Usage': `${metrics.memoryUsage}MB`,
+            'X-Request-ID': req.id
+          });
         }
 
         return originalSend.call(this, data);
@@ -408,8 +408,8 @@ class RequestMiddleware {
       // Context7 Pattern: Extract API version from header or URL
       const versionHeader = req.get('API-Version');
       const versionFromUrl = req.originalUrl.match(/\/v(\d+)\//);
-      
-      req.apiVersion = versionHeader || 
+
+      req.apiVersion = versionHeader ||
                       (versionFromUrl ? versionFromUrl[1] : '1');
 
       this.logger.debug('API version detected', {
@@ -432,18 +432,18 @@ class RequestMiddleware {
    */
   validateRequestData(req, schema) {
     const errors = [];
-    
+
     // Context7 Pattern: Validate different parts of request
     if (schema.body && req.body) {
       const bodyErrors = this.validateAgainstSchema(req.body, schema.body, 'body');
       errors.push(...bodyErrors);
     }
-    
+
     if (schema.query && req.query) {
       const queryErrors = this.validateAgainstSchema(req.query, schema.query, 'query');
       errors.push(...queryErrors);
     }
-    
+
     if (schema.params && req.params) {
       const paramErrors = this.validateAgainstSchema(req.params, schema.params, 'params');
       errors.push(...paramErrors);
@@ -460,25 +460,25 @@ class RequestMiddleware {
    */
   validateAgainstSchema(data, schema, location) {
     const errors = [];
-    
+
     // Context7 Pattern: Basic validation logic
     for (const [field, rules] of Object.entries(schema)) {
       if (rules.required && !data[field]) {
         errors.push(`${location}.${field} is required`);
       }
-      
+
       if (data[field] && rules.type && typeof data[field] !== rules.type) {
         errors.push(`${location}.${field} must be of type ${rules.type}`);
       }
-      
+
       if (data[field] && rules.minLength && data[field].length < rules.minLength) {
         errors.push(`${location}.${field} must be at least ${rules.minLength} characters`);
       }
-      
+
       if (data[field] && rules.maxLength && data[field].length > rules.maxLength) {
         errors.push(`${location}.${field} must not exceed ${rules.maxLength} characters`);
       }
-      
+
       if (data[field] && rules.pattern && typeof data[field] === 'string') {
         const regex = new RegExp(rules.pattern);
         if (!regex.test(data[field])) {
@@ -486,7 +486,7 @@ class RequestMiddleware {
         }
       }
     }
-    
+
     return errors;
   }
 
@@ -499,11 +499,11 @@ class RequestMiddleware {
     }
 
     const sanitized = {};
-    
+
     for (const [key, value] of Object.entries(obj)) {
       // Context7 Pattern: Sanitize keys and values
       const sanitizedKey = this.sanitizeString(key);
-      
+
       if (typeof value === 'string') {
         sanitized[sanitizedKey] = this.sanitizeString(value);
       } else if (typeof value === 'object' && value !== null) {

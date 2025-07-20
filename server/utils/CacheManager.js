@@ -1,6 +1,6 @@
 /**
  * 🗄️ Cache Manager - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Centralized Cache Management System
  * - In-memory caching with TTL support
  * - Pattern-based cache invalidation
@@ -21,7 +21,7 @@ class CacheManager {
       deletes: 0,
       expired: 0
     };
-    
+
     // Context7 Pattern: Cleanup interval
     this.cleanupInterval = setInterval(() => {
       this.cleanup();
@@ -34,12 +34,12 @@ class CacheManager {
   get(key) {
     const namespacedKey = this.getNamespacedKey(key);
     const item = this.cache.get(namespacedKey);
-    
+
     if (!item) {
       this.stats.misses++;
       return null;
     }
-    
+
     // Check if expired
     if (this.isExpired(item)) {
       this.delete(key);
@@ -47,7 +47,7 @@ class CacheManager {
       this.stats.misses++;
       return null;
     }
-    
+
     this.stats.hits++;
     return item.value;
   }
@@ -59,28 +59,28 @@ class CacheManager {
     const namespacedKey = this.getNamespacedKey(key);
     const expiry = ttl || this.defaultTTL;
     const expiresAt = Date.now() + expiry;
-    
+
     const item = {
       value,
       expiresAt,
       createdAt: Date.now(),
       accessCount: 0
     };
-    
+
     // Clear existing timer if present
     if (this.timers.has(namespacedKey)) {
       clearTimeout(this.timers.get(namespacedKey));
     }
-    
+
     // Set new timer
     const timer = setTimeout(() => {
       this.delete(key);
     }, expiry);
-    
+
     this.cache.set(namespacedKey, item);
     this.timers.set(namespacedKey, timer);
     this.stats.sets++;
-    
+
     return true;
   }
 
@@ -89,18 +89,18 @@ class CacheManager {
    */
   delete(key) {
     const namespacedKey = this.getNamespacedKey(key);
-    
+
     // Clear timer
     if (this.timers.has(namespacedKey)) {
       clearTimeout(this.timers.get(namespacedKey));
       this.timers.delete(namespacedKey);
     }
-    
+
     const deleted = this.cache.delete(namespacedKey);
     if (deleted) {
       this.stats.deletes++;
     }
-    
+
     return deleted;
   }
 
@@ -110,16 +110,16 @@ class CacheManager {
   has(key) {
     const namespacedKey = this.getNamespacedKey(key);
     const item = this.cache.get(namespacedKey);
-    
+
     if (!item) {
       return false;
     }
-    
+
     if (this.isExpired(item)) {
       this.delete(key);
       return false;
     }
-    
+
     return true;
   }
 
@@ -128,15 +128,15 @@ class CacheManager {
    */
   async getOrSet(key, factory, ttl = null) {
     const cachedValue = this.get(key);
-    
+
     if (cachedValue !== null) {
       return cachedValue;
     }
-    
+
     // Execute factory function
     const value = await factory();
     this.set(key, value, ttl);
-    
+
     return value;
   }
 
@@ -146,16 +146,16 @@ class CacheManager {
   deletePattern(pattern) {
     const regex = new RegExp(pattern.replace(/\*/g, '.*'));
     const keysToDelete = [];
-    
+
     for (const namespacedKey of this.cache.keys()) {
       const key = this.removeNamespace(namespacedKey);
       if (regex.test(key)) {
         keysToDelete.push(key);
       }
     }
-    
+
     keysToDelete.forEach(key => this.delete(key));
-    
+
     return keysToDelete.length;
   }
 
@@ -167,11 +167,11 @@ class CacheManager {
     for (const timer of this.timers.values()) {
       clearTimeout(timer);
     }
-    
+
     this.cache.clear();
     this.timers.clear();
     this.stats.deletes += this.cache.size;
-    
+
     return true;
   }
 
@@ -181,7 +181,7 @@ class CacheManager {
   getStats() {
     const totalRequests = this.stats.hits + this.stats.misses;
     const hitRate = totalRequests > 0 ? (this.stats.hits / totalRequests) * 100 : 0;
-    
+
     return {
       ...this.stats,
       hitRate: Math.round(hitRate * 100) / 100,
@@ -217,7 +217,7 @@ class CacheManager {
       stats: this.getStats(),
       keys: this.getKeys()
     };
-    
+
     return info;
   }
 
@@ -227,27 +227,27 @@ class CacheManager {
   extend(key, additionalTTL) {
     const namespacedKey = this.getNamespacedKey(key);
     const item = this.cache.get(namespacedKey);
-    
+
     if (!item || this.isExpired(item)) {
       return false;
     }
-    
+
     // Update expiry
     item.expiresAt += additionalTTL;
-    
+
     // Clear existing timer
     if (this.timers.has(namespacedKey)) {
       clearTimeout(this.timers.get(namespacedKey));
     }
-    
+
     // Set new timer
     const newTTL = item.expiresAt - Date.now();
     const timer = setTimeout(() => {
       this.delete(key);
     }, newTTL);
-    
+
     this.timers.set(namespacedKey, timer);
-    
+
     return true;
   }
 
@@ -257,11 +257,11 @@ class CacheManager {
   getTTL(key) {
     const namespacedKey = this.getNamespacedKey(key);
     const item = this.cache.get(namespacedKey);
-    
+
     if (!item || this.isExpired(item)) {
       return -1;
     }
-    
+
     return item.expiresAt - Date.now();
   }
 
@@ -271,11 +271,11 @@ class CacheManager {
   touch(key) {
     const namespacedKey = this.getNamespacedKey(key);
     const item = this.cache.get(namespacedKey);
-    
+
     if (!item || this.isExpired(item)) {
       return false;
     }
-    
+
     item.accessCount++;
     return true;
   }
@@ -285,7 +285,7 @@ class CacheManager {
    */
   export() {
     const data = {};
-    
+
     for (const [namespacedKey, item] of this.cache.entries()) {
       if (!this.isExpired(item)) {
         const key = this.removeNamespace(namespacedKey);
@@ -297,7 +297,7 @@ class CacheManager {
         };
       }
     }
-    
+
     return data;
   }
 
@@ -309,14 +309,14 @@ class CacheManager {
       if (!this.isExpired(item)) {
         const namespacedKey = this.getNamespacedKey(key);
         this.cache.set(namespacedKey, item);
-        
+
         // Set timer for remaining TTL
         const remainingTTL = item.expiresAt - Date.now();
         if (remainingTTL > 0) {
           const timer = setTimeout(() => {
             this.delete(key);
           }, remainingTTL);
-          
+
           this.timers.set(namespacedKey, timer);
         }
       }
@@ -350,15 +350,15 @@ class CacheManager {
   cleanup() {
     const now = Date.now();
     const keysToDelete = [];
-    
+
     for (const [namespacedKey, item] of this.cache.entries()) {
       if (now > item.expiresAt) {
         keysToDelete.push(this.removeNamespace(namespacedKey));
       }
     }
-    
+
     keysToDelete.forEach(key => this.delete(key));
-    
+
     return keysToDelete.length;
   }
 
@@ -367,12 +367,12 @@ class CacheManager {
    */
   getMemoryUsage() {
     let totalSize = 0;
-    
+
     for (const [key, item] of this.cache.entries()) {
       totalSize += this.getObjectSize(key);
       totalSize += this.getObjectSize(item);
     }
-    
+
     return {
       bytes: totalSize,
       kb: Math.round(totalSize / 1024 * 100) / 100,
@@ -386,7 +386,7 @@ class CacheManager {
   getObjectSize(obj) {
     try {
       return JSON.stringify(obj).length * 2; // Rough estimate
-    } catch (error) {
+    } catch {
       return 0;
     }
   }
@@ -399,12 +399,12 @@ class CacheManager {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
     }
-    
+
     // Clear all timers
     for (const timer of this.timers.values()) {
       clearTimeout(timer);
     }
-    
+
     // Clear cache
     this.cache.clear();
     this.timers.clear();

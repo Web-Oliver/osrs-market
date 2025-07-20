@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Activity, Database, Zap, TrendingUp, Eye, AlertTriangle, CheckCircle, Clock, DollarSign, BarChart3, Brain, Cpu, HardDrive, Wifi, RefreshCw } from 'lucide-react';
+import { Activity, Database, Zap, AlertTriangle, BarChart3, Brain, Cpu, Wifi, RefreshCw } from 'lucide-react';
 import MetricsCard from './MetricsCard';
 
 interface SystemStatus {

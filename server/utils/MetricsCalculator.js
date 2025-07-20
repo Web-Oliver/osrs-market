@@ -1,6 +1,6 @@
 /**
  * 📊 Metrics Calculator - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Advanced Metrics Calculation System
  * - Statistical calculations for monitoring data
  * - Performance metrics analysis
@@ -179,7 +179,7 @@ class MetricsCalculator {
       return null;
     }
 
-    const values = data.map(item => 
+    const values = data.map(item =>
       field ? this.getNestedValue(item, field) : item
     ).filter(value => typeof value === 'number' && !isNaN(value));
 
@@ -221,7 +221,7 @@ class MetricsCalculator {
     }
 
     const movingAverages = [];
-    
+
     for (let i = window - 1; i < data.length; i++) {
       const slice = data.slice(i - window + 1, i + 1);
       const sum = slice.reduce((acc, val) => acc + val, 0);
@@ -240,7 +240,7 @@ class MetricsCalculator {
     }
 
     const ema = [data[0]];
-    
+
     for (let i = 1; i < data.length; i++) {
       const prevEma = ema[i - 1];
       const currentEma = alpha * data[i] + (1 - alpha) * prevEma;
@@ -254,7 +254,7 @@ class MetricsCalculator {
    * Context7 Pattern: Calculate correlation between two datasets
    */
   calculateCorrelation(dataX, dataY) {
-    if (!Array.isArray(dataX) || !Array.isArray(dataY) || 
+    if (!Array.isArray(dataX) || !Array.isArray(dataY) ||
         dataX.length !== dataY.length || dataX.length === 0) {
       return null;
     }
@@ -337,14 +337,16 @@ class MetricsCalculator {
     }
 
     const stats = this.calculateStatistics(data);
-    if (!stats) return [];
+    if (!stats) {
+      return [];
+    }
 
     const anomalies = [];
     const zScoreThreshold = threshold;
 
     data.forEach((value, index) => {
       const zScore = Math.abs((value - stats.mean) / stats.standardDeviation);
-      
+
       if (zScore > zScoreThreshold) {
         anomalies.push({
           index,
@@ -408,8 +410,8 @@ class MetricsCalculator {
    */
   calculateMedian(sortedValues) {
     const mid = Math.floor(sortedValues.length / 2);
-    return sortedValues.length % 2 === 0 ? 
-      (sortedValues[mid - 1] + sortedValues[mid]) / 2 : 
+    return sortedValues.length % 2 === 0 ?
+      (sortedValues[mid - 1] + sortedValues[mid]) / 2 :
       sortedValues[mid];
   }
 
@@ -436,7 +438,7 @@ class MetricsCalculator {
     if (!historicalData || historicalData.length < 2) {
       return [];
     }
-    
+
     return historicalData
       .map(point => point[metricName])
       .filter(val => val !== undefined && val !== null)
@@ -447,14 +449,20 @@ class MetricsCalculator {
    * Calculate trend direction
    */
   calculateTrendDirection(data) {
-    if (data.length < 2) return 'stable';
-    
+    if (data.length < 2) {
+      return 'stable';
+    }
+
     const start = data[0];
     const end = data[data.length - 1];
     const change = ((end - start) / start) * 100;
-    
-    if (change > 5) return 'increasing';
-    if (change < -5) return 'decreasing';
+
+    if (change > 5) {
+      return 'increasing';
+    }
+    if (change < -5) {
+      return 'decreasing';
+    }
     return 'stable';
   }
 
@@ -470,17 +478,17 @@ class MetricsCalculator {
    */
   getCachedOrCalculate(key, calculator) {
     const cached = this.cache.get(key);
-    
+
     if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
       return cached.result;
     }
-    
+
     const result = calculator();
     this.cache.set(key, {
       result,
       timestamp: Date.now()
     });
-    
+
     return result;
   }
 }

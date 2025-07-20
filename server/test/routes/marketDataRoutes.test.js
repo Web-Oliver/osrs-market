@@ -1,6 +1,6 @@
 /**
  * 📊 Market Data Routes Tests - Context7 Pattern
- * 
+ *
  * Context7 Pattern: API Endpoint Testing
  * - Integration tests for Express routes
  * - Tests for POST /api/market-data/snapshot
@@ -33,7 +33,7 @@ jest.mock('../../middleware/RequestMiddleware', () => ({
 jest.mock('../../middleware/ErrorMiddleware', () => ({
   ErrorMiddleware: jest.fn().mockImplementation(() => ({
     handleAsyncError: (fn) => fn,
-    handleError: (err, req, res, next) => {
+    handleError: (err, req, res, _next) => {
       res.status(500).json({ success: false, error: err.message });
     },
     handleNotFound: (req, res) => {
@@ -77,7 +77,7 @@ describe('Market Data Routes', () => {
   let app;
   let testItem;
 
-  beforeAll(async () => {
+  beforeAll(async() => {
     // Connect to test database
     if (mongoose.connection.readyState === 0) {
       await mongoose.connect('mongodb://localhost:27017/osrs_market_test');
@@ -107,12 +107,12 @@ describe('Market Data Routes', () => {
     }
   });
 
-  beforeEach(async () => {
+  beforeEach(async() => {
     // Clean up test data before each test
     await MarketPriceSnapshotModel.deleteMany({});
   });
 
-  afterAll(async () => {
+  afterAll(async() => {
     // Clean up test data and close connection
     await MarketPriceSnapshotModel.deleteMany({});
     await ItemModel.deleteMany({});
@@ -130,7 +130,7 @@ describe('Market Data Routes', () => {
       source: 'osrs_wiki_api'
     };
 
-    test('should create a new market snapshot and return 201', async () => {
+    test('should create a new market snapshot and return 201', async() => {
       const response = await request(app)
         .post('/api/market-data/snapshot')
         .send(validSnapshotData)
@@ -146,7 +146,7 @@ describe('Market Data Routes', () => {
       expect(response.body.data.source).toBe(validSnapshotData.source);
     });
 
-    test('should update existing snapshot with same key', async () => {
+    test('should update existing snapshot with same key', async() => {
       // Create initial snapshot
       const initialResponse = await request(app)
         .post('/api/market-data/snapshot')
@@ -173,7 +173,7 @@ describe('Market Data Routes', () => {
       expect(updateResponse.body.data.lowPrice).toBe(2550000);
     });
 
-    test('should return 400 for missing required fields', async () => {
+    test('should return 400 for missing required fields', async() => {
       const invalidData = {
         timestamp: Date.now(),
         interval: 'latest',
@@ -192,7 +192,7 @@ describe('Market Data Routes', () => {
       expect(response.body.error).toContain('Missing required fields');
     });
 
-    test('should return 400 for invalid interval', async () => {
+    test('should return 400 for invalid interval', async() => {
       const invalidData = {
         ...validSnapshotData,
         interval: 'invalid_interval'
@@ -207,11 +207,11 @@ describe('Market Data Routes', () => {
       expect(response.body.error).toContain('Invalid interval');
     });
 
-    test('should return 400 for invalid price relationship', async () => {
+    test('should return 400 for invalid price relationship', async() => {
       const invalidData = {
         ...validSnapshotData,
         highPrice: 2400000,
-        lowPrice: 2500000  // lowPrice > highPrice
+        lowPrice: 2500000 // lowPrice > highPrice
       };
 
       const response = await request(app)
@@ -223,10 +223,10 @@ describe('Market Data Routes', () => {
       expect(response.body.error).toContain('High price cannot be less than low price');
     });
 
-    test('should return 400 for invalid RSI value', async () => {
+    test('should return 400 for invalid RSI value', async() => {
       const invalidData = {
         ...validSnapshotData,
-        rsi: 150  // RSI should be 0-100
+        rsi: 150 // RSI should be 0-100
       };
 
       const response = await request(app)
@@ -238,7 +238,7 @@ describe('Market Data Routes', () => {
       expect(response.body.error).toContain('RSI must be between 0 and 100');
     });
 
-    test('should accept valid advanced calculated metrics', async () => {
+    test('should accept valid advanced calculated metrics', async() => {
       const dataWithMetrics = {
         ...validSnapshotData,
         marginGp: 50000,
@@ -263,7 +263,7 @@ describe('Market Data Routes', () => {
   });
 
   describe('GET /api/market-data/:itemId', () => {
-    beforeEach(async () => {
+    beforeEach(async() => {
       // Create test snapshots
       const baseTime = Date.now();
       const testSnapshots = [
@@ -311,7 +311,7 @@ describe('Market Data Routes', () => {
       }
     });
 
-    test('should return all snapshots for an item', async () => {
+    test('should return all snapshots for an item', async() => {
       const response = await request(app)
         .get('/api/market-data/4151')
         .expect(200);
@@ -322,7 +322,7 @@ describe('Market Data Routes', () => {
       expect(response.body.data[0].itemId).toBe(4151);
     });
 
-    test('should filter by interval', async () => {
+    test('should filter by interval', async() => {
       const response = await request(app)
         .get('/api/market-data/4151')
         .query({ interval: 'latest' })
@@ -333,10 +333,10 @@ describe('Market Data Routes', () => {
       expect(response.body.data.every(snap => snap.interval === 'latest')).toBe(true);
     });
 
-    test('should filter by date range', async () => {
+    test('should filter by date range', async() => {
       const baseTime = Date.now();
       const startDate = baseTime - 2400000; // 40 minutes ago
-      const endDate = baseTime + 1000;      // 1 second from now
+      const endDate = baseTime + 1000; // 1 second from now
 
       const response = await request(app)
         .get('/api/market-data/4151')
@@ -345,12 +345,12 @@ describe('Market Data Routes', () => {
 
       expect(response.body.success).toBe(true);
       expect(response.body.data.length).toBeGreaterThan(0);
-      expect(response.body.data.every(snap => 
+      expect(response.body.data.every(snap =>
         snap.timestamp >= startDate && snap.timestamp <= endDate
       )).toBe(true);
     });
 
-    test('should filter by interval and date range', async () => {
+    test('should filter by interval and date range', async() => {
       const baseTime = Date.now();
       const startDate = baseTime - 2400000;
       const endDate = baseTime + 1000;
@@ -361,14 +361,14 @@ describe('Market Data Routes', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data.every(snap => 
+      expect(response.body.data.every(snap =>
         snap.interval === 'latest' &&
-        snap.timestamp >= startDate && 
+        snap.timestamp >= startDate &&
         snap.timestamp <= endDate
       )).toBe(true);
     });
 
-    test('should return 404 for non-existent item', async () => {
+    test('should return 404 for non-existent item', async() => {
       const response = await request(app)
         .get('/api/market-data/99999')
         .expect(404);
@@ -377,7 +377,7 @@ describe('Market Data Routes', () => {
       expect(response.body.error).toContain('No market snapshots found');
     });
 
-    test('should return 400 for invalid itemId', async () => {
+    test('should return 400 for invalid itemId', async() => {
       const response = await request(app)
         .get('/api/market-data/invalid')
         .expect(400);
@@ -386,7 +386,7 @@ describe('Market Data Routes', () => {
       expect(response.body.error).toContain('itemId must be a valid number');
     });
 
-    test('should handle startDate only', async () => {
+    test('should handle startDate only', async() => {
       const baseTime = Date.now();
       const startDate = baseTime - 1800000; // 30 minutes ago
 
@@ -396,12 +396,12 @@ describe('Market Data Routes', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data.every(snap => 
+      expect(response.body.data.every(snap =>
         snap.timestamp >= startDate
       )).toBe(true);
     });
 
-    test('should handle endDate only', async () => {
+    test('should handle endDate only', async() => {
       const baseTime = Date.now();
       const endDate = baseTime - 1800000; // 30 minutes ago
 
@@ -411,19 +411,19 @@ describe('Market Data Routes', () => {
         .expect(200);
 
       expect(response.body.success).toBe(true);
-      expect(response.body.data.every(snap => 
+      expect(response.body.data.every(snap =>
         snap.timestamp <= endDate
       )).toBe(true);
     });
 
-    test('should return snapshots sorted by timestamp (newest first)', async () => {
+    test('should return snapshots sorted by timestamp (newest first)', async() => {
       const response = await request(app)
         .get('/api/market-data/4151')
         .expect(200);
 
       expect(response.body.success).toBe(true);
       const timestamps = response.body.data.map(snap => snap.timestamp);
-      
+
       // Check if timestamps are sorted in descending order
       for (let i = 0; i < timestamps.length - 1; i++) {
         expect(timestamps[i]).toBeGreaterThanOrEqual(timestamps[i + 1]);
@@ -432,7 +432,7 @@ describe('Market Data Routes', () => {
   });
 
   describe('Integration Tests', () => {
-    test('should work with real database operations', async () => {
+    test('should work with real database operations', async() => {
       const snapshotData = {
         itemId: 4151,
         timestamp: Date.now(),

@@ -1,6 +1,6 @@
 /**
  * 🔍 Base Validator - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Base Validation Class
  * - Shared validation logic
  * - Reusable validation methods
@@ -18,13 +18,13 @@ class BaseValidator {
    */
   validateData(data, schema) {
     this.errors = [];
-    
+
     // Validate each section of the schema
     for (const [section, rules] of Object.entries(schema)) {
       const sectionData = data[section] || {};
       this.validateSection(sectionData, rules, section);
     }
-    
+
     return {
       isValid: this.errors.length === 0,
       errors: this.errors
@@ -49,12 +49,12 @@ class BaseValidator {
       this.errors.push(`${fieldPath} is required`);
       return;
     }
-    
+
     // Skip validation if field is optional and not provided
     if (rule.optional && (value === undefined || value === null)) {
       return;
     }
-    
+
     // Type validation
     if (value !== undefined && value !== null) {
       this.validateType(value, rule, fieldPath);
@@ -66,23 +66,23 @@ class BaseValidator {
    */
   validateType(value, rule, fieldPath) {
     switch (rule.type) {
-      case 'string':
-        this.validateString(value, rule, fieldPath);
-        break;
-      case 'number':
-        this.validateNumber(value, rule, fieldPath);
-        break;
-      case 'boolean':
-        this.validateBoolean(value, rule, fieldPath);
-        break;
-      case 'array':
-        this.validateArray(value, rule, fieldPath);
-        break;
-      case 'object':
-        this.validateObject(value, rule, fieldPath);
-        break;
-      default:
-        this.errors.push(`${fieldPath} has unknown type: ${rule.type}`);
+    case 'string':
+      this.validateString(value, rule, fieldPath);
+      break;
+    case 'number':
+      this.validateNumber(value, rule, fieldPath);
+      break;
+    case 'boolean':
+      this.validateBoolean(value, rule, fieldPath);
+      break;
+    case 'array':
+      this.validateArray(value, rule, fieldPath);
+      break;
+    case 'object':
+      this.validateObject(value, rule, fieldPath);
+      break;
+    default:
+      this.errors.push(`${fieldPath} has unknown type: ${rule.type}`);
     }
   }
 
@@ -94,21 +94,21 @@ class BaseValidator {
       this.errors.push(`${fieldPath} must be a string`);
       return;
     }
-    
+
     // Length validation
     if (rule.minLength && value.length < rule.minLength) {
       this.errors.push(`${fieldPath} must be at least ${rule.minLength} characters long`);
     }
-    
+
     if (rule.maxLength && value.length > rule.maxLength) {
       this.errors.push(`${fieldPath} must not exceed ${rule.maxLength} characters`);
     }
-    
+
     // Enum validation
     if (rule.enum && !rule.enum.includes(value)) {
       this.errors.push(`${fieldPath} must be one of: ${rule.enum.join(', ')}`);
     }
-    
+
     // Pattern validation
     if (rule.pattern && !rule.pattern.test(value)) {
       this.errors.push(`${fieldPath} does not match required pattern`);
@@ -120,21 +120,21 @@ class BaseValidator {
    */
   validateNumber(value, rule, fieldPath) {
     const numericValue = Number(value);
-    
+
     if (isNaN(numericValue)) {
       this.errors.push(`${fieldPath} must be a valid number`);
       return;
     }
-    
+
     // Range validation
     if (rule.min !== undefined && numericValue < rule.min) {
       this.errors.push(`${fieldPath} must be at least ${rule.min}`);
     }
-    
+
     if (rule.max !== undefined && numericValue > rule.max) {
       this.errors.push(`${fieldPath} must not exceed ${rule.max}`);
     }
-    
+
     // Integer validation
     if (rule.integer && !Number.isInteger(numericValue)) {
       this.errors.push(`${fieldPath} must be an integer`);
@@ -158,16 +158,16 @@ class BaseValidator {
       this.errors.push(`${fieldPath} must be an array`);
       return;
     }
-    
+
     // Length validation
     if (rule.minItems && value.length < rule.minItems) {
       this.errors.push(`${fieldPath} must contain at least ${rule.minItems} items`);
     }
-    
+
     if (rule.maxItems && value.length > rule.maxItems) {
       this.errors.push(`${fieldPath} must not contain more than ${rule.maxItems} items`);
     }
-    
+
     // Item validation
     if (rule.items) {
       value.forEach((item, index) => {
@@ -184,7 +184,7 @@ class BaseValidator {
       this.errors.push(`${fieldPath} must be an object`);
       return;
     }
-    
+
     // Properties validation
     if (rule.properties) {
       for (const [prop, propRule] of Object.entries(rule.properties)) {
@@ -218,20 +218,20 @@ class BaseValidator {
    */
   validateTimestamp(timestamp) {
     const numericTimestamp = Number(timestamp);
-    
+
     if (isNaN(numericTimestamp)) {
       return { isValid: false, error: 'Timestamp must be a valid number' };
     }
-    
+
     // Check if timestamp is reasonable (not too old, not too far in future)
     const now = Date.now();
     const oneYearAgo = now - (365 * 24 * 60 * 60 * 1000);
     const oneYearFromNow = now + (365 * 24 * 60 * 60 * 1000);
-    
+
     if (numericTimestamp < oneYearAgo || numericTimestamp > oneYearFromNow) {
       return { isValid: false, error: 'Timestamp is outside reasonable range' };
     }
-    
+
     return { isValid: true, timestamp: numericTimestamp };
   }
 
@@ -242,7 +242,7 @@ class BaseValidator {
     if (typeof input !== 'string') {
       return input;
     }
-    
+
     return input
       .trim()
       .replace(/[<>]/g, '') // Remove potential HTML tags
@@ -256,7 +256,7 @@ class BaseValidator {
   validateIpAddress(ip) {
     const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
     const ipv6Regex = /^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/;
-    
+
     return ipv4Regex.test(ip) || ipv6Regex.test(ip);
   }
 

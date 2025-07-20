@@ -1,27 +1,24 @@
 /**
  * 📊 Financial Metrics Calculator - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Centralized Financial Metrics Calculation System
  * - Single responsibility for all raw financial calculations
  * - DRY principle - consolidates duplicate calculation logic
  * - Used by MarketDataService and TradingAnalysisService
  * - Integrates with GE tax system for accurate profit calculations
  * - Supports technical indicators and risk metrics
- * 
+ *
  * SOLID Principles:
  * - SRP: Single responsibility for metric calculations
  * - OCP: Open for extension with new indicators
  * - DIP: Depends on marketConstants abstraction
  */
 
-const { 
-  calculateProfitAfterTax, 
-  calculateProfitPercentageAfterTax,
+const {
+  calculateProfitAfterTax,
   calculateGETax,
   calculateNetSellPrice,
-  isTaxFree,
-  GE_TAX_RATE,
-  GE_TAX_THRESHOLD_GP 
+  isTaxFree
 } = require('./marketConstants');
 
 const { Logger } = require('./Logger');
@@ -35,11 +32,11 @@ class FinancialMetricsCalculator {
 
   /**
    * Context7 Pattern: Calculate all derived metrics for a market snapshot
-   * 
+   *
    * This is the primary method for calculating all financial metrics
    * from raw market data. It returns a comprehensive object with all
    * calculated values that can be stored in MarketPriceSnapshotModel.
-   * 
+   *
    * @param {Object} rawData - Raw market data with itemId, highPrice, lowPrice, volume, etc.
    * @param {Array} historicalData - Optional historical data for trend analysis
    * @returns {Object} Complete set of calculated metrics
@@ -164,12 +161,14 @@ class FinancialMetricsCalculator {
    * Context7 Pattern: Calculate volume score (0-100)
    */
   calculateVolumeScore(volume) {
-    if (volume <= 0) return 0;
-    
+    if (volume <= 0) {
+      return 0;
+    }
+
     // Logarithmic scale for volume scoring
     const logVolume = Math.log10(volume + 1);
     const maxLogVolume = Math.log10(1000000); // Assume 1M as max reasonable volume
-    
+
     return Math.min(100, (logVolume / maxLogVolume) * 100);
   }
 
@@ -177,14 +176,24 @@ class FinancialMetricsCalculator {
    * Context7 Pattern: Calculate liquidity rating
    */
   calculateLiquidityRating(volume, price) {
-    if (volume <= 0 || price <= 0) return 'very_low';
-    
+    if (volume <= 0 || price <= 0) {
+      return 'very_low';
+    }
+
     const volumeValue = volume * price;
-    
-    if (volumeValue >= 100000000) return 'very_high'; // 100M+
-    if (volumeValue >= 10000000) return 'high'; // 10M+
-    if (volumeValue >= 1000000) return 'medium'; // 1M+
-    if (volumeValue >= 100000) return 'low'; // 100K+
+
+    if (volumeValue >= 100000000) {
+      return 'very_high';
+    } // 100M+
+    if (volumeValue >= 10000000) {
+      return 'high';
+    } // 10M+
+    if (volumeValue >= 1000000) {
+      return 'medium';
+    } // 1M+
+    if (volumeValue >= 100000) {
+      return 'low';
+    } // 100K+
     return 'very_low';
   }
 
@@ -193,8 +202,10 @@ class FinancialMetricsCalculator {
    */
   calculateVolatility(highPrice, lowPrice) {
     const average = this.calculateAveragePrice(highPrice, lowPrice);
-    if (average === 0) return 0;
-    
+    if (average === 0) {
+      return 0;
+    }
+
     const spread = this.calculatePriceSpread(highPrice, lowPrice);
     return (spread / average) * 100;
   }
@@ -204,26 +215,30 @@ class FinancialMetricsCalculator {
    */
   calculateRiskScore(rawData, historicalData = []) {
     let riskScore = 0;
-    
+
     // Volatility risk (0-40 points)
     const volatility = this.calculateVolatility(rawData.highPrice, rawData.lowPrice);
     riskScore += Math.min(40, volatility);
-    
+
     // Volume risk (0-20 points) - low volume = higher risk
     const volumeScore = this.calculateVolumeScore(rawData.volume || 0);
     riskScore += Math.max(0, 20 - (volumeScore * 0.2));
-    
+
     // Price level risk (0-20 points) - very high or very low prices = higher risk
     const avgPrice = this.calculateAveragePrice(rawData.highPrice, rawData.lowPrice);
-    if (avgPrice > 100000000) riskScore += 15; // Very expensive items
-    if (avgPrice < 100) riskScore += 10; // Very cheap items
-    
+    if (avgPrice > 100000000) {
+      riskScore += 15;
+    } // Very expensive items
+    if (avgPrice < 100) {
+      riskScore += 10;
+    } // Very cheap items
+
     // Historical trend risk (0-20 points)
     if (historicalData.length >= 2) {
       const trendRisk = this.calculateTrendRisk(historicalData);
       riskScore += Math.min(20, trendRisk);
     }
-    
+
     return Math.min(100, riskScore);
   }
 
@@ -231,15 +246,17 @@ class FinancialMetricsCalculator {
    * Context7 Pattern: Calculate trading velocity
    */
   calculateVelocity(volume, highPrice, lowPrice) {
-    if (volume <= 0) return 0;
-    
+    if (volume <= 0) {
+      return 0;
+    }
+
     const avgPrice = this.calculateAveragePrice(highPrice, lowPrice);
     const volumeValue = volume * avgPrice;
-    
+
     // Velocity based on volume value turnover
     // Higher volume value = faster trading = higher velocity
     const velocityScore = Math.min(100, Math.log10(volumeValue + 1) * 10);
-    
+
     return velocityScore;
   }
 
@@ -250,17 +267,17 @@ class FinancialMetricsCalculator {
     const marginGp = calculateProfitAfterTax(rawData.lowPrice, rawData.highPrice);
     const velocity = this.calculateVelocity(rawData.volume || 0, rawData.highPrice, rawData.lowPrice);
     const riskScore = this.calculateRiskScore(rawData, historicalData);
-    
+
     // Base calculation: profit * velocity factor * risk adjustment
     const velocityFactor = velocity / 100; // Convert to 0-1 range
     const riskAdjustment = (100 - riskScore) / 100; // Lower risk = higher multiplier
-    
+
     const expectedProfit = marginGp * velocityFactor * riskAdjustment;
-    
+
     // Estimate trades per hour based on volume
     const volumeScore = this.calculateVolumeScore(rawData.volume || 0);
     const tradesPerHour = Math.min(10, volumeScore / 10); // Max 10 trades per hour
-    
+
     return expectedProfit * tradesPerHour;
   }
 
@@ -269,21 +286,21 @@ class FinancialMetricsCalculator {
    */
   calculateTechnicalIndicators(rawData, historicalData = []) {
     const indicators = {};
-    
+
     if (historicalData.length >= 5) {
       // Moving averages
       indicators.trendMovingAverage = this.calculateMovingAverage(historicalData, 5);
-      
+
       // RSI
       if (historicalData.length >= 14) {
         indicators.rsi = this.calculateRSI(historicalData, 14);
       }
-      
+
       // MACD
       if (historicalData.length >= 26) {
         indicators.macd = this.calculateMACD(historicalData);
       }
-      
+
       // Bollinger Bands
       if (historicalData.length >= 20) {
         const bollinger = this.calculateBollingerBands(historicalData, 20);
@@ -292,7 +309,7 @@ class FinancialMetricsCalculator {
         indicators.bollingerMiddle = bollinger.middle;
       }
     }
-    
+
     return indicators;
   }
 
@@ -300,15 +317,19 @@ class FinancialMetricsCalculator {
    * Context7 Pattern: Calculate momentum score
    */
   calculateMomentumScore(rawData, historicalData = []) {
-    if (historicalData.length < 2) return 0;
-    
+    if (historicalData.length < 2) {
+      return 0;
+    }
+
     const currentPrice = this.calculateAveragePrice(rawData.highPrice, rawData.lowPrice);
     const previousPrice = historicalData[historicalData.length - 2];
-    
-    if (!previousPrice || typeof previousPrice !== 'number') return 0;
-    
+
+    if (!previousPrice || typeof previousPrice !== 'number') {
+      return 0;
+    }
+
     const priceChange = ((currentPrice - previousPrice) / previousPrice) * 100;
-    
+
     // Momentum score: -100 to +100
     return Math.max(-100, Math.min(100, priceChange * 5));
   }
@@ -318,14 +339,20 @@ class FinancialMetricsCalculator {
    */
   calculateConfidence(rawData, historicalData = []) {
     let confidence = 0.5; // Base confidence
-    
+
     // Data completeness
-    if (rawData.volume > 0) confidence += 0.2;
-    if (rawData.highPrice > 0 && rawData.lowPrice > 0) confidence += 0.2;
-    
+    if (rawData.volume > 0) {
+      confidence += 0.2;
+    }
+    if (rawData.highPrice > 0 && rawData.lowPrice > 0) {
+      confidence += 0.2;
+    }
+
     // Historical data availability
-    if (historicalData.length >= 10) confidence += 0.1;
-    
+    if (historicalData.length >= 10) {
+      confidence += 0.1;
+    }
+
     return Math.min(1.0, confidence);
   }
 
@@ -334,20 +361,30 @@ class FinancialMetricsCalculator {
    */
   calculateDataQuality(rawData) {
     let quality = 0;
-    
+
     // Price data quality
-    if (rawData.highPrice > 0 && rawData.lowPrice > 0) quality += 30;
-    if (rawData.highPrice >= rawData.lowPrice) quality += 20;
-    
+    if (rawData.highPrice > 0 && rawData.lowPrice > 0) {
+      quality += 30;
+    }
+    if (rawData.highPrice >= rawData.lowPrice) {
+      quality += 20;
+    }
+
     // Volume data quality
-    if (rawData.volume !== undefined && rawData.volume >= 0) quality += 20;
-    
+    if (rawData.volume !== undefined && rawData.volume >= 0) {
+      quality += 20;
+    }
+
     // Timestamp quality
-    if (rawData.timestamp && rawData.timestamp > 0) quality += 15;
-    
+    if (rawData.timestamp && rawData.timestamp > 0) {
+      quality += 15;
+    }
+
     // Source quality
-    if (rawData.source && rawData.source !== 'unknown') quality += 15;
-    
+    if (rawData.source && rawData.source !== 'unknown') {
+      quality += 15;
+    }
+
     return Math.min(100, quality);
   }
 
@@ -355,11 +392,13 @@ class FinancialMetricsCalculator {
    * Context7 Pattern: Calculate moving average
    */
   calculateMovingAverage(historicalData, period) {
-    if (historicalData.length < period) return null;
-    
+    if (historicalData.length < period) {
+      return null;
+    }
+
     const recentData = historicalData.slice(-period);
     const sum = recentData.reduce((acc, value) => acc + (typeof value === 'number' ? value : 0), 0);
-    
+
     return sum / period;
   }
 
@@ -367,12 +406,14 @@ class FinancialMetricsCalculator {
    * Context7 Pattern: Calculate RSI (Relative Strength Index)
    */
   calculateRSI(historicalData, period = 14) {
-    if (historicalData.length < period + 1) return null;
-    
+    if (historicalData.length < period + 1) {
+      return null;
+    }
+
     const prices = historicalData.slice(-period - 1);
     const gains = [];
     const losses = [];
-    
+
     for (let i = 1; i < prices.length; i++) {
       const change = prices[i] - prices[i - 1];
       if (change > 0) {
@@ -383,15 +424,17 @@ class FinancialMetricsCalculator {
         losses.push(Math.abs(change));
       }
     }
-    
+
     const avgGain = gains.reduce((sum, gain) => sum + gain, 0) / gains.length;
     const avgLoss = losses.reduce((sum, loss) => sum + loss, 0) / losses.length;
-    
-    if (avgLoss === 0) return 100;
-    
+
+    if (avgLoss === 0) {
+      return 100;
+    }
+
     const rs = avgGain / avgLoss;
     const rsi = 100 - (100 / (1 + rs));
-    
+
     return Math.max(0, Math.min(100, rsi));
   }
 
@@ -399,15 +442,19 @@ class FinancialMetricsCalculator {
    * Context7 Pattern: Calculate MACD
    */
   calculateMACD(historicalData, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
-    if (historicalData.length < slowPeriod) return null;
-    
+    if (historicalData.length < slowPeriod) {
+      return null;
+    }
+
     const fastEMA = this.calculateEMA(historicalData, fastPeriod);
     const slowEMA = this.calculateEMA(historicalData, slowPeriod);
-    
-    if (fastEMA === null || slowEMA === null) return null;
-    
+
+    if (fastEMA === null || slowEMA === null) {
+      return null;
+    }
+
     const macdLine = fastEMA - slowEMA;
-    
+
     return {
       macd: macdLine,
       signal: 0, // Simplified - would need more complex calculation
@@ -419,20 +466,24 @@ class FinancialMetricsCalculator {
    * Context7 Pattern: Calculate Bollinger Bands
    */
   calculateBollingerBands(historicalData, period = 20, stdDev = 2) {
-    if (historicalData.length < period) return null;
-    
+    if (historicalData.length < period) {
+      return null;
+    }
+
     const recentData = historicalData.slice(-period);
     const sma = this.calculateMovingAverage(recentData, period);
-    
-    if (sma === null) return null;
-    
+
+    if (sma === null) {
+      return null;
+    }
+
     const variance = recentData.reduce((acc, price) => {
       const diff = price - sma;
       return acc + (diff * diff);
     }, 0) / period;
-    
+
     const standardDeviation = Math.sqrt(variance);
-    
+
     return {
       upper: sma + (standardDeviation * stdDev),
       middle: sma,
@@ -444,17 +495,19 @@ class FinancialMetricsCalculator {
    * Context7 Pattern: Calculate EMA (Exponential Moving Average)
    */
   calculateEMA(historicalData, period) {
-    if (historicalData.length < period) return null;
-    
+    if (historicalData.length < period) {
+      return null;
+    }
+
     const multiplier = 2 / (period + 1);
     const prices = historicalData.slice(-period);
-    
+
     let ema = prices.slice(0, period).reduce((sum, price) => sum + price, 0) / period;
-    
+
     for (let i = period; i < prices.length; i++) {
       ema = (prices[i] - ema) * multiplier + ema;
     }
-    
+
     return ema;
   }
 
@@ -462,19 +515,21 @@ class FinancialMetricsCalculator {
    * Context7 Pattern: Calculate trend risk
    */
   calculateTrendRisk(historicalData) {
-    if (historicalData.length < 2) return 0;
-    
+    if (historicalData.length < 2) {
+      return 0;
+    }
+
     const changes = [];
     for (let i = 1; i < historicalData.length; i++) {
       const change = ((historicalData[i] - historicalData[i - 1]) / historicalData[i - 1]) * 100;
       changes.push(change);
     }
-    
+
     // Calculate volatility of changes
     const avgChange = changes.reduce((sum, change) => sum + change, 0) / changes.length;
     const variance = changes.reduce((sum, change) => sum + Math.pow(change - avgChange, 2), 0) / changes.length;
     const volatilityRisk = Math.sqrt(variance);
-    
+
     return Math.min(20, volatilityRisk);
   }
 
@@ -483,7 +538,7 @@ class FinancialMetricsCalculator {
    */
   batchCalculateMetrics(items, historicalDataMap = {}) {
     const results = [];
-    
+
     for (const item of items) {
       try {
         const historicalData = historicalDataMap[item.itemId] || [];
@@ -504,13 +559,13 @@ class FinancialMetricsCalculator {
         });
       }
     }
-    
+
     this.logger.info('Batch metric calculation completed', {
       totalItems: items.length,
       successful: results.filter(r => r.success).length,
       failed: results.filter(r => !r.success).length
     });
-    
+
     return results;
   }
 

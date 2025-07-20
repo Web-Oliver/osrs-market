@@ -1,6 +1,6 @@
 /**
  * 🏺 OSRS Scraper Routes - Context7 Optimized
- * 
+ *
  * Context7 Pattern: RESTful API Routes for OSRS Data Scraping
  * - Comprehensive OSRS Grand Exchange data import endpoints
  * - Real-time scraping status and progress monitoring
@@ -25,94 +25,94 @@ const errorMiddleware = new ErrorMiddleware();
 /**
  * POST /api/osrs-scraper/import/start
  * Start comprehensive OSRS data import from Grand Exchange
- * 
+ *
  * Scrapes data from:
  * - Most Traded Items (list=0)
- * - Greatest Rise Items (list=1) 
+ * - Greatest Rise Items (list=1)
  * - Greatest Fall Items (list=3)
  * - Most Valuable Items (list=2)
- * 
+ *
  * Features:
  * - Pattern detection and anomaly analysis
  * - Historical data fetching for interesting items
  * - Data integrity checks and MongoDB storage
  * - Respectful scraping with rate limiting
  */
-router.post('/import/start', 
-  errorMiddleware.handleAsyncError(scraperController.startFullImport)
+router.post('/import/start',
+  errorMiddleware.handleAsyncError(scraperController.startFullImport.bind(scraperController))
 );
 
 /**
  * GET /api/osrs-scraper/status
  * Get current scraping operation status
- * 
+ *
  * Returns:
  * - Current scraping progress
  * - Service health status
  * - System resource usage
  * - Last scrape completion details
  */
-router.get('/status', errorMiddleware.handleAsyncError(scraperController.getScrapingStatus));
+router.get('/status', errorMiddleware.handleAsyncError(scraperController.getScrapingStatus.bind(scraperController)));
 
 /**
  * GET /api/osrs-scraper/data/latest
  * Get latest scraped market data
- * 
+ *
  * Query Parameters:
  * - category: Filter by category (mostTraded, greatestRise, greatestFall, mostValuable)
  * - limit: Limit number of results (default: 50)
  * - format: Response format (json, csv, summary)
- * 
+ *
  * Example: GET /data/latest?category=mostTraded&limit=20&format=csv
  */
-router.get('/data/latest', errorMiddleware.handleAsyncError(scraperController.getLatestScrapedData));
+router.get('/data/latest', errorMiddleware.handleAsyncError(scraperController.getLatestScrapedData.bind(scraperController)));
 
 /**
  * GET /api/osrs-scraper/patterns
  * Get detected market patterns and anomalies
- * 
+ *
  * Query Parameters:
  * - type: Filter by pattern type (MULTI_CATEGORY_APPEARANCE, SIGNIFICANT_PRICE_CHANGE, HIGH_VALUE_UNUSUAL_ACTIVITY)
  * - significance: Filter by significance level (LOW, MEDIUM, HIGH, CRITICAL)
  * - limit: Limit number of results (default: 100)
- * 
+ *
  * Features:
  * - Pattern statistics and aggregations
  * - Anomaly detection results
  * - Market intelligence insights
  */
-router.get('/patterns', errorMiddleware.handleAsyncError(scraperController.getMarketPatterns));
+router.get('/patterns', errorMiddleware.handleAsyncError(scraperController.getMarketPatterns.bind(scraperController)));
 
 /**
  * GET /api/osrs-scraper/search
  * Search for specific item data across all categories
- * 
+ *
  * Query Parameters:
  * - query: Item name to search for (required)
  * - includeHistorical: Include historical data (true/false)
- * 
+ *
  * Features:
  * - Cross-category item search
  * - Historical data inclusion
  * - Fuzzy matching capabilities
- * 
+ *
  * Example: GET /search?query=dragon&includeHistorical=true
  */
-router.get('/search', 
-  errorMiddleware.handleAsyncError(scraperController.searchItemData)
+router.get('/search',
+  errorMiddleware.handleAsyncError(scraperController.searchItemData.bind(scraperController))
 );
 
 /**
  * GET /api/osrs-scraper/health
  * Get scraper service health status
- * 
+ *
  * Returns:
  * - Service initialization status
  * - Database connection health
  * - System resource monitoring
  * - Recent operation status
  */
-router.get('/health', errorMiddleware.handleAsyncError(scraperController.getHealthStatus));
+router.get('/health', errorMiddleware.handleAsyncError(scraperController.getHealthStatus.bind(scraperController)));
 
 /**
  * Context7 Pattern: API Documentation endpoint
@@ -124,7 +124,7 @@ router.get('/', (req, res) => {
     description: 'Comprehensive OSRS Grand Exchange data scraping and analysis system',
     features: [
       'Multi-category data scraping (Most Traded, Greatest Rise, Greatest Fall, Most Valuable)',
-      'Real-time pattern detection and anomaly analysis', 
+      'Real-time pattern detection and anomaly analysis',
       'Historical data fetching for high-interest items',
       'Data integrity checks and MongoDB storage',
       'Multiple export formats (JSON, CSV, Summary)',
@@ -165,7 +165,7 @@ router.get('/', (req, res) => {
     dataSources: {
       'OSRS Grand Exchange': {
         mostTraded: 'https://secure.runescape.com/m=itemdb_oldschool/top100?list=0&scale=3',
-        greatestRise: 'https://secure.runescape.com/m=itemdb_oldschool/top100?list=1&scale=3', 
+        greatestRise: 'https://secure.runescape.com/m=itemdb_oldschool/top100?list=1&scale=3',
         mostValuable: 'https://secure.runescape.com/m=itemdb_oldschool/top100?list=2&scale=3',
         greatestFall: 'https://secure.runescape.com/m=itemdb_oldschool/top100?list=3&scale=3'
       },

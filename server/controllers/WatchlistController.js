@@ -1,6 +1,6 @@
 /**
  * 📋 WatchlistController - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Clean Architecture Controller
  * - Handles HTTP requests for watchlist operations
  * - Implements proper error handling and validation
@@ -71,12 +71,12 @@ class WatchlistController {
       return ApiResponse.success(res, watchlistItem, 'Item added to watchlist successfully');
     } catch (error) {
       this.logger.error('Error adding item to watchlist:', error);
-      
+
       // Handle duplicate key error
       if (error.code === 11000) {
         return ApiResponse.error(res, 'Item already exists in watchlist', 'ITEM_ALREADY_EXISTS', 409);
       }
-      
+
       return ApiResponse.error(res, 'Failed to add item to watchlist', error.message, 500);
     }
   }
@@ -132,9 +132,15 @@ class WatchlistController {
       }
 
       // Update the item
-      if (currentPrice !== undefined) watchlistItem.currentPrice = currentPrice;
-      if (currentMargin !== undefined) watchlistItem.currentMargin = currentMargin;
-      if (notes !== undefined) watchlistItem.notes = notes;
+      if (currentPrice !== undefined) {
+        watchlistItem.currentPrice = currentPrice;
+      }
+      if (currentMargin !== undefined) {
+        watchlistItem.currentMargin = currentMargin;
+      }
+      if (notes !== undefined) {
+        watchlistItem.notes = notes;
+      }
 
       const updatedItem = await watchlistItem.save();
 
@@ -190,7 +196,7 @@ class WatchlistController {
     try {
       // Test database connection
       const testCount = await WatchlistModel.countDocuments();
-      
+
       const health = {
         service: 'WatchlistController',
         status: 'healthy',

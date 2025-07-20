@@ -1,7 +1,7 @@
 /**
  * 🚀 OSRS Market Tracker Backend Server
  * Context7 Optimized Express.js Server with MongoDB Integration
- * 
+ *
  * This Express server provides API endpoints for the frontend to access MongoDB data
  * with Context7 best practices: solid, DRY, optimized implementation
  */
@@ -50,14 +50,14 @@ async function connectToMongoDB() {
       databaseName: mongoConfig.databaseName,
       appName: mongoConfig.options.appName
     });
-    
+
     mongoService = new MongoDataPersistence(mongoConfig);
     await mongoService.connect();
-    
+
     // Test the connection
     const healthCheck = await mongoService.healthCheck();
     console.log('🩺 MongoDB Health Check:', healthCheck);
-    
+
     console.log('✅ Connected to MongoDB successfully with Context7 optimizations');
     return true;
   } catch (error) {
@@ -75,10 +75,10 @@ async function connectToMongoDB() {
 async function connectToMongoose() {
   try {
     console.log('🍃 Connecting to MongoDB via Mongoose...');
-    
+
     const mongooseConnectionString = `${mongoConfig.connectionString}/${mongoConfig.databaseName}`;
     console.log('📋 Mongoose Connection String:', mongooseConnectionString.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'));
-    
+
     await mongoose.connect(mongooseConnectionString, {
       // Same optimizations as native driver
       maxPoolSize: 50,
@@ -91,14 +91,14 @@ async function connectToMongoose() {
       retryWrites: true,
       retryReads: true
     });
-    
+
     console.log('✅ Mongoose connected successfully');
-    
+
     // Test mongoose connection
     const adminDb = mongoose.connection.db.admin();
     await adminDb.ping();
     console.log('🏓 Mongoose ping successful');
-    
+
     return true;
   } catch (error) {
     console.error('❌ Failed to connect to Mongoose:', error);
@@ -116,7 +116,7 @@ async function connectToMongoose() {
 /**
  * Get live monitoring data with Context7 optimized queries
  */
-app.get('/api/live-monitoring', async (req, res) => {
+app.get('/api/live-monitoring', async(req, res) => {
   try {
     if (!mongoService) {
       return res.status(503).json({ error: 'Database not connected' });
@@ -135,7 +135,7 @@ app.get('/api/live-monitoring', async (req, res) => {
 /**
  * Save live monitoring data with Context7 optimizations
  */
-app.post('/api/live-monitoring', async (req, res) => {
+app.post('/api/live-monitoring', async(req, res) => {
   try {
     if (!mongoService) {
       return res.status(503).json({ error: 'Database not connected' });
@@ -157,7 +157,7 @@ app.post('/api/live-monitoring', async (req, res) => {
 /**
  * Get aggregated statistics with Context7 optimized aggregation
  */
-app.get('/api/aggregated-stats', async (req, res) => {
+app.get('/api/aggregated-stats', async(req, res) => {
   try {
     if (!mongoService) {
       return res.status(503).json({ error: 'Database not connected' });
@@ -176,7 +176,7 @@ app.get('/api/aggregated-stats', async (req, res) => {
 /**
  * Get system status with Context7 optimized health monitoring
  */
-app.get('/api/system-status', async (req, res) => {
+app.get('/api/system-status', async(req, res) => {
   try {
     if (!mongoService) {
       return res.status(503).json({ error: 'Database not connected' });
@@ -241,7 +241,7 @@ app.get('/api/system-status', async (req, res) => {
 /**
  * Get efficiency metrics with Context7 optimizations
  */
-app.get('/api/efficiency-metrics', async (req, res) => {
+app.get('/api/efficiency-metrics', async(req, res) => {
   try {
     const metrics = {
       smartSelection: {
@@ -277,7 +277,7 @@ app.get('/api/efficiency-metrics', async (req, res) => {
 /**
  * Get market data with Context7 optimizations
  */
-app.get('/api/market-data', async (req, res) => {
+app.get('/api/market-data', async(req, res) => {
   try {
     if (!mongoService) {
       return res.status(503).json({ error: 'Database not connected' });
@@ -302,14 +302,14 @@ app.get('/api/market-data', async (req, res) => {
 /**
  * Save market data with Context7 optimizations
  */
-app.post('/api/market-data', async (req, res) => {
+app.post('/api/market-data', async(req, res) => {
   try {
     if (!mongoService) {
       return res.status(503).json({ error: 'Database not connected' });
     }
 
     const { items, collectionSource = 'API' } = req.body;
-    
+
     if (!items || !Array.isArray(items)) {
       return res.status(400).json({ error: 'Invalid items data' });
     }
@@ -325,7 +325,7 @@ app.post('/api/market-data', async (req, res) => {
 /**
  * Database cleanup endpoint with Context7 optimizations
  */
-app.post('/api/cleanup', async (req, res) => {
+app.post('/api/cleanup', async(req, res) => {
   try {
     if (!mongoService) {
       return res.status(503).json({ error: 'Database not connected' });
@@ -333,7 +333,7 @@ app.post('/api/cleanup', async (req, res) => {
 
     const maxAge = req.body.maxAge || 7 * 24 * 60 * 60 * 1000; // 7 days default
     const result = await mongoService.cleanupOldData(maxAge);
-    
+
     res.json(result);
   } catch (error) {
     console.error('Error during cleanup:', error);
@@ -344,18 +344,18 @@ app.post('/api/cleanup', async (req, res) => {
 /**
  * Health check endpoint with Context7 optimizations
  */
-app.get('/api/health', async (req, res) => {
+app.get('/api/health', async(req, res) => {
   try {
     if (!mongoService) {
-      return res.status(503).json({ 
-        status: 'unhealthy', 
+      return res.status(503).json({
+        status: 'unhealthy',
         mongodb: false,
         timestamp: Date.now()
       });
     }
 
     const health = await mongoService.healthCheck();
-    
+
     res.json({
       status: health.connected ? 'healthy' : 'unhealthy',
       mongodb: health.connected,
@@ -365,8 +365,8 @@ app.get('/api/health', async (req, res) => {
     });
   } catch (error) {
     console.error('Health check failed:', error);
-    res.status(503).json({ 
-      status: 'unhealthy', 
+    res.status(503).json({
+      status: 'unhealthy',
       mongodb: false,
       error: error.message,
       timestamp: Date.now()
@@ -380,9 +380,9 @@ app.get('*', (req, res) => {
 });
 
 // Context7 optimized error handling middleware
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   console.error('Server error:', err);
-  res.status(500).json({ 
+  res.status(500).json({
     error: 'Internal server error',
     timestamp: Date.now()
   });
@@ -391,13 +391,13 @@ app.use((err, req, res, next) => {
 // Start server with Context7 optimizations
 async function startServer() {
   console.log('🚀 Starting server with dual database connections...');
-  
+
   // Connect both database drivers
   const [mongoConnected, mongooseConnected] = await Promise.all([
     connectToMongoDB(),
     connectToMongoose()
   ]);
-  
+
   if (!mongoConnected || !mongooseConnected) {
     console.error('❌ Failed to connect to one or more databases');
     console.log('📊 Database Connection Status:', {
@@ -407,10 +407,10 @@ async function startServer() {
   } else {
     console.log('✅ Both database connections established successfully');
   }
-  
+
   // Create HTTP server for WebSocket support
   const server = http.createServer(app);
-  
+
   // Initialize WebSocket logging service
   let webSocketService = null;
   try {
@@ -421,14 +421,14 @@ async function startServer() {
   } catch (error) {
     console.error('❌ Failed to initialize WebSocket service:', error);
   }
-  
+
   server.listen(PORT, () => {
     console.log(`🚀 Server running on port ${PORT}`);
     console.log(`📊 Dashboard: http://localhost:${PORT}`);
     console.log(`🔗 API: http://localhost:${PORT}/api`);
     console.log(`🔌 WebSocket: ws://localhost:${PORT}/logs`);
     console.log(`💾 MongoDB: ${mongoConnected ? 'Connected with Context7 optimizations' : 'Disconnected (using fallback data)'}`);
-    
+
     if (mongoConnected) {
       console.log('✅ Context7 optimizations active:');
       console.log('   - Optimized connection pooling');
@@ -440,12 +440,12 @@ async function startServer() {
 }
 
 // Context7 optimized graceful shutdown
-process.on('SIGINT', async () => {
+process.on('SIGINT', async() => {
   console.log('\n🛑 Shutting down server with Context7 cleanup...');
-  
+
   // Close both database connections
   const shutdownPromises = [];
-  
+
   if (mongoService) {
     shutdownPromises.push(
       mongoService.disconnect()
@@ -453,7 +453,7 @@ process.on('SIGINT', async () => {
         .catch(error => console.error('Error closing MongoDB native connection:', error))
     );
   }
-  
+
   if (mongoose.connection.readyState !== 0) {
     shutdownPromises.push(
       mongoose.connection.close()
@@ -461,10 +461,10 @@ process.on('SIGINT', async () => {
         .catch(error => console.error('Error closing Mongoose connection:', error))
     );
   }
-  
+
   await Promise.all(shutdownPromises);
   console.log('✅ All database connections closed');
-  
+
   process.exit(0);
 });
 

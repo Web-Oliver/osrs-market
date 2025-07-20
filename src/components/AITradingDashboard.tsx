@@ -29,7 +29,7 @@ export function AITradingDashboard() {
     isInitialized,
     isTraining,
     currentSession,
-    trainingMetrics,
+    trainingMetrics: _trainingMetrics,
     tradingActions,
     performance,
     error,
@@ -47,7 +47,7 @@ export function AITradingDashboard() {
   } = useAITrading()
 
   const { items } = useItemPrices()
-  const { showSuccess, showError } = useNotifications()
+  const { showSuccess } = useNotifications()
   const [autoTradeEnabled, setAutoTradeEnabled] = useState(false)
   const [adaptiveConfig, setAdaptiveConfig] = useState<Partial<AdaptiveLearningConfig>>({
     enableOnlineLearning: true,
@@ -114,7 +114,6 @@ export function AITradingDashboard() {
     input.click()
   }
 
-  const recentMetrics = trainingMetrics.slice(-10)
   const [analytics, setAnalytics] = useState<PerformanceAnalytics | null>(null)
   const [trainingData, setTrainingData] = useState<any[]>([])
   

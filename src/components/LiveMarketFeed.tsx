@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Activity, TrendingUp, TrendingDown, DollarSign, Zap, Database, AlertTriangle, CheckCircle, Clock, ArrowUp, ArrowDown, Circle } from 'lucide-react';
+import { Activity, TrendingUp, Database, AlertTriangle, CheckCircle, ArrowUp, ArrowDown, Circle } from 'lucide-react';
 
 interface MarketEvent {
   id: string;
@@ -54,7 +54,7 @@ const LiveMarketFeed: React.FC = () => {
         }
         
         const result = await response.json();
-        const duration = Date.now() - startTime;
+        const _duration = Date.now() - startTime;
         
         if (result.success && result.data) {
           const itemCount = Object.keys(result.data).length;

@@ -1,6 +1,6 @@
 /**
  * 🗄️ MongoDB Data Persistence - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Advanced MongoDB Operations with Data Modeling
  * - Optimized connection pooling and resource management
  * - Comprehensive data validation and sanitization
@@ -27,7 +27,7 @@ class MongoDataPersistence {
         w: 'majority'
       }
     };
-    
+
     this.client = null;
     this.database = null;
     this.isConnected = false;
@@ -44,10 +44,10 @@ class MongoDataPersistence {
       await this.client.connect();
       this.database = this.client.db(this.config.databaseName);
       this.isConnected = true;
-      
+
       // Create indexes for optimized queries
       await this.createIndexes();
-      
+
       console.log('✅ MongoDB connection established successfully');
       return true;
     } catch (error) {
@@ -367,18 +367,30 @@ class MongoDataPersistence {
       const collection = this.database.collection('ai_decisions');
       const query = {};
 
-      if (filters.sessionId) query.sessionId = filters.sessionId;
-      if (filters.itemId) query.itemId = filters.itemId;
-      if (filters.action) query.action = filters.action;
+      if (filters.sessionId) {
+        query.sessionId = filters.sessionId;
+      }
+      if (filters.itemId) {
+        query.itemId = filters.itemId;
+      }
+      if (filters.action) {
+        query.action = filters.action;
+      }
       if (filters.startTime && filters.endTime) {
         query.timestamp = { $gte: filters.startTime, $lte: filters.endTime };
       }
 
       const cursor = collection.find(query);
-      
-      if (options.sort) cursor.sort(options.sort);
-      if (options.limit) cursor.limit(options.limit);
-      if (options.skip) cursor.skip(options.skip);
+
+      if (options.sort) {
+        cursor.sort(options.sort);
+      }
+      if (options.limit) {
+        cursor.limit(options.limit);
+      }
+      if (options.skip) {
+        cursor.skip(options.skip);
+      }
 
       return await cursor.toArray();
     } catch (error) {
@@ -399,8 +411,8 @@ class MongoDataPersistence {
       const collection = this.database.collection('ai_decisions');
       const result = await collection.updateOne(
         { _id: decisionId },
-        { 
-          $set: { 
+        {
+          $set: {
             outcome: outcome,
             updatedAt: Date.now()
           }
@@ -502,7 +514,7 @@ class MongoDataPersistence {
     try {
       const collection = this.database.collection('historical_prices');
       const startTime = Date.now() - (hoursBack * 60 * 60 * 1000);
-      
+
       const query = {
         itemId: { $in: itemIds },
         interval: interval,
@@ -577,7 +589,7 @@ class MongoDataPersistence {
           $group: {
             _id: '$sessionId',
             totalDecisions: { $sum: 1 },
-            successfulTrades: { 
+            successfulTrades: {
               $sum: { $cond: [{ $gt: ['$outcome.profitLoss', 0] }, 1, 0] }
             },
             totalProfit: { $sum: { $ifNull: ['$outcome.profitLoss', 0] } },

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * 📥 Item Mappings Import Script - Context7 One-Time Import
- * 
+ *
  * Context7 Pattern: Command-Line Script for Data Migration
  * - SOLID: Single Responsibility - Import OSRS item mappings
  * - DRY: Reusable import logic and error handling
@@ -27,15 +27,15 @@ class ImportScript {
     try {
       console.log('🚀 Starting OSRS Item Mappings Import');
       console.log('====================================');
-      
+
       const startTime = Date.now();
 
       // Parse command line arguments
       const args = this.parseArguments();
-      
+
       // Connect to MongoDB
       await this.connectToMongoDB();
-      
+
       // Perform the import
       console.log('📥 Importing item mappings from OSRS Wiki API...');
       const result = await this.itemMappingService.importAllItemMappings({
@@ -44,23 +44,23 @@ class ImportScript {
 
       // Display results
       this.displayResults(result, startTime);
-      
+
       // Close database connection
       await mongoose.disconnect();
-      
+
       console.log('✅ Import completed successfully!');
       process.exit(0);
 
     } catch (error) {
       this.logger.error('Import script failed', error);
       console.error('❌ Import failed:', error.message);
-      
+
       try {
         await mongoose.disconnect();
       } catch (disconnectError) {
         this.logger.error('Error disconnecting from MongoDB', disconnectError);
       }
-      
+
       process.exit(1);
     }
   }
@@ -74,23 +74,23 @@ class ImportScript {
     };
 
     const argv = process.argv.slice(2);
-    
+
     for (let i = 0; i < argv.length; i++) {
       const arg = argv[i].toLowerCase();
-      
+
       switch (arg) {
-        case '--force':
-        case '-f':
-          args.force = true;
-          break;
-        case '--help':
-        case '-h':
-          this.displayHelp();
-          process.exit(0);
-          break;
-        default:
-          console.warn(`⚠️  Unknown argument: ${argv[i]}`);
-          break;
+      case '--force':
+      case '-f':
+        args.force = true;
+        break;
+      case '--help':
+      case '-h':
+        this.displayHelp();
+        process.exit(0);
+        break;
+      default:
+        console.warn(`⚠️  Unknown argument: ${argv[i]}`);
+        break;
       }
     }
 
@@ -102,30 +102,30 @@ class ImportScript {
    */
   async connectToMongoDB() {
     try {
-      const mongoConnectionString = 
-        process.env.MONGODB_CONNECTION_STRING || 
+      const mongoConnectionString =
+        process.env.MONGODB_CONNECTION_STRING ||
         'mongodb://localhost:27017';
-      
-      const databaseName = 
-        process.env.MONGODB_DATABASE || 
+
+      const databaseName =
+        process.env.MONGODB_DATABASE ||
         'osrs_market_data';
 
       const connectionUrl = `${mongoConnectionString}/${databaseName}`;
-      
+
       console.log('🔌 Connecting to MongoDB...');
       console.log(`   Database: ${databaseName}`);
-      
+
       await mongoose.connect(connectionUrl, {
         serverSelectionTimeoutMS: 30000, // 30 seconds
         connectTimeoutMS: 30000
       });
-      
+
       console.log('✅ Connected to MongoDB successfully');
-      
+
       // Test the connection
       const adminDb = mongoose.connection.db.admin();
       await adminDb.ping();
-      
+
     } catch (error) {
       this.logger.error('Failed to connect to MongoDB', error);
       throw new Error(`MongoDB connection failed: ${error.message}`);
@@ -138,12 +138,12 @@ class ImportScript {
   displayResults(result, startTime) {
     const processingTime = Date.now() - startTime;
     const processingSeconds = Math.round(processingTime / 1000);
-    
+
     console.log('\n📊 Import Results');
     console.log('================');
     console.log(`Status: ${result.success ? '✅ Success' : '❌ Failed'}`);
     console.log(`Message: ${result.message}`);
-    
+
     if (result.skipped) {
       console.log(`Existing Items: ${result.existingCount}`);
       console.log('💡 Use --force to reimport existing data');
@@ -151,13 +151,13 @@ class ImportScript {
       console.log(`Total Items: ${result.totalItems || 0}`);
       console.log(`Items Imported: ${result.imported || 0}`);
       console.log(`Items Updated: ${result.updated || 0}`);
-      
+
       if (result.errors && result.errors.length > 0) {
         console.log(`Errors: ${result.errors.length}`);
         console.log('❌ Some items failed to import (check logs for details)');
       }
     }
-    
+
     console.log(`Processing Time: ${processingSeconds}s`);
   }
 
@@ -207,9 +207,9 @@ EXAMPLES:
 // Context7 Pattern: Handle script execution
 if (require.main === module) {
   const importScript = new ImportScript();
-  
+
   // Handle graceful shutdown
-  process.on('SIGINT', async () => {
+  process.on('SIGINT', async() => {
     console.log('\n🛑 Import interrupted by user');
     try {
       await mongoose.disconnect();
@@ -218,8 +218,8 @@ if (require.main === module) {
     }
     process.exit(130); // Standard exit code for SIGINT
   });
-  
-  process.on('SIGTERM', async () => {
+
+  process.on('SIGTERM', async() => {
     console.log('\n🛑 Import terminated');
     try {
       await mongoose.disconnect();
@@ -228,9 +228,9 @@ if (require.main === module) {
     }
     process.exit(143); // Standard exit code for SIGTERM
   });
-  
+
   // Handle uncaught exceptions
-  process.on('uncaughtException', async (error) => {
+  process.on('uncaughtException', async(error) => {
     console.error('💥 Uncaught Exception:', error);
     try {
       await mongoose.disconnect();
@@ -239,8 +239,8 @@ if (require.main === module) {
     }
     process.exit(1);
   });
-  
-  process.on('unhandledRejection', async (reason, promise) => {
+
+  process.on('unhandledRejection', async(reason, promise) => {
     console.error('💥 Unhandled Rejection at:', promise, 'reason:', reason);
     try {
       await mongoose.disconnect();
@@ -249,7 +249,7 @@ if (require.main === module) {
     }
     process.exit(1);
   });
-  
+
   // Run the import
   importScript.run();
 }

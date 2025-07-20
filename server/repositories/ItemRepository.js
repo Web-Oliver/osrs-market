@@ -1,6 +1,6 @@
 /**
  * 🏛️ Item Repository - Context7 Data Access Layer
- * 
+ *
  * Context7 Pattern: Repository Pattern for Data Access
  * - SOLID: Single Responsibility - Item data access operations
  * - DRY: Reusable query patterns and data transformations
@@ -36,22 +36,22 @@ class ItemRepository {
       // Convert to ItemId value object if needed
       const id = typeof itemId === 'number' ? new ItemId(itemId) : itemId;
       this.logger.debug('Finding item by ID (ENHANCED)', { itemId: id.value });
-      
+
       // Use adapter for domain entity conversion
       const domainItem = await this.adapter.findByIdEnhanced(id.value, options);
-      
+
       if (!domainItem) {
         this.logger.debug('Item not found', { itemId: id.value });
         return null;
       }
 
-      this.logger.debug('Item found successfully (ENHANCED)', { 
-        itemId: id.value, 
+      this.logger.debug('Item found successfully (ENHANCED)', {
+        itemId: id.value,
         name: domainItem.name,
         category: domainItem.getCategory(),
         alchemyProfit: domainItem.getAlchemyProfit()
       });
-      
+
       return domainItem;
     } catch (error) {
       this.logger.error('Error finding item by ID', error, { itemId });
@@ -67,28 +67,28 @@ class ItemRepository {
       // Convert to ItemId value objects if needed
       const ids = itemIds.map(id => typeof id === 'number' ? new ItemId(id) : id);
       const values = ids.map(id => id.value);
-      
-      this.logger.debug('Finding items by IDs (ENHANCED)', { 
+
+      this.logger.debug('Finding items by IDs (ENHANCED)', {
         count: values.length,
         sample: values.slice(0, 5)
       });
-      
+
       // Use adapter for domain entity conversion
-      const domainItems = await this.adapter.findEnhanced({ 
+      const domainItems = await this.adapter.findEnhanced({
         itemId: { $in: values },
         status: 'active'
       }, options);
-      
-      this.logger.debug('Items found successfully (ENHANCED)', { 
+
+      this.logger.debug('Items found successfully (ENHANCED)', {
         requested: values.length,
         found: domainItems.length,
         categories: [...new Set(domainItems.map(item => item.getCategory()))]
       });
-      
+
       return domainItems;
     } catch (error) {
-      this.logger.error('Error finding items by IDs', error, { 
-        itemCount: itemIds.length 
+      this.logger.error('Error finding items by IDs', error, {
+        itemCount: itemIds.length
       });
       throw error;
     }
@@ -99,11 +99,11 @@ class ItemRepository {
    */
   async searchByName(searchTerm, options = {}) {
     try {
-      this.logger.debug('Searching items by name', { 
+      this.logger.debug('Searching items by name', {
         searchTerm,
-        options 
+        options
       });
-      
+
       const query = ItemModel.find({
         $text: { $search: searchTerm },
         status: 'active'
@@ -113,30 +113,30 @@ class ItemRepository {
       });
 
       query.sort({ score: { $meta: 'textScore' } });
-      
+
       if (options.limit) {
         query.limit(options.limit);
       }
-      
+
       if (options.members !== undefined) {
         query.where('members').equals(options.members);
       }
-      
+
       if (options.tradeable !== undefined) {
         query.where('tradeable_on_ge').equals(options.tradeable);
       }
 
       const items = await query.exec();
-      
-      this.logger.debug('Search completed successfully', { 
+
+      this.logger.debug('Search completed successfully', {
         searchTerm,
         resultCount: items.length
       });
-      
+
       return items;
     } catch (error) {
-      this.logger.error('Error searching items by name', error, { 
-        searchTerm 
+      this.logger.error('Error searching items by name', error, {
+        searchTerm
       });
       throw error;
     }
@@ -149,12 +149,12 @@ class ItemRepository {
     try {
       const minValue = options.minValue || 100000;
       const limit = options.limit || 50;
-      
-      this.logger.debug('Getting high-value items', { 
-        minValue, 
-        limit 
+
+      this.logger.debug('Getting high-value items', {
+        minValue,
+        limit
       });
-      
+
       const query = ItemModel.find({
         value: { $gte: minValue },
         tradeable_on_ge: true,
@@ -162,22 +162,22 @@ class ItemRepository {
       }, this.defaultProjection);
 
       query.sort({ value: -1 }).limit(limit);
-      
+
       if (options.members !== undefined) {
         query.where('members').equals(options.members);
       }
 
       const items = await query.exec();
-      
-      this.logger.debug('High-value items retrieved', { 
+
+      this.logger.debug('High-value items retrieved', {
         minValue,
         count: items.length
       });
-      
+
       return items;
     } catch (error) {
-      this.logger.error('Error getting high-value items', error, { 
-        minValue: options.minValue 
+      this.logger.error('Error getting high-value items', error, {
+        minValue: options.minValue
       });
       throw error;
     }
@@ -189,12 +189,12 @@ class ItemRepository {
   async getItemsRequiringSync(maxAge = 24 * 60 * 60 * 1000) {
     try {
       const cutoff = new Date(Date.now() - maxAge);
-      
-      this.logger.debug('Getting items requiring sync', { 
+
+      this.logger.debug('Getting items requiring sync', {
         cutoff,
         maxAgeHours: maxAge / (60 * 60 * 1000)
       });
-      
+
       const items = await ItemModel.find({
         $or: [
           { lastSyncedAt: { $lt: cutoff } },
@@ -202,13 +202,13 @@ class ItemRepository {
         ],
         status: 'active'
       }, this.defaultProjection)
-      .sort({ lastSyncedAt: 1 })
-      .exec();
-      
-      this.logger.debug('Items requiring sync found', { 
+        .sort({ lastSyncedAt: 1 })
+        .exec();
+
+      this.logger.debug('Items requiring sync found', {
         count: items.length
       });
-      
+
       return items;
     } catch (error) {
       this.logger.error('Error getting items requiring sync', error);
@@ -223,11 +223,11 @@ class ItemRepository {
     try {
       const itemCount = itemsData.length;
       this.logger.debug('Upserting items (ENHANCED)', { itemCount });
-      
+
       // Create domain entities for validation and business logic
       const domainItems = [];
       const errors = [];
-      
+
       for (const itemData of itemsData) {
         try {
           const domainItem = Item.create({
@@ -244,7 +244,7 @@ class ItemRepository {
           });
         }
       }
-      
+
       if (domainItems.length === 0) {
         return {
           success: false,
@@ -254,7 +254,7 @@ class ItemRepository {
           errors
         };
       }
-      
+
       // Convert to MongoDB operations
       const operations = domainItems.map(item => {
         const data = item.toPersistenceData();
@@ -277,25 +277,25 @@ class ItemRepository {
         ordered: false, // Continue on errors
         ...options
       });
-      
+
       // Log business insights from the batch
       const categories = {};
       let profitableAlchemy = 0;
       let highValue = 0;
-      
+
       for (const item of domainItems) {
         const category = item.getCategory();
         categories[category] = (categories[category] || 0) + 1;
-        
+
         if (item.isProfitableAlchemy()) {
           profitableAlchemy++;
         }
-        
+
         if (item.market.value > 100000) {
           highValue++;
         }
       }
-      
+
       this.logger.info('Items upserted successfully (ENHANCED)', {
         itemCount,
         validItems: domainItems.length,
@@ -310,7 +310,7 @@ class ItemRepository {
           successRate: `${((domainItems.length / itemCount) * 100).toFixed(1)}%`
         }
       });
-      
+
       return {
         success: true,
         upserted: result.upsertedCount,
@@ -325,8 +325,8 @@ class ItemRepository {
         }
       };
     } catch (error) {
-      this.logger.error('Error upserting items', error, { 
-        itemCount: itemsData.length 
+      this.logger.error('Error upserting items', error, {
+        itemCount: itemsData.length
       });
       throw error;
     }
@@ -337,29 +337,29 @@ class ItemRepository {
    */
   async markItemsAsSynced(itemIds) {
     try {
-      this.logger.debug('Marking items as synced', { 
-        count: itemIds.length 
+      this.logger.debug('Marking items as synced', {
+        count: itemIds.length
       });
-      
+
       const result = await ItemModel.updateMany(
         { itemId: { $in: itemIds } },
-        { 
-          $set: { 
+        {
+          $set: {
             lastSyncedAt: new Date(),
             updatedAt: new Date()
           }
         }
       );
-      
-      this.logger.debug('Items marked as synced', { 
+
+      this.logger.debug('Items marked as synced', {
         matched: result.matchedCount,
         modified: result.modifiedCount
       });
-      
+
       return result;
     } catch (error) {
-      this.logger.error('Error marking items as synced', error, { 
-        itemCount: itemIds.length 
+      this.logger.error('Error marking items as synced', error, {
+        itemCount: itemIds.length
       });
       throw error;
     }
@@ -370,67 +370,67 @@ class ItemRepository {
    */
   async getItemsByCategory(category, options = {}) {
     try {
-      this.logger.debug('Getting items by category', { 
-        category, 
-        options 
+      this.logger.debug('Getting items by category', {
+        category,
+        options
       });
-      
+
       // Build query based on category
-      let query = {};
-      
+      const query = {};
+
       switch (category) {
-        case 'runes':
-          query.name = { $regex: /rune/i };
-          break;
-        case 'potions':
-          query.name = { $regex: /potion/i };
-          break;
-        case 'food':
-          query.name = { $regex: /food|fish|meat|bread|cake/i };
-          break;
-        case 'high_value':
-          query.highalch = { $gt: 10000 };
-          break;
-        case 'members':
-          query.members = true;
-          break;
-        case 'free':
-          query.members = false;
-          break;
-        default:
-          // General category - no specific filter
-          break;
+      case 'runes':
+        query.name = { $regex: /rune/i };
+        break;
+      case 'potions':
+        query.name = { $regex: /potion/i };
+        break;
+      case 'food':
+        query.name = { $regex: /food|fish|meat|bread|cake/i };
+        break;
+      case 'high_value':
+        query.highalch = { $gt: 10000 };
+        break;
+      case 'members':
+        query.members = true;
+        break;
+      case 'free':
+        query.members = false;
+        break;
+      default:
+        // General category - no specific filter
+        break;
       }
-      
+
       query.status = 'active';
-      
+
       const mongoQuery = ItemModel.find(query, this.defaultProjection);
-      
+
       if (options.tradeable !== undefined) {
         mongoQuery.where('tradeable_on_ge').equals(options.tradeable);
       }
-      
+
       if (options.sort) {
         mongoQuery.sort(options.sort);
       } else {
         mongoQuery.sort({ name: 1 });
       }
-      
+
       if (options.limit) {
         mongoQuery.limit(options.limit);
       }
 
       const items = await mongoQuery.exec();
-      
-      this.logger.debug('Items retrieved by category', { 
+
+      this.logger.debug('Items retrieved by category', {
         category,
         count: items.length
       });
-      
+
       return items;
     } catch (error) {
-      this.logger.error('Error getting items by category', error, { 
-        category 
+      this.logger.error('Error getting items by category', error, {
+        category
       });
       throw error;
     }
@@ -442,11 +442,11 @@ class ItemRepository {
   async getStatistics() {
     try {
       this.logger.debug('Getting repository statistics');
-      
+
       const stats = await ItemModel.getStatistics();
-      
+
       this.logger.debug('Statistics retrieved successfully', stats);
-      
+
       return stats;
     } catch (error) {
       this.logger.error('Error getting statistics', error);
@@ -462,27 +462,27 @@ class ItemRepository {
       const page = Math.max(1, options.page || 1);
       const limit = Math.min(100, Math.max(1, options.limit || 20));
       const skip = (page - 1) * limit;
-      
-      this.logger.debug('Getting paginated items', { 
-        page, 
-        limit, 
-        skip 
+
+      this.logger.debug('Getting paginated items', {
+        page,
+        limit,
+        skip
       });
-      
+
       const query = { status: 'active' };
-      
+
       if (options.members !== undefined) {
         query.members = options.members;
       }
-      
+
       if (options.tradeable !== undefined) {
         query.tradeable_on_ge = options.tradeable;
       }
-      
+
       if (options.minValue) {
         query.value = { $gte: options.minValue };
       }
-      
+
       if (options.maxValue) {
         query.value = { ...query.value, $lte: options.maxValue };
       }
@@ -495,19 +495,19 @@ class ItemRepository {
           .exec(),
         ItemModel.countDocuments(query)
       ]);
-      
+
       const totalPages = Math.ceil(totalCount / limit);
       const hasNextPage = page < totalPages;
       const hasPrevPage = page > 1;
-      
-      this.logger.debug('Paginated items retrieved', { 
+
+      this.logger.debug('Paginated items retrieved', {
         page,
         limit,
         totalCount,
         totalPages,
         itemCount: items.length
       });
-      
+
       return {
         items,
         pagination: {
@@ -530,32 +530,32 @@ class ItemRepository {
    */
   async createItem(itemData) {
     try {
-      this.logger.debug('Creating new item (ENHANCED)', { 
+      this.logger.debug('Creating new item (ENHANCED)', {
         itemId: itemData.itemId,
         name: itemData.name
       });
-      
+
       // Create domain entity first for validation and business logic
       const domainItem = Item.create({
         ...itemData,
         status: 'active',
         dataSource: 'manual'
       });
-      
+
       // Save using adapter
       const savedItem = await this.adapter.saveEnhanced(domainItem);
-      
-      this.logger.info('Item created successfully (ENHANCED)', { 
+
+      this.logger.info('Item created successfully (ENHANCED)', {
         itemId: savedItem.id.value,
         name: savedItem.name,
         category: savedItem.getCategory(),
         alchemyProfit: savedItem.getAlchemyProfit()
       });
-      
+
       return savedItem;
     } catch (error) {
-      this.logger.error('Error creating item', error, { 
-        itemId: itemData.itemId 
+      this.logger.error('Error creating item', error, {
+        itemId: itemData.itemId
       });
       throw error;
     }
@@ -566,38 +566,38 @@ class ItemRepository {
    */
   async updateItem(itemId, updateData) {
     try {
-      this.logger.debug('Updating item', { 
+      this.logger.debug('Updating item', {
         itemId,
         updateFields: Object.keys(updateData)
       });
-      
+
       const updatedItem = await ItemModel.findOneAndUpdate(
         { itemId, status: 'active' },
-        { 
+        {
           $set: {
             ...updateData,
             updatedAt: new Date()
           },
           $inc: { version: 1 }
         },
-        { 
+        {
           new: true,
           runValidators: true,
           select: this.defaultProjection
         }
       );
-      
+
       if (!updatedItem) {
         this.logger.warn('Item not found for update', { itemId });
         return null;
       }
-      
-      this.logger.info('Item updated successfully', { 
+
+      this.logger.info('Item updated successfully', {
         itemId,
         name: updatedItem.name,
         version: updatedItem.version
       });
-      
+
       return updatedItem;
     } catch (error) {
       this.logger.error('Error updating item', error, { itemId });
@@ -611,10 +611,10 @@ class ItemRepository {
   async deleteItem(itemId) {
     try {
       this.logger.debug('Soft deleting item', { itemId });
-      
+
       const deletedItem = await ItemModel.findOneAndUpdate(
         { itemId, status: 'active' },
-        { 
+        {
           $set: {
             status: 'removed',
             updatedAt: new Date()
@@ -623,17 +623,17 @@ class ItemRepository {
         },
         { new: true }
       );
-      
+
       if (!deletedItem) {
         this.logger.warn('Item not found for deletion', { itemId });
         return null;
       }
-      
-      this.logger.info('Item soft deleted successfully', { 
+
+      this.logger.info('Item soft deleted successfully', {
         itemId,
         name: deletedItem.name
       });
-      
+
       return deletedItem;
     } catch (error) {
       this.logger.error('Error deleting item', error, { itemId });

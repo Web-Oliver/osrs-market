@@ -1,6 +1,6 @@
 /**
  * 📊 Data Collection Controller - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Controller Layer for Data Collection Operations
  * - Handles data collection lifecycle management
  * - Thin controllers with business logic in services
@@ -17,7 +17,7 @@ class DataCollectionController {
   constructor() {
     this.dataCollectionService = new DataCollectionService();
     this.logger = new Logger('DataCollectionController');
-    
+
     // Context7 Pattern: Bind methods to preserve 'this' context
     this.startCollection = this.startCollection.bind(this);
     this.stopCollection = this.stopCollection.bind(this);
@@ -299,7 +299,7 @@ class DataCollectionController {
       });
 
       const limit = req.query.limit ? parseInt(req.query.limit) : 50;
-      
+
       // Get latest data from market data service
       const marketData = await this.dataCollectionService.marketDataService.getMarketData({
         limit,
@@ -333,7 +333,7 @@ class DataCollectionController {
       });
 
       const timeRange = req.query.timeRange ? parseInt(req.query.timeRange) : 3600000; // 1 hour
-      
+
       // Get metrics from monitoring service
       const metrics = await this.dataCollectionService.monitoringService.getAggregatedStats(timeRange);
 
@@ -363,7 +363,7 @@ class DataCollectionController {
 
       const stats = this.dataCollectionService.getCollectionStats();
       const health = this.dataCollectionService.getHealth();
-      
+
       const performance = {
         collections: {
           total: stats.totalCollections,
@@ -420,7 +420,7 @@ class DataCollectionController {
 
       const format = req.query.format || 'json';
       const timeRange = req.query.timeRange ? parseInt(req.query.timeRange) : 24 * 60 * 60 * 1000; // 24 hours
-      
+
       // Validate format
       const validFormats = ['json', 'csv'];
       if (!validFormats.includes(format)) {
@@ -433,7 +433,7 @@ class DataCollectionController {
       // Get data from market data service
       const endTime = Date.now();
       const startTime = endTime - timeRange;
-      
+
       const data = await this.dataCollectionService.marketDataService.getMarketData({
         startTime,
         endTime,
@@ -444,18 +444,18 @@ class DataCollectionController {
 
       // Set appropriate headers
       const filename = `osrs-market-data-${new Date().toISOString().split('T')[0]}.${format}`;
-      
+
       if (format === 'csv') {
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        
+
         // Convert to CSV
         const csvData = this.convertToCSV(data);
         res.send(csvData);
       } else {
         res.setHeader('Content-Type', 'application/json');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        
+
         return ApiResponse.success(res, {
           data,
           exportInfo: {
@@ -528,7 +528,7 @@ class DataCollectionController {
   calculateEfficiencyMetrics(stats) {
     const totalItems = 3000; // Approximate total OSRS items
     const itemSelectionEfficiency = ((totalItems - stats.itemsTracked) / totalItems) * 100;
-    
+
     return {
       itemSelectionEfficiency: Math.round(itemSelectionEfficiency * 100) / 100,
       dataCollectionEfficiency: stats.successRate,

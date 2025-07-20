@@ -1,7 +1,7 @@
 /**
  * 🚀 MongoDB Data Persistence Service - Backend Implementation
  * Context7 Best Practices: Solid, DRY, Optimized MongoDB Backend Service
- * 
+ *
  * This service implements MongoDB persistence with Context7 optimization patterns:
  * - Optimized connection pooling with proper sizing
  * - Efficient indexing strategies for performance
@@ -19,44 +19,44 @@ class MongoDataPersistence {
     this.client = null;
     this.db = null;
     this.isConnected = false;
-    
+
     // Collections
     this.marketDataCollection = null;
     this.tradeOutcomesCollection = null;
     this.trainingMetricsCollection = null;
     this.collectionStatsCollection = null;
     this.liveMonitoringCollection = null;
-    
+
     // Context7 Optimized Connection Configuration
     this.connectionOptions = {
       // Connection Pool Optimization (Context7 Best Practices)
-      maxPoolSize: 50,                    // Maximum connections in pool
-      minPoolSize: 5,                     // Minimum connections maintained
-      maxConnecting: 5,                   // Max concurrent connection attempts
-      maxIdleTimeMS: 30000,              // 30 seconds idle timeout
-      
+      maxPoolSize: 50, // Maximum connections in pool
+      minPoolSize: 5, // Minimum connections maintained
+      maxConnecting: 5, // Max concurrent connection attempts
+      maxIdleTimeMS: 30000, // 30 seconds idle timeout
+
       // Timeout Configuration (Context7 Recommended)
-      connectTimeoutMS: 10000,           // 10 seconds connection timeout
-      socketTimeoutMS: 45000,            // 45 seconds socket timeout
-      serverSelectionTimeoutMS: 10000,   // 10 seconds server selection timeout
-      
+      connectTimeoutMS: 10000, // 10 seconds connection timeout
+      socketTimeoutMS: 45000, // 45 seconds socket timeout
+      serverSelectionTimeoutMS: 10000, // 10 seconds server selection timeout
+
       // Reliability & Performance (Context7 Optimized)
-      retryWrites: true,                 // Enable retry for write operations
-      retryReads: true,                  // Enable retry for read operations
+      retryWrites: true, // Enable retry for write operations
+      retryReads: true, // Enable retry for read operations
       readPreference: 'primaryPreferred', // Context7 performance optimization
-      writeConcern: { w: 'majority' },   // Ensure data durability
-      
+      writeConcern: { w: 'majority' }, // Ensure data durability
+
       // Modern MongoDB Features
       serverApi: {
         version: ServerApiVersion.v1,
         strict: true,
-        deprecationErrors: true,
+        deprecationErrors: true
       },
-      
+
       // Additional Context7 Optimizations
-      compressors: ['zlib'],             // Enable compression for network efficiency
-      zlibCompressionLevel: 6,           // Balanced compression level
-      
+      compressors: ['zlib'], // Enable compression for network efficiency
+      zlibCompressionLevel: 6, // Balanced compression level
+
       ...config.options
     };
 
@@ -89,17 +89,17 @@ class MongoDataPersistence {
 
       // Create MongoClient with Context7 optimized settings
       this.client = new MongoClient(this.config.connectionString, this.connectionOptions);
-      
+
       // Connect to MongoDB
       await this.client.connect();
       this.db = this.client.db(this.config.databaseName);
-      
+
       // Initialize collections
       await this.initializeCollections();
-      
+
       // Create Context7 optimized indexes
       await this.createOptimizedIndexes();
-      
+
       this.isConnected = true;
       this.logDebug('✅ MongoDB connection established successfully with Context7 optimizations', {
         database: this.config.databaseName,
@@ -205,7 +205,7 @@ class MongoDataPersistence {
    */
   async saveMarketData(items, collectionSource = 'API') {
     this.ensureConnected();
-    
+
     const startTime = Date.now();
     this.logDebug(`💾 Saving ${items.length} market data items with Context7 optimizations...`, {
       source: collectionSource,
@@ -231,18 +231,18 @@ class MongoDataPersistence {
         collectionSource,
         processingTime: Date.now() - startTime,
         spread: this.calculateSpread(item.priceData),
-        volume: item.priceData.highTime && item.priceData.lowTime 
+        volume: item.priceData.highTime && item.priceData.lowTime
           ? Math.abs((item.priceData.highTime || 0) - (item.priceData.lowTime || 0))
           : undefined,
         lastUpdateTime: Date.now()
       }));
 
       // Context7 optimized bulk insert with ordered=false for performance
-      const result = await this.marketDataCollection.insertMany(documents, { 
+      const result = await this.marketDataCollection.insertMany(documents, {
         ordered: false,
         writeConcern: { w: 'majority' }
       });
-      
+
       const processingTime = Date.now() - startTime;
 
       this.logDebug('✅ Market data saved successfully with Context7 optimizations', {
@@ -266,30 +266,38 @@ class MongoDataPersistence {
    */
   async getMarketData(options = {}) {
     this.ensureConnected();
-    
+
     this.logDebug('🔍 Querying market data with Context7 optimizations...', options);
 
     try {
       // Context7 optimized aggregation pipeline
       const pipeline = [];
-      
+
       // Build match stage with Context7 optimizations
       const matchStage = {};
-      if (options.itemId) matchStage.itemId = options.itemId;
-      if (options.onlyTradeable) matchStage.tradeable = true;
+      if (options.itemId) {
+        matchStage.itemId = options.itemId;
+      }
+      if (options.onlyTradeable) {
+        matchStage.tradeable = true;
+      }
       if (options.startTime || options.endTime) {
         matchStage.timestamp = {};
-        if (options.startTime) matchStage.timestamp.$gte = options.startTime;
-        if (options.endTime) matchStage.timestamp.$lte = options.endTime;
+        if (options.startTime) {
+          matchStage.timestamp.$gte = options.startTime;
+        }
+        if (options.endTime) {
+          matchStage.timestamp.$lte = options.endTime;
+        }
       }
-      
+
       if (Object.keys(matchStage).length > 0) {
         pipeline.push({ $match: matchStage });
       }
 
       // Context7 optimized sorting
       pipeline.push({ $sort: { timestamp: -1 } });
-      
+
       // Context7 optimized limit
       if (options.limit) {
         pipeline.push({ $limit: options.limit });
@@ -298,11 +306,11 @@ class MongoDataPersistence {
       // Execute aggregation with Context7 optimizations
       const results = await this.marketDataCollection
         .aggregate(pipeline, {
-          allowDiskUse: true,  // Context7 optimization for large datasets
+          allowDiskUse: true, // Context7 optimization for large datasets
           readPreference: 'primaryPreferred'
         })
         .toArray();
-      
+
       this.logDebug('✅ Market data query completed with Context7 optimizations', {
         resultsFound: results.length,
         queryFilter: matchStage,
@@ -322,7 +330,7 @@ class MongoDataPersistence {
    */
   async getLiveMonitoringData(limit = 50) {
     this.ensureConnected();
-    
+
     this.logDebug('📊 Fetching live monitoring data with Context7 optimizations...', { limit });
 
     try {
@@ -370,7 +378,7 @@ class MongoDataPersistence {
    */
   async saveLiveMonitoringData(data) {
     this.ensureConnected();
-    
+
     try {
       const document = {
         ...data,
@@ -399,7 +407,7 @@ class MongoDataPersistence {
    */
   async getAggregatedStats(timeRange = 3600000) {
     this.ensureConnected();
-    
+
     const cutoffTime = Date.now() - timeRange;
     this.logDebug('📈 Generating aggregated statistics with Context7 optimizations...', {
       timeRangeMs: timeRange,
@@ -434,8 +442,8 @@ class MongoDataPersistence {
             totalProfit: { $round: ['$totalProfit', 2] },
             avgResponseTime: { $round: ['$avgResponseTime', 0] },
             avgDataQuality: { $round: ['$avgDataQuality', 2] },
-            healthyPercentage: { 
-              $round: [{ $multiply: [{ $divide: ['$healthyStatusCount', '$totalRecords'] }, 100] }, 1] 
+            healthyPercentage: {
+              $round: [{ $multiply: [{ $divide: ['$healthyStatusCount', '$totalRecords'] }, 100] }, 1]
             },
             timeRangeHours: { $divide: [timeRange, 3600000] }
           }
@@ -473,7 +481,7 @@ class MongoDataPersistence {
    */
   async getDatabaseSummary() {
     this.ensureConnected();
-    
+
     this.logDebug('📊 Generating database summary with Context7 optimizations...');
 
     try {
@@ -563,7 +571,7 @@ class MongoDataPersistence {
    */
   async cleanupOldData(maxAge = 7 * 24 * 60 * 60 * 1000) {
     this.ensureConnected();
-    
+
     const cutoffTime = Date.now() - maxAge;
     this.logDebug('🧹 Cleaning up old data with Context7 optimizations...', {
       maxAgeMs: maxAge,
@@ -612,11 +620,11 @@ class MongoDataPersistence {
 
     try {
       this.logDebug('🔌 Disconnecting from MongoDB with Context7 cleanup...');
-      
+
       if (this.client) {
         await this.client.close();
       }
-      
+
       this.isConnected = false;
       this.db = null;
       this.client = null;
@@ -625,7 +633,7 @@ class MongoDataPersistence {
       this.trainingMetricsCollection = null;
       this.collectionStatsCollection = null;
       this.liveMonitoringCollection = null;
-      
+
       this.logDebug('✅ MongoDB disconnected successfully');
     } catch (error) {
       this.logError('❌ Error during MongoDB disconnection', error);
@@ -642,7 +650,9 @@ class MongoDataPersistence {
   }
 
   calculateSpread(priceData) {
-    if (!priceData.high || !priceData.low || priceData.low === 0) return undefined;
+    if (!priceData.high || !priceData.low || priceData.low === 0) {
+      return undefined;
+    }
     return ((priceData.high - priceData.low) / priceData.low) * 100;
   }
 
@@ -654,7 +664,9 @@ class MongoDataPersistence {
   logError(message, error, context) {
     const timestamp = new Date().toISOString();
     console.error(`[${timestamp}] [MongoDB-Error] ${message}`);
-    if (context) console.error(`[${timestamp}] [MongoDB-Context]`, JSON.stringify(context, null, 2));
+    if (context) {
+      console.error(`[${timestamp}] [MongoDB-Context]`, JSON.stringify(context, null, 2));
+    }
     console.error(`[${timestamp}] [MongoDB-Stack]`, error);
   }
 }

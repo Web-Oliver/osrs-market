@@ -1,6 +1,6 @@
 /**
  * 📊 Monitoring Service - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Service Layer
  * - Business logic separated from controllers
  * - DRY principles with reusable service methods
@@ -19,7 +19,7 @@ class MonitoringService {
     this.logger = new Logger('MonitoringService');
     this.cache = new CacheManager('monitoring', 300); // 5 minutes cache
     this.metricsCalculator = new MetricsCalculator();
-    
+
     // Context7 Pattern: Initialize MongoDB persistence
     this.initializeMongoDB();
   }
@@ -36,7 +36,7 @@ class MonitoringService {
 
       this.mongoService = new MongoDataPersistence(mongoConfig);
       await this.mongoService.connect();
-      
+
       this.logger.info('MongoDB persistence initialized successfully');
     } catch (error) {
       this.logger.error('Failed to initialize MongoDB persistence', error);
@@ -53,7 +53,7 @@ class MonitoringService {
 
       const cacheKey = `live_data_${limit}`;
       const cachedData = this.cache.get(cacheKey);
-      
+
       if (cachedData) {
         this.logger.debug('Returning cached live monitoring data');
         return cachedData;
@@ -68,9 +68,9 @@ class MonitoringService {
 
       // Context7 Pattern: Transform data for consistent API response
       const transformedData = this.transformLiveData(data);
-      
+
       this.cache.set(cacheKey, transformedData);
-      
+
       this.logger.debug('Successfully fetched live monitoring data', {
         recordCount: transformedData.length,
         source: 'mongodb'
@@ -95,13 +95,13 @@ class MonitoringService {
 
       // Context7 Pattern: Validate and enrich data
       const enrichedData = this.enrichMonitoringData(data);
-      
+
       if (this.mongoService) {
         const insertedId = await this.mongoService.saveLiveMonitoringData(enrichedData);
-        
+
         // Context7 Pattern: Invalidate cache on data change
         this.cache.deletePattern('live_data_*');
-        
+
         this.logger.debug('Successfully saved live monitoring data', {
           insertedId,
           timestamp: enrichedData.timestamp
@@ -126,7 +126,7 @@ class MonitoringService {
 
       const cacheKey = `aggregated_stats_${timeRange}`;
       const cachedStats = this.cache.get(cacheKey);
-      
+
       if (cachedStats) {
         this.logger.debug('Returning cached aggregated statistics');
         return cachedStats;
@@ -141,9 +141,9 @@ class MonitoringService {
 
       // Context7 Pattern: Calculate additional metrics
       const enhancedStats = this.calculateEnhancedStats(stats, timeRange);
-      
+
       this.cache.set(cacheKey, enhancedStats);
-      
+
       this.logger.debug('Successfully fetched aggregated statistics', {
         timeRange,
         source: 'mongodb'
@@ -357,10 +357,10 @@ class MonitoringService {
 
       if (this.mongoService) {
         const result = await this.mongoService.cleanupOldData(maxAge);
-        
+
         // Context7 Pattern: Invalidate cache after cleanup
         this.cache.clear();
-        
+
         this.logger.info('Data cleanup completed successfully', result);
         return result;
       } else {
@@ -456,7 +456,6 @@ class MonitoringService {
       recommendations: this.metricsCalculator.generateRecommendations(stats)
     };
   }
-
 
 
 }

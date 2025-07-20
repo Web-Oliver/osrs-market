@@ -1,13 +1,13 @@
 /**
  * 📊 Market Price Snapshot Model - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Unified Time-Series Market Data Model
  * - Single source of truth for all market price data
  * - Supports multiple data granularities (daily, 5m, 1h, latest)
  * - Optimized for time-series queries and analytics
  * - Integrated with ItemModel for referential integrity
  * - Advanced calculated metrics for AI training
- * 
+ *
  * DRY: Centralized market data structure
  * SOLID: Single responsibility for market snapshots
  * Hierarchical: Foundation for market analytics services
@@ -18,7 +18,7 @@ const { Schema } = mongoose;
 
 /**
  * Context7 Pattern: Market Price Snapshot Schema Definition
- * 
+ *
  * This schema serves as the unified time-series data model for all market price information.
  * It consolidates data from multiple sources (OSRS Wiki API, Grand Exchange scraping, etc.)
  * into a single, queryable format optimized for AI training and market analysis.
@@ -53,7 +53,7 @@ const MarketPriceSnapshotSchema = new Schema({
 
   /**
    * Data Granularity Identifier
-   * 
+   *
    * Distinguishes between different data collection intervals:
    * - 'daily_scrape': Daily Grand Exchange scraping data
    * - '5m': 5-minute intervals from OSRS Wiki API
@@ -104,7 +104,7 @@ const MarketPriceSnapshotSchema = new Schema({
 
   /**
    * Advanced Calculated Metrics (Placeholder Fields)
-   * 
+   *
    * These fields will be populated by analytical services in subsequent steps.
    * They represent key trading indicators and risk metrics for AI training.
    */
@@ -313,10 +313,10 @@ const MarketPriceSnapshotSchema = new Schema({
   // Context7 Pattern: Schema Options
   timestamps: { createdAt: true, updatedAt: true },
   collection: 'market_price_snapshots',
-  
+
   // Optimize for time-series queries
   autoIndex: true,
-  
+
   // JSON transformation for API responses
   toJSON: {
     transform: function(doc, ret) {
@@ -328,7 +328,7 @@ const MarketPriceSnapshotSchema = new Schema({
 
 /**
  * Context7 Pattern: Compound Indexes for Time-Series Optimization
- * 
+ *
  * These indexes are crucial for efficient time-series queries and analytics.
  * The compound index on (itemId, interval, timestamp) ensures fast lookups
  * for specific items across time periods.
@@ -336,67 +336,67 @@ const MarketPriceSnapshotSchema = new Schema({
 
 // Primary compound index for time-series queries
 MarketPriceSnapshotSchema.index(
-  { itemId: 1, interval: 1, timestamp: 1 }, 
-  { 
+  { itemId: 1, interval: 1, timestamp: 1 },
+  {
     unique: true,
     name: 'idx_item_interval_timestamp_unique',
-    background: true 
+    background: true
   }
 );
 
 // Index for recent data queries
 MarketPriceSnapshotSchema.index(
   { timestamp: -1, interval: 1 },
-  { 
+  {
     name: 'idx_timestamp_interval_desc',
-    background: true 
+    background: true
   }
 );
 
 // Index for volume-based queries
 MarketPriceSnapshotSchema.index(
   { volume: -1, interval: 1 },
-  { 
+  {
     name: 'idx_volume_interval_desc',
-    background: true 
+    background: true
   }
 );
 
 // Index for source-based queries
 MarketPriceSnapshotSchema.index(
   { source: 1, createdAt: -1 },
-  { 
+  {
     name: 'idx_source_created_desc',
-    background: true 
+    background: true
   }
 );
 
 /**
  * Context7 Pattern: Pre-save Middleware
- * 
+ *
  * Ensures data integrity and performs automatic calculations before saving.
  */
 MarketPriceSnapshotSchema.pre('save', function(next) {
   // Update the updatedAt timestamp
   this.updatedAt = new Date();
-  
+
   // Validate price consistency
   if (this.highPrice < this.lowPrice) {
     return next(new Error('High price cannot be less than low price'));
   }
-  
+
   // Ensure timestamp is reasonable
   const now = Date.now();
   if (this.timestamp > now + 86400000) { // More than 24 hours in future
     return next(new Error('Timestamp cannot be more than 24 hours in the future'));
   }
-  
+
   next();
 });
 
 /**
  * Context7 Pattern: Instance Methods
- * 
+ *
  * Helper methods for common operations on market price snapshots.
  */
 
@@ -481,11 +481,11 @@ MarketPriceSnapshotSchema.methods.isItemTaxFree = function() {
  * @returns {Object} Detailed profit breakdown with tax information
  */
 MarketPriceSnapshotSchema.methods.getProfitBreakdown = function() {
-  const { 
-    calculateProfitAfterTax, 
-    calculateGETax, 
+  const {
+    calculateProfitAfterTax,
+    calculateGETax,
     calculateNetSellPrice,
-    isTaxFree 
+    isTaxFree
   } = require('../utils/marketConstants');
 
   const buyPrice = this.lowPrice;
@@ -514,7 +514,7 @@ MarketPriceSnapshotSchema.methods.getProfitBreakdown = function() {
 
 /**
  * Context7 Pattern: Static Methods
- * 
+ *
  * Class-level methods for common queries and operations.
  */
 
@@ -557,8 +557,8 @@ MarketPriceSnapshotSchema.statics.getHighVolumeSnapshots = function(minVolume = 
     volume: { $gte: minVolume },
     interval
   })
-  .sort({ volume: -1, timestamp: -1 })
-  .limit(limit);
+    .sort({ volume: -1, timestamp: -1 })
+    .limit(limit);
 };
 
 /**
@@ -575,7 +575,7 @@ MarketPriceSnapshotSchema.statics.getSnapshotsBySource = function(source, limit 
 
 /**
  * Context7 Pattern: Virtual Properties
- * 
+ *
  * Computed properties that don't persist to the database.
  */
 
@@ -605,7 +605,7 @@ MarketPriceSnapshotSchema.virtual('formattedTimestamp').get(function() {
  */
 const MarketPriceSnapshotModel = mongoose.model('MarketPriceSnapshot', MarketPriceSnapshotSchema);
 
-module.exports = { 
+module.exports = {
   MarketPriceSnapshotModel,
-  MarketPriceSnapshotSchema 
+  MarketPriceSnapshotSchema
 };

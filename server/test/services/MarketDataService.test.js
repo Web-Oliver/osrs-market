@@ -1,6 +1,6 @@
 /**
  * 📊 Market Data Service Tests - Context7 Pattern
- * 
+ *
  * Context7 Pattern: Comprehensive Service Testing
  * - Unit tests for saveMarketSnapshot() function
  * - Unit tests for getMarketSnapshots() function
@@ -27,7 +27,7 @@ describe('MarketDataService', () => {
   let marketDataService;
   let testItem;
 
-  beforeAll(async () => {
+  beforeAll(async() => {
     // Connect to test database
     if (mongoose.connection.readyState === 0) {
       await mongoose.connect('mongodb://localhost:27017/osrs_market_test');
@@ -52,21 +52,21 @@ describe('MarketDataService', () => {
     }
   });
 
-  beforeEach(async () => {
+  beforeEach(async() => {
     // Ensure clean state before each test
     await MarketPriceSnapshotModel.deleteMany({});
     // Create fresh instance for each test
     marketDataService = new MarketDataService();
   });
 
-  afterEach(async () => {
+  afterEach(async() => {
     // Clean up test data after each test
     await MarketPriceSnapshotModel.deleteMany({});
     // Wait a brief moment to ensure cleanup is complete
     await new Promise(resolve => setTimeout(resolve, 50));
   });
 
-  afterAll(async () => {
+  afterAll(async() => {
     // Clean up test data and close connection
     await MarketPriceSnapshotModel.deleteMany({});
     await ItemModel.deleteMany({});
@@ -84,7 +84,7 @@ describe('MarketDataService', () => {
       source: 'osrs_wiki_api'
     };
 
-    test('should save a new market snapshot successfully', async () => {
+    test('should save a new market snapshot successfully', async() => {
       const result = await marketDataService.saveMarketSnapshot(validSnapshotData);
 
       expect(result).toBeDefined();
@@ -97,7 +97,7 @@ describe('MarketDataService', () => {
       expect(result.source).toBe(validSnapshotData.source);
     });
 
-    test('should update existing snapshot with same itemId, timestamp, and interval', async () => {
+    test('should update existing snapshot with same itemId, timestamp, and interval', async() => {
       // First save
       const firstResult = await marketDataService.saveMarketSnapshot(validSnapshotData);
       const firstId = firstResult._id;
@@ -109,7 +109,7 @@ describe('MarketDataService', () => {
         lowPrice: 2550000,
         volume: 150
       };
-      
+
       const secondResult = await marketDataService.saveMarketSnapshot(updatedData);
 
       // Should be same document, but updated
@@ -127,7 +127,7 @@ describe('MarketDataService', () => {
       expect(snapshots.length).toBe(1);
     });
 
-    test('should create separate snapshots for different intervals', async () => {
+    test('should create separate snapshots for different intervals', async() => {
       // Save with 'latest' interval
       const latestResult = await marketDataService.saveMarketSnapshot(validSnapshotData);
 
@@ -151,7 +151,7 @@ describe('MarketDataService', () => {
       expect(snapshots.length).toBe(2);
     });
 
-    test('should throw error for missing required fields', async () => {
+    test('should throw error for missing required fields', async() => {
       // Missing itemId
       await expect(marketDataService.saveMarketSnapshot({
         timestamp: Date.now(),
@@ -180,10 +180,10 @@ describe('MarketDataService', () => {
       })).rejects.toThrow('Missing required fields: itemId, timestamp, interval');
     });
 
-    test('should throw error for invalid price relationship', async () => {
+    test('should throw error for invalid price relationship', async() => {
       const invalidData = {
         ...validSnapshotData,
-        highPrice: 2400000,  // Lower than lowPrice
+        highPrice: 2400000, // Lower than lowPrice
         lowPrice: 2500000
       };
 
@@ -191,17 +191,17 @@ describe('MarketDataService', () => {
         .rejects.toThrow('High price cannot be less than low price');
     });
 
-    test('should run schema validation on save', async () => {
+    test('should run schema validation on save', async() => {
       const invalidData = {
         ...validSnapshotData,
-        interval: 'invalid_interval'  // Not in enum
+        interval: 'invalid_interval' // Not in enum
       };
 
       await expect(marketDataService.saveMarketSnapshot(invalidData))
         .rejects.toThrow();
     });
 
-    test('should handle database errors gracefully', async () => {
+    test('should handle database errors gracefully', async() => {
       // Mock Mongoose to throw an error
       const originalFindOneAndUpdate = MarketPriceSnapshotModel.findOneAndUpdate;
       MarketPriceSnapshotModel.findOneAndUpdate = jest.fn().mockRejectedValue(
@@ -219,10 +219,10 @@ describe('MarketDataService', () => {
   describe('getMarketSnapshots()', () => {
     let testSnapshots;
 
-    beforeEach(async () => {
+    beforeEach(async() => {
       // Ensure clean state before creating test data
       await MarketPriceSnapshotModel.deleteMany({});
-      
+
       // Create test data
       const baseTime = Date.now();
       testSnapshots = [
@@ -279,18 +279,18 @@ describe('MarketDataService', () => {
       }
     });
 
-    test('should retrieve all snapshots for an item', async () => {
+    test('should retrieve all snapshots for an item', async() => {
       const result = await marketDataService.getMarketSnapshots(4151);
 
       expect(result).toHaveLength(4); // 4 snapshots for item 4151
       expect(result[0].itemId).toBe(4151);
-      
+
       // Should be sorted by timestamp descending (newest first)
       expect(result[0].timestamp).toBeGreaterThan(result[1].timestamp);
       expect(result[1].timestamp).toBeGreaterThan(result[2].timestamp);
     });
 
-    test('should filter by interval', async () => {
+    test('should filter by interval', async() => {
       const result = await marketDataService.getMarketSnapshots(4151, 'latest');
 
       expect(result).toHaveLength(3); // 3 'latest' snapshots for item 4151
@@ -299,7 +299,7 @@ describe('MarketDataService', () => {
       });
     });
 
-    test('should filter by date range', async () => {
+    test('should filter by date range', async() => {
       const baseTime = Date.now();
       const startDate = baseTime - 2400000; // 40 minutes ago
       const endDate = baseTime + 5000; // 5 seconds from now
@@ -318,7 +318,7 @@ describe('MarketDataService', () => {
       });
     });
 
-    test('should filter by interval and date range', async () => {
+    test('should filter by interval and date range', async() => {
       const baseTime = Date.now();
       const startDate = baseTime - 2400000; // 40 minutes ago
       const endDate = baseTime + 5000; // 5 seconds from now
@@ -338,12 +338,12 @@ describe('MarketDataService', () => {
       });
     });
 
-    test('should return empty array for non-existent item', async () => {
+    test('should return empty array for non-existent item', async() => {
       const result = await marketDataService.getMarketSnapshots(99999);
       expect(result).toHaveLength(0);
     });
 
-    test('should return empty array for invalid date range', async () => {
+    test('should return empty array for invalid date range', async() => {
       const baseTime = Date.now();
       const startDate = baseTime + 3600000; // 1 hour from now
       const endDate = baseTime + 7200000; // 2 hours from now
@@ -358,7 +358,7 @@ describe('MarketDataService', () => {
       expect(result).toHaveLength(0);
     });
 
-    test('should throw error for invalid itemId', async () => {
+    test('should throw error for invalid itemId', async() => {
       await expect(marketDataService.getMarketSnapshots(null))
         .rejects.toThrow('itemId must be a valid number');
 
@@ -369,7 +369,7 @@ describe('MarketDataService', () => {
         .rejects.toThrow('itemId must be a valid number');
     });
 
-    test('should handle database errors gracefully', async () => {
+    test('should handle database errors gracefully', async() => {
       // Mock Mongoose to throw an error
       const originalFind = MarketPriceSnapshotModel.find;
       MarketPriceSnapshotModel.find = jest.fn().mockReturnValue({
@@ -385,7 +385,7 @@ describe('MarketDataService', () => {
       MarketPriceSnapshotModel.find = originalFind;
     });
 
-    test('should populate item data correctly', async () => {
+    test('should populate item data correctly', async() => {
       const result = await marketDataService.getMarketSnapshots(4151);
 
       expect(result[0].itemId).toBeDefined();
@@ -393,7 +393,7 @@ describe('MarketDataService', () => {
       // This test verifies the populate call is made correctly
     });
 
-    test('should handle startDate only', async () => {
+    test('should handle startDate only', async() => {
       const baseTime = Date.now();
       const startDate = baseTime - 1800000; // 30 minutes ago
 
@@ -409,7 +409,7 @@ describe('MarketDataService', () => {
       });
     });
 
-    test('should handle endDate only', async () => {
+    test('should handle endDate only', async() => {
       const baseTime = Date.now();
       const endDate = baseTime - 1800000; // 30 minutes ago
 
@@ -428,7 +428,7 @@ describe('MarketDataService', () => {
   });
 
   describe('Integration Tests', () => {
-    test('should work with real MarketPriceSnapshotModel schema', async () => {
+    test('should work with real MarketPriceSnapshotModel schema', async() => {
       const snapshotData = {
         itemId: 4151,
         timestamp: Date.now(),
@@ -440,7 +440,7 @@ describe('MarketDataService', () => {
       };
 
       const result = await marketDataService.saveMarketSnapshot(snapshotData);
-      
+
       // Test that calculated metrics are properly computed
       // sellPrice: 2,500,000 - tax(50,000) = 2,450,000 net
       // buyPrice: 2,400,000
@@ -450,7 +450,7 @@ describe('MarketDataService', () => {
       expect(result.geTaxAmount).toBe(50000); // 2% of 2,500,000
       expect(result.netSellPrice).toBe(2450000); // 2,500,000 - 50,000
       expect(result.isTaxFree).toBe(false);
-      
+
       // Verify other calculated fields exist (be more lenient about which ones exist)
       expect(result.volatility).toBeDefined();
       expect(result.riskScore).toBeDefined();
@@ -460,7 +460,7 @@ describe('MarketDataService', () => {
       expect(result.liquidityRating).toBeDefined();
     });
 
-    test('should handle schema validation errors', async () => {
+    test('should handle schema validation errors', async() => {
       const invalidData = {
         itemId: 4151,
         timestamp: Date.now(),

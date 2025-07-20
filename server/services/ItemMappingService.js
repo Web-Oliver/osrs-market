@@ -1,6 +1,6 @@
 /**
  * 🗺️ Item Mapping Service - Context7 Business Logic Layer
- * 
+ *
  * Context7 Pattern: Service Layer for Item Mapping Operations
  * - SOLID: Single Responsibility - Item mapping business logic
  * - DRY: Reusable business operations and data transformations
@@ -29,11 +29,11 @@ class ItemMappingService {
     this.osrsWikiService = new OSRSWikiService();
     this.cache = new CacheManager('item_mapping', 900000); // 15 minutes cache
     this.dataTransformer = new DataTransformer();
-    
+
     // Enhanced Domain Components
     this.domainService = new ItemDomainService();
     this.adapter = new ItemModelAdapter();
-    
+
     // Context7 Pattern: Business rule constants
     this.SYNC_BATCH_SIZE = 1000;
     this.MAX_SYNC_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
@@ -47,10 +47,10 @@ class ItemMappingService {
   async importAllItemMappings(options = {}) {
     try {
       this.logger.info('Starting complete item mapping import');
-      
+
       const startTime = Date.now();
       const forceReimport = options.force || false;
-      
+
       // Check if we already have data (unless forcing reimport)
       if (!forceReimport) {
         const existingCount = await this.getItemCount();
@@ -71,7 +71,7 @@ class ItemMappingService {
       // Fetch all item mappings from OSRS Wiki API
       this.logger.info('Fetching item mappings from OSRS Wiki API');
       const mappingData = await this.osrsWikiService.getItemMapping();
-      
+
       if (!mappingData || !Array.isArray(mappingData)) {
         throw new Error('Invalid mapping data received from OSRS Wiki API');
       }
@@ -82,7 +82,7 @@ class ItemMappingService {
 
       // Transform and validate the data
       const transformedItems = this.transformMappingData(mappingData);
-      
+
       // Validate the transformed data
       const validationResult = this.validateMappingData(transformedItems);
       if (!validationResult.isValid) {
@@ -91,9 +91,9 @@ class ItemMappingService {
 
       // Import in batches for performance
       const importResult = await this.batchImportItems(transformedItems);
-      
+
       const processingTime = Date.now() - startTime;
-      
+
       this.logger.info('Item mapping import completed successfully', {
         totalItems: mappingData.length,
         imported: importResult.imported,
@@ -256,10 +256,10 @@ class ItemMappingService {
 
         try {
           const batchResult = await this.itemRepository.upsertItems(batch);
-          
+
           imported += batchResult.upserted;
           updated += batchResult.modified;
-          
+
           if (batchResult.errors && batchResult.errors.length > 0) {
             errors.push(...batchResult.errors);
           }
@@ -313,14 +313,14 @@ class ItemMappingService {
     try {
       const cacheKey = `item_${itemId}`;
       const cached = this.cache.get(cacheKey);
-      
+
       if (cached) {
         this.logger.debug('Returning cached item', { itemId });
         return cached;
       }
 
       const item = await this.itemRepository.findById(itemId);
-      
+
       if (item) {
         this.cache.set(cacheKey, item);
       }
@@ -370,7 +370,7 @@ class ItemMappingService {
       };
 
       const items = await this.itemRepository.getHighValueItems(businessOptions);
-      
+
       // Sort by business value (considering alchemy profit)
       const enrichedItems = items
         .map(item => this.enrichItemData(item))
@@ -413,7 +413,7 @@ class ItemMappingService {
       };
 
       const result = await this.itemRepository.getPaginatedItems(validatedOptions);
-      
+
       // Enrich items with business data
       result.items = result.items.map(item => this.enrichItemData(item));
 
@@ -430,18 +430,18 @@ class ItemMappingService {
   enrichItemData(item) {
     try {
       const itemObj = item.toObject ? item.toObject() : item;
-      
+
       // Calculate business metrics
       const alchemyProfit = Math.max(0, itemObj.highalch - itemObj.value - 200); // Nature rune cost
       const isProfitableAlchemy = alchemyProfit > 0;
       const profitMargin = itemObj.value > 0 ? (alchemyProfit / itemObj.value) * 100 : 0;
-      
+
       // Business value score (combines value and profit potential)
       const businessValue = itemObj.value + (alchemyProfit * 2);
-      
+
       // Category classification
       const category = this.classifyItem(itemObj);
-      
+
       return {
         ...itemObj,
         // Business calculations
@@ -466,17 +466,33 @@ class ItemMappingService {
    */
   classifyItem(item) {
     const name = item.name.toLowerCase();
-    
-    if (name.includes('rune')) return 'runes';
-    if (name.includes('potion') || name.includes('brew')) return 'potions';
-    if (name.includes('food') || name.includes('fish') || name.includes('meat') || 
-        name.includes('bread') || name.includes('cake')) return 'food';
-    if (name.includes('ore') || name.includes('bar')) return 'smithing';
-    if (name.includes('log') || name.includes('plank')) return 'woodcutting';
-    if (name.includes('seed') || name.includes('herb')) return 'farming';
-    if (item.highalch > 10000) return 'high_value';
-    if (item.members) return 'members';
-    
+
+    if (name.includes('rune')) {
+      return 'runes';
+    }
+    if (name.includes('potion') || name.includes('brew')) {
+      return 'potions';
+    }
+    if (name.includes('food') || name.includes('fish') || name.includes('meat') ||
+        name.includes('bread') || name.includes('cake')) {
+      return 'food';
+    }
+    if (name.includes('ore') || name.includes('bar')) {
+      return 'smithing';
+    }
+    if (name.includes('log') || name.includes('plank')) {
+      return 'woodcutting';
+    }
+    if (name.includes('seed') || name.includes('herb')) {
+      return 'farming';
+    }
+    if (item.highalch > 10000) {
+      return 'high_value';
+    }
+    if (item.members) {
+      return 'members';
+    }
+
     return 'general';
   }
 
@@ -494,9 +510,9 @@ class ItemMappingService {
         totalItems: stats.totalItems || 0,
         lastSyncDate: stats.lastSyncDate,
         itemsRequiringSync: oldItems.length,
-        syncHealth: oldItems.length === 0 ? 'healthy' : 
-                   oldItems.length < 100 ? 'good' : 
-                   oldItems.length < 1000 ? 'needs_attention' : 'critical'
+        syncHealth: oldItems.length === 0 ? 'healthy' :
+          oldItems.length < 100 ? 'good' :
+            oldItems.length < 1000 ? 'needs_attention' : 'critical'
       };
 
       return {
@@ -645,16 +661,16 @@ class ItemMappingService {
    */
   async batchProcessItemsEnhanced(itemsData, options = {}) {
     try {
-      this.logger.info('Starting enhanced batch processing', { 
+      this.logger.info('Starting enhanced batch processing', {
         count: itemsData.length,
-        options 
+        options
       });
 
       const startTime = Date.now();
-      
+
       // 1. Batch validate with domain service
       const validation = this.domainService.batchValidateItems(itemsData);
-      
+
       this.logger.info('Batch validation completed', {
         total: itemsData.length,
         valid: validation.valid.length,
@@ -680,7 +696,7 @@ class ItemMappingService {
       const batchSize = options.batchSize || this.SYNC_BATCH_SIZE;
       for (let i = 0; i < validation.valid.length; i += batchSize) {
         const batch = validation.valid.slice(i, i + batchSize);
-        
+
         try {
           const domainItems = batch.map(data => {
             const item = Item.create(data);
@@ -690,21 +706,21 @@ class ItemMappingService {
 
           // Save batch using adapter
           const saveResult = await this.adapter.saveEnhanced(domainItems[0]); // Simplified for demo
-          
+
           // Collect business insights
           for (const item of domainItems) {
             const category = item.getCategory();
-            results.businessInsights.categories[category] = 
+            results.businessInsights.categories[category] =
               (results.businessInsights.categories[category] || 0) + 1;
-            
+
             if (item.isProfitableAlchemy()) {
               results.businessInsights.profitableAlchemy++;
             }
-            
+
             if (item.market.value > this.HIGH_VALUE_THRESHOLD) {
               results.businessInsights.highValue++;
             }
-            
+
             if (item.market.tradeableOnGE) {
               results.businessInsights.tradeable++;
             }
@@ -759,10 +775,10 @@ class ItemMappingService {
 
       // Get all active items as domain entities
       const items = await this.adapter.findEnhanced({ status: 'active' });
-      
+
       // Generate comprehensive statistics
       const stats = this.domainService.calculateItemStatistics(items);
-      
+
       // Find items by business criteria
       const insights = {
         statistics: stats,

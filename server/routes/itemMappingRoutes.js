@@ -1,6 +1,6 @@
 /**
  * 🛣️ Item Mapping Routes - Context7 Express Router
- * 
+ *
  * Context7 Pattern: Express Router with RESTful Design
  * - SOLID: Single Responsibility - Item mapping HTTP routing
  * - DRY: Reusable middleware patterns and route handlers
@@ -98,8 +98,8 @@ router.get(
   '/category/:category',
   requestMiddleware.validateRequest({
     params: {
-      category: { 
-        type: 'string', 
+      category: {
+        type: 'string',
         required: true,
         enum: ['runes', 'potions', 'food', 'smithing', 'woodcutting', 'farming', 'high_value', 'members', 'free', 'general']
       }
@@ -154,12 +154,12 @@ router.get(
   '/business/:criteria',
   requestMiddleware.validateRequest({
     params: {
-      criteria: { 
-        type: 'string', 
+      criteria: {
+        type: 'string',
         required: true,
         enum: [
           'profitableAlchemy',
-          'highValueTradeable', 
+          'highValueTradeable',
           'flippingCandidates',
           'freeToPlayTradeable',
           'highEndMembersEquipment',
@@ -205,14 +205,14 @@ router.get(
       itemId: { type: 'string', required: true }
     }
   }),
-  async (req, res) => {
+  async(req, res) => {
     try {
       const itemId = parseInt(req.params.itemId);
       const { ItemMappingService } = require('../services/ItemMappingService');
       const itemMappingService = new ItemMappingService();
-      
+
       const item = await itemMappingService.getItemById(itemId);
-      
+
       if (!item) {
         return res.status(404).json({
           success: false,
@@ -220,7 +220,7 @@ router.get(
           timestamp: Date.now()
         });
       }
-      
+
       const geLimits = {
         itemId: itemId,
         buyLimit: item.buy_limit || null,
@@ -228,7 +228,7 @@ router.get(
         members: item.members || false,
         stackable: item.stackable || false
       };
-      
+
       res.status(200).json({
         success: true,
         data: geLimits,

@@ -1,6 +1,6 @@
 /**
  * 🔧 Common Types - Shared type definitions across the application
- * 
+ *
  * Context7 Pattern: Centralized type definitions using JSDoc
  * - DRY: Single source of truth for common types
  * - SOLID: Interface segregation through focused type definitions

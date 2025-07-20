@@ -1,13 +1,12 @@
 /**
  * 📋 Item Specifications - Business rule specifications using Specification Pattern
- * 
+ *
  * Context7 Pattern: Specification Pattern for business rules
  * - DRY: Reusable business rule definitions
  * - SOLID: Open/Closed principle - extensible specifications
  * - Clean business logic separation
  */
 
-const { AlchemyInfo } = require('../value-objects/AlchemyInfo');
 
 /**
  * Base Specification class

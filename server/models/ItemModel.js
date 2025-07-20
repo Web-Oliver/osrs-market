@@ -1,6 +1,6 @@
 /**
  * 🏺 OSRS Item Model - Context7 MongoDB Schema
- * 
+ *
  * Context7 Pattern: Domain Model with MongoDB Schema
  * - SOLID: Single Responsibility - Item data modeling
  * - DRY: Reusable schema definitions and validation
@@ -178,10 +178,10 @@ const ItemSchema = new mongoose.Schema({
   // Context7 Pattern: Schema options
   timestamps: true, // Automatic createdAt/updatedAt
   versionKey: '__v',
-  
+
   // Optimize for read performance
   collection: 'items',
-  
+
   // JSON transform options
   toJSON: {
     transform: function(doc, ret) {
@@ -210,7 +210,7 @@ ItemSchema.index({ value: -1, tradeable_on_ge: 1 }); // High-value tradeable ite
 ItemSchema.index({ highalch: -1, lowalch: -1 }); // Alchemy sorting
 ItemSchema.index({ status: 1, lastSyncedAt: -1 }); // Active items by sync date
 ItemSchema.index({ dataSource: 1, updatedAt: -1 }); // Source tracking
-ItemSchema.index({ name: 'text', examine: 'text' }, { 
+ItemSchema.index({ name: 'text', examine: 'text' }, {
   weights: { name: 10, examine: 1 },
   name: 'item_text_search'
 }); // Full-text search
@@ -222,33 +222,33 @@ ItemSchema.pre('save', function(next) {
   try {
     // Update timestamp
     this.updatedAt = new Date();
-    
+
     // Validate alchemy values
     if (this.highalch < this.lowalch) {
       throw new Error('High alch value cannot be less than low alch value');
     }
-    
+
     // Ensure positive values
     if (this.value < 0 || this.lowalch < 0 || this.highalch < 0) {
       throw new Error('Values cannot be negative');
     }
-    
+
     // Increment version on updates
     if (this.isModified() && !this.isNew) {
       this.version += 1;
     }
-    
-    logger.debug('Item validation passed', { 
-      itemId: this.itemId, 
+
+    logger.debug('Item validation passed', {
+      itemId: this.itemId,
       name: this.name,
-      version: this.version 
+      version: this.version
     });
-    
+
     next();
   } catch (error) {
-    logger.error('Item validation failed', error, { 
-      itemId: this.itemId, 
-      name: this.name 
+    logger.error('Item validation failed', error, {
+      itemId: this.itemId,
+      name: this.name
     });
     next(error);
   }
@@ -263,12 +263,16 @@ ItemSchema.statics = {
    */
   async findByMembershipAndTradeable(members = null, tradeable = null, options = {}) {
     const query = {};
-    
-    if (members !== null) query.members = members;
-    if (tradeable !== null) query.tradeable_on_ge = tradeable;
-    
+
+    if (members !== null) {
+      query.members = members;
+    }
+    if (tradeable !== null) {
+      query.tradeable_on_ge = tradeable;
+    }
+
     query.status = 'active'; // Only active items
-    
+
     return this.find(query, null, {
       limit: options.limit || 100,
       sort: options.sort || { name: 1 },
@@ -372,11 +376,21 @@ ItemSchema.methods = {
    * Get item category based on properties
    */
   getCategory() {
-    if (this.name.toLowerCase().includes('rune')) return 'runes';
-    if (this.name.toLowerCase().includes('potion')) return 'potions';
-    if (this.name.toLowerCase().includes('food')) return 'food';
-    if (this.highalch > 10000) return 'high_value';
-    if (this.members) return 'members';
+    if (this.name.toLowerCase().includes('rune')) {
+      return 'runes';
+    }
+    if (this.name.toLowerCase().includes('potion')) {
+      return 'potions';
+    }
+    if (this.name.toLowerCase().includes('food')) {
+      return 'food';
+    }
+    if (this.highalch > 10000) {
+      return 'high_value';
+    }
+    if (this.members) {
+      return 'members';
+    }
     return 'general';
   },
 

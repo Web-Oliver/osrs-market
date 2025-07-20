@@ -1,6 +1,6 @@
 /**
  * 📊 Logger Manager - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Centralized Logger Management with WebSocket Integration
  * - Manages Logger instances and WebSocket streaming
  * - Provides structured logging with real-time streaming
@@ -20,10 +20,10 @@ class LoggerManager {
     this.logQueue = [];
     this.maxQueueSize = 1000;
     this.processingQueue = false;
-    
+
     // Create system logger
     this.systemLogger = new Logger('LoggerManager');
-    
+
     this.systemLogger.info('📊 Logger Manager initialized');
   }
 
@@ -38,12 +38,12 @@ class LoggerManager {
       }
 
       this.webSocketService = new WebSocketLoggingService(server, options);
-      
+
       // Start processing queued logs
       this.startLogProcessing();
-      
+
       this.isInitialized = true;
-      
+
       this.systemLogger.info('✅ WebSocket logging service initialized successfully');
     } catch (error) {
       this.systemLogger.error('❌ Failed to initialize WebSocket logging service', error);
@@ -60,7 +60,7 @@ class LoggerManager {
       const enhancedLogger = this.enhanceLogger(logger, moduleName);
       this.loggers.set(moduleName, enhancedLogger);
     }
-    
+
     return this.loggers.get(moduleName);
   }
 
@@ -116,7 +116,7 @@ class LoggerManager {
         result,
         category: 'trading'
       };
-      
+
       logger.info(message, tradingMeta);
       this.streamLog('info', moduleName, message, tradingMeta);
     };
@@ -130,7 +130,7 @@ class LoggerManager {
         reasoning,
         category: 'ai'
       };
-      
+
       logger.info(message, aiMeta);
       this.streamLog('info', moduleName, message, aiMeta);
     };
@@ -144,7 +144,7 @@ class LoggerManager {
         priceData,
         category: 'market'
       };
-      
+
       logger.info(message, marketMeta);
       this.streamLog('info', moduleName, message, marketMeta);
     };
@@ -169,7 +169,7 @@ class LoggerManager {
 
       // Add to queue for processing
       this.logQueue.push(logEntry);
-      
+
       // Maintain queue size
       if (this.logQueue.length > this.maxQueueSize) {
         this.logQueue.shift();
@@ -275,11 +275,11 @@ class LoggerManager {
    */
   configureStreaming(options) {
     this.maxQueueSize = options.maxQueueSize || this.maxQueueSize;
-    
+
     if (this.webSocketService) {
       this.webSocketService.updateOptions(options);
     }
-    
+
     this.systemLogger.info('📝 Log streaming configured', {
       options: Object.keys(options)
     });
@@ -390,7 +390,7 @@ class LoggerManager {
    */
   createContextLogger(moduleName, context = {}) {
     const baseLogger = this.getLogger(moduleName);
-    
+
     return {
       ...baseLogger,
       info: (message, meta = {}) => baseLogger.info(message, { ...context, ...meta }),
@@ -423,22 +423,22 @@ class LoggerManager {
   async shutdown() {
     try {
       this.systemLogger.info('📊 Shutting down Logger Manager');
-      
+
       // Flush remaining logs
       await this.flushLogs();
-      
+
       // Stop processing
       this.stopLogProcessing();
-      
+
       // Shutdown WebSocket service
       if (this.webSocketService) {
         await this.webSocketService.shutdown();
       }
-      
+
       // Clear loggers
       this.loggers.clear();
       this.logQueue = [];
-      
+
       this.systemLogger.info('✅ Logger Manager shutdown completed');
     } catch (error) {
       this.systemLogger.error('❌ Error shutting down Logger Manager', error);

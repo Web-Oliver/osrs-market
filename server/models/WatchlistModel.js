@@ -1,6 +1,6 @@
 /**
  * 📋 WatchlistModel - MongoDB Schema for User Watchlist Items
- * 
+ *
  * Context7 Pattern: Domain-Driven Design with Mongoose
  * - Comprehensive watchlist item management
  * - User-specific watchlist tracking
@@ -21,7 +21,7 @@ const watchlistSchema = new mongoose.Schema({
     index: true,
     description: 'Unique identifier for the user (hardcoded for now, will be authentication-based later)'
   },
-  
+
   itemId: {
     type: Number,
     required: true,
@@ -29,7 +29,7 @@ const watchlistSchema = new mongoose.Schema({
     index: true,
     description: 'OSRS item ID from the Grand Exchange'
   },
-  
+
   itemName: {
     type: String,
     required: true,
@@ -37,38 +37,38 @@ const watchlistSchema = new mongoose.Schema({
     maxlength: 100,
     description: 'Human-readable name of the item'
   },
-  
+
   addedDate: {
     type: Date,
     required: true,
     default: Date.now,
     description: 'Timestamp when the item was added to the watchlist'
   },
-  
+
   currentPrice: {
     type: Number,
     min: 0,
     description: 'Current market price of the item (cached for performance)'
   },
-  
+
   currentMargin: {
     type: Number,
     description: 'Current margin/profit potential (cached for performance)'
   },
-  
+
   notes: {
     type: String,
     maxlength: 500,
     trim: true,
     description: 'User notes about this watchlist item'
   },
-  
+
   isActive: {
     type: Boolean,
     default: true,
     description: 'Whether this watchlist item is still active'
   },
-  
+
   metadata: {
     type: Map,
     of: mongoose.Schema.Types.Mixed,
@@ -125,11 +125,11 @@ watchlistSchema.methods.deactivate = function() {
  */
 watchlistSchema.statics.findByUserId = function(userId, options = {}) {
   const query = { userId, isActive: true };
-  
+
   if (options.itemId) {
     query.itemId = options.itemId;
   }
-  
+
   return this.find(query)
     .sort({ addedDate: -1 })
     .limit(options.limit || 100);
@@ -159,7 +159,7 @@ watchlistSchema.statics.addItem = function(userId, itemId, itemName, additionalD
     addedDate: new Date(),
     ...additionalData
   });
-  
+
   return watchlistItem.save();
 };
 
@@ -171,7 +171,7 @@ watchlistSchema.pre('save', function(next) {
   if (this.itemName) {
     this.itemName = this.itemName.trim();
   }
-  
+
   next();
 });
 

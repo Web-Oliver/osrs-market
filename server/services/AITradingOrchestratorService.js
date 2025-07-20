@@ -1,6 +1,6 @@
 /**
  * 🤖 AI Trading Orchestrator Service - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Service Layer for AI Trading Orchestration
  * - Manages AI trading sessions and learning cycles
  * - Orchestrates neural trading agents and outcome tracking
@@ -25,20 +25,20 @@ const { ItemDomainService } = require('../domain/services/ItemDomainService');
 class AITradingOrchestratorService {
   constructor(networkConfig, adaptiveConfig) {
     this.logger = new Logger('AITradingOrchestrator');
-    
+
     // REFACTORED: Use PythonRLClientService for AI operations
     this.pythonRLClient = new PythonRLClientService(networkConfig);
-    
+
     // Keep legacy agent for fallback compatibility
     this.agent = new NeuralTradingAgentService(networkConfig);
     this.outcomeTracker = new TradeOutcomeTrackerService();
     this.tradingAnalysis = new TradingAnalysisService();
     this.persistence = null; // Will be initialized properly
-    
+
     // ENHANCED: Domain services for trading intelligence
     this.itemRepository = new ItemRepository();
     this.domainService = new ItemDomainService();
-    
+
     this.currentSession = null;
     this.trainingMetrics = [];
     this.adaptiveConfig = adaptiveConfig || {
@@ -71,10 +71,10 @@ class AITradingOrchestratorService {
         connectionString: process.env.MONGODB_CONNECTION_STRING || 'mongodb://localhost:27017',
         databaseName: process.env.MONGODB_DATABASE || 'osrs_market_data'
       };
-      
+
       this.persistence = new MongoDataPersistence(mongoConfig);
       await this.persistence.initialize();
-      
+
       this.logger.info('✅ MongoDB persistence initialized for AI decision tracking');
     } catch (error) {
       this.logger.error('❌ Failed to initialize MongoDB persistence', error);
@@ -87,7 +87,7 @@ class AITradingOrchestratorService {
    */
   startLearningSession() {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     this.currentSession = {
       id: sessionId,
       startTime: Date.now(),
@@ -134,7 +134,7 @@ class AITradingOrchestratorService {
 
           const marketState = this.convertToMarketState(item);
           const prediction = await this.predictWithPythonRL(marketState);
-          
+
           // CRITICAL: Save AI decision to MongoDB for tracking and learning
           if (this.persistence && this.currentSession) {
             const decision = {
@@ -146,11 +146,11 @@ class AITradingOrchestratorService {
               reasoning: prediction.reasoning || 'Neural network prediction',
               timestamp: Date.now()
             };
-            
+
             try {
               const decisionId = await this.persistence.saveAIDecision(decision);
               prediction.decisionId = decisionId; // Track for outcome updates
-              
+
               this.logger.debug('💾 AI decision saved to database', {
                 decisionId,
                 itemId: decision.itemId,
@@ -161,11 +161,11 @@ class AITradingOrchestratorService {
               this.logger.error('❌ Failed to save AI decision', error);
             }
           }
-          
+
           // Only execute trades with high confidence or during training
           if (prediction.confidence > 0.7 || this.isTraining()) {
             actions.push(prediction);
-            
+
             // Simulate trade execution for training
             if (this.isTraining()) {
               await this.simulateTradeExecution(marketState, prediction);
@@ -188,7 +188,7 @@ class AITradingOrchestratorService {
             hasPriceHistory: !!item.priceHistory,
             priceHistoryLength: item.priceHistory?.length || 0
           });
-          
+
           // Continue to next item instead of failing entire operation
           continue;
         }
@@ -217,7 +217,7 @@ class AITradingOrchestratorService {
       // Try Python RL service first
       const features = this.encodeStateForPython(marketState);
       const pythonPrediction = await this.pythonRLClient.predict(features);
-      
+
       // Convert Python prediction to expected format
       const prediction = {
         action: this.convertPythonAction(pythonPrediction.action, marketState, pythonPrediction),
@@ -227,27 +227,27 @@ class AITradingOrchestratorService {
         modelVersion: pythonPrediction.modelVersion,
         source: 'python_rl'
       };
-      
+
       this.logger.debug('🐍 Python RL prediction received', {
         itemId: marketState.itemId,
         action: prediction.action.type,
         confidence: prediction.confidence,
         expectedReturn: prediction.expectedReturn
       });
-      
+
       return prediction;
     } catch (error) {
       this.logger.warn('⚠️ Python RL service unavailable, falling back to local agent', error);
-      
+
       try {
         // Fallback to local neural agent
         const localPrediction = this.agent.predict(marketState);
         localPrediction.source = 'local_neural';
-        
+
         return localPrediction;
       } catch (fallbackError) {
         this.logger.error('❌ Both Python RL and local agent failed, using simple fallback', fallbackError);
-        
+
         // Simple fallback prediction
         return {
           action: {
@@ -289,14 +289,14 @@ class AITradingOrchestratorService {
   convertPythonAction(pythonAction, marketState = null, fullPrediction = null) {
     // Python action can be a number (0=BUY, 1=HOLD, 2=SELL) or an object with type
     let actionType;
-    
+
     if (typeof pythonAction === 'number') {
       // Convert numeric action to string
       switch (pythonAction) {
-        case 0: actionType = 'BUY'; break;
-        case 1: actionType = 'HOLD'; break;
-        case 2: actionType = 'SELL'; break;
-        default: actionType = 'HOLD'; break;
+      case 0: actionType = 'BUY'; break;
+      case 1: actionType = 'HOLD'; break;
+      case 2: actionType = 'SELL'; break;
+      default: actionType = 'HOLD'; break;
       }
     } else if (typeof pythonAction === 'object') {
       // Handle object format
@@ -305,12 +305,12 @@ class AITradingOrchestratorService {
       // Handle string format
       actionType = pythonAction || 'HOLD';
     }
-    
+
     // Use action_name from full prediction if available (fallback response includes this)
     if (fullPrediction && fullPrediction.action_name) {
       actionType = fullPrediction.action_name;
     }
-    
+
     return {
       type: actionType,
       itemId: (marketState && marketState.itemId) || (pythonAction && pythonAction.itemId) || null,
@@ -358,25 +358,25 @@ class AITradingOrchestratorService {
    */
   async simulateTradeExecution(marketState, prediction) {
     const tradeId = `trade_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     try {
       // Start tracking the trade
       this.outcomeTracker.startTrade(tradeId, prediction.action, marketState);
 
       // Simulate market movement and trade completion
-      setTimeout(async () => {
+      setTimeout(async() => {
         try {
           const success = this.simulateTradeSuccess(marketState, prediction.action);
           const finalPrice = this.simulatePriceMovement(marketState, prediction.action);
           const newMarketState = { ...marketState, price: finalPrice, timestamp: Date.now() };
-          
+
           const tradeOutcome = this.outcomeTracker.completeTrade(
-            tradeId, 
-            finalPrice, 
-            newMarketState, 
+            tradeId,
+            finalPrice,
+            newMarketState,
             success
           );
-          
+
           if (tradeOutcome && this.isTraining()) {
             await this.processTradeOutcome(marketState, prediction, newMarketState, success, tradeOutcome);
           }
@@ -396,17 +396,17 @@ class AITradingOrchestratorService {
     try {
       // Convert to OpenAI Gym format for Python RL service
       const observation = this.encodeStateForPython(marketState);
-      
+
       // Add historical context if available
-      const historyFeatures = historicalData.slice(-10).map(state => 
+      const historyFeatures = historicalData.slice(-10).map(state =>
         this.encodeStateForPython(state)
       );
-      
+
       // Pad history to fixed size for consistent input
       while (historyFeatures.length < 10) {
         historyFeatures.unshift(new Array(8).fill(0));
       }
-      
+
       return {
         observation: observation,
         history: historyFeatures,
@@ -467,11 +467,11 @@ class AITradingOrchestratorService {
 
           // Get prediction from Python RL service
           const prediction = await this.predictWithPythonRL(marketState);
-          
+
           // Simulate trade execution
           const tradeResult = await this.simulateTradeForEpisode(
-            marketState, 
-            prediction, 
+            marketState,
+            prediction,
             currentPortfolioValue
           );
 
@@ -552,19 +552,19 @@ class AITradingOrchestratorService {
     try {
       const action = prediction.action;
       const confidence = prediction.confidence;
-      
+
       // Determine trade size based on confidence and portfolio value
       const maxTradeSize = currentPortfolioValue * 0.1; // Max 10% of portfolio
       const tradeSize = Math.min(maxTradeSize, confidence * maxTradeSize);
-      
+
       let profitLoss = 0;
       let executed = false;
-      
+
       if (action.type === 'BUY') {
         // Simulate buying at current price and selling at predicted price
         const buyPrice = marketState.price;
         const sellPrice = buyPrice * (1 + (marketState.spread / 100));
-        
+
         // Calculate potential profit (simplified)
         const quantity = Math.floor(tradeSize / buyPrice);
         if (quantity > 0) {
@@ -575,22 +575,22 @@ class AITradingOrchestratorService {
         // Simulate selling at current price
         const sellPrice = marketState.price;
         const buyPrice = sellPrice * (1 - (marketState.spread / 100));
-        
+
         const quantity = Math.floor(tradeSize / sellPrice);
         if (quantity > 0) {
           profitLoss = quantity * (sellPrice - buyPrice);
           executed = true;
         }
       }
-      
+
       // Add market volatility and execution risk
       if (executed) {
         const volatilityFactor = 1 + (Math.random() - 0.5) * (marketState.volatility / 100);
         const executionRisk = Math.random() > 0.95 ? 0.5 : 1; // 5% chance of partial execution
-        
+
         profitLoss = profitLoss * volatilityFactor * executionRisk;
       }
-      
+
       return {
         executed,
         profitLoss,
@@ -616,24 +616,24 @@ class AITradingOrchestratorService {
   calculateEpisodeReward(marketState, prediction, tradeResult, currentPortfolioValue) {
     try {
       let reward = 0;
-      
+
       // Primary reward: profit/loss from trade
       if (tradeResult.executed) {
         reward += tradeResult.profitLoss / 10000; // Scale down for neural network
       }
-      
+
       // Confidence reward: reward high confidence correct predictions
       if (tradeResult.executed && tradeResult.profitLoss > 0) {
         reward += prediction.confidence * 5;
       } else if (tradeResult.executed && tradeResult.profitLoss < 0) {
         reward -= prediction.confidence * 5;
       }
-      
+
       // Risk management reward: penalize risky trades
       if (tradeResult.tradeSize > currentPortfolioValue * 0.2) {
         reward -= 10; // Penalty for over-sized trades
       }
-      
+
       // Market condition reward: reward appropriate actions
       if (marketState.trend === 'UP' && prediction.action.type === 'BUY') {
         reward += 2;
@@ -642,12 +642,12 @@ class AITradingOrchestratorService {
       } else if (marketState.trend === 'FLAT' && prediction.action.type === 'HOLD') {
         reward += 1;
       }
-      
+
       // Volatility penalty: reduce reward for high volatility trades
       if (marketState.volatility > 20) {
         reward -= Math.min(5, marketState.volatility / 10);
       }
-      
+
       return Math.max(-50, Math.min(50, reward)); // Clamp reward
     } catch (error) {
       this.logger.error('❌ Error calculating episode reward', error);
@@ -660,10 +660,10 @@ class AITradingOrchestratorService {
    */
   actionToIndex(action) {
     switch (action.type) {
-      case 'BUY': return 0;
-      case 'SELL': return 1;
-      case 'HOLD': return 2;
-      default: return 2;
+    case 'BUY': return 0;
+    case 'SELL': return 1;
+    case 'HOLD': return 2;
+    default: return 2;
     }
   }
 
@@ -673,7 +673,7 @@ class AITradingOrchestratorService {
   formatEpisodeForTraining(episodeData) {
     try {
       const trainingData = [];
-      
+
       for (let i = 0; i < episodeData.observations.length - 1; i++) {
         trainingData.push({
           state: episodeData.observations[i],
@@ -684,7 +684,7 @@ class AITradingOrchestratorService {
           info: episodeData.info[i]
         });
       }
-      
+
       return trainingData;
     } catch (error) {
       this.logger.error('❌ Error formatting episode for training', error);
@@ -716,7 +716,7 @@ class AITradingOrchestratorService {
             newMarketState,
             true
           );
-          
+
           this.logger.debug('🐍 Experience stored in Python RL service', {
             itemId: marketState.itemId,
             reward: reward.totalReward,
@@ -748,9 +748,9 @@ class AITradingOrchestratorService {
             nextState: newMarketState,
             done: true
           }]);
-          
+
           loss = trainingResult.averageLoss || 0;
-          
+
           this.logger.debug('🐍 Python RL training completed', {
             episodesTrained: trainingResult.episodesTrained,
             averageLoss: trainingResult.averageLoss,
@@ -781,10 +781,10 @@ class AITradingOrchestratorService {
             reward: reward.totalReward,
             tradeId: tradeOutcome.tradeId
           };
-          
+
           try {
             await this.persistence.updateAIDecisionOutcome(prediction.decisionId, outcome);
-            
+
             this.logger.debug('✅ AI decision outcome updated', {
               decisionId: prediction.decisionId,
               success: success,
@@ -806,10 +806,10 @@ class AITradingOrchestratorService {
           finalMarketState: newMarketState,
           reward: reward.totalReward
         };
-        
+
         try {
           await this.persistence.saveTradeOutcome(enhancedTradeOutcome);
-          
+
           this.logger.debug('✅ Trade outcome saved to database', {
             tradeId: tradeOutcome.tradeId,
             sessionId: this.currentSession.id,
@@ -831,16 +831,28 @@ class AITradingOrchestratorService {
     let successProbability = 0.6; // Base success rate
 
     // Adjust based on market conditions
-    if (action.type === 'BUY' && marketState.trend === 'UP') successProbability += 0.2;
-    if (action.type === 'SELL' && marketState.trend === 'DOWN') successProbability += 0.2;
-    if (action.type === 'HOLD') successProbability = 0.8;
+    if (action.type === 'BUY' && marketState.trend === 'UP') {
+      successProbability += 0.2;
+    }
+    if (action.type === 'SELL' && marketState.trend === 'DOWN') {
+      successProbability += 0.2;
+    }
+    if (action.type === 'HOLD') {
+      successProbability = 0.8;
+    }
 
     // Adjust based on technical indicators
-    if (marketState.rsi < 30 && action.type === 'BUY') successProbability += 0.15;
-    if (marketState.rsi > 70 && action.type === 'SELL') successProbability += 0.15;
+    if (marketState.rsi < 30 && action.type === 'BUY') {
+      successProbability += 0.15;
+    }
+    if (marketState.rsi > 70 && action.type === 'SELL') {
+      successProbability += 0.15;
+    }
 
     // Adjust based on spread
-    if (marketState.spread > 5) successProbability += 0.1;
+    if (marketState.spread > 5) {
+      successProbability += 0.1;
+    }
 
     return Math.random() < Math.min(0.95, successProbability);
   }
@@ -851,17 +863,25 @@ class AITradingOrchestratorService {
   simulatePriceMovement(marketState, action) {
     const basePrice = marketState.price;
     const volatilityFactor = marketState.volatility / 100;
-    
+
     // Random price movement with trend bias
     let movement = (Math.random() - 0.5) * volatilityFactor * basePrice;
-    
+
     // Apply trend bias
-    if (marketState.trend === 'UP') movement += basePrice * 0.01;
-    if (marketState.trend === 'DOWN') movement -= basePrice * 0.01;
+    if (marketState.trend === 'UP') {
+      movement += basePrice * 0.01;
+    }
+    if (marketState.trend === 'DOWN') {
+      movement -= basePrice * 0.01;
+    }
 
     // Add some action-based movement (market impact)
-    if (action.type === 'BUY') movement += basePrice * 0.005;
-    if (action.type === 'SELL') movement -= basePrice * 0.005;
+    if (action.type === 'BUY') {
+      movement += basePrice * 0.005;
+    }
+    if (action.type === 'SELL') {
+      movement -= basePrice * 0.005;
+    }
 
     return Math.max(1, Math.round(basePrice + movement));
   }
@@ -916,14 +936,16 @@ class AITradingOrchestratorService {
    * Context7 Pattern: Check for adaptive learning
    */
   checkAdaptiveLearning() {
-    if (!this.adaptiveConfig.enableOnlineLearning) return;
+    if (!this.adaptiveConfig.enableOnlineLearning) {
+      return;
+    }
 
     const timeSinceUpdate = Date.now() - this.lastModelUpdate;
     const tradesCount = this.outcomeTracker.getOutcomesCount();
 
     // Check if it's time for adaptive learning
     if (
-      tradesCount > 0 && 
+      tradesCount > 0 &&
       tradesCount % this.adaptiveConfig.learningFrequency === 0 &&
       timeSinceUpdate > 60000 // At least 1 minute between updates
     ) {
@@ -941,12 +963,12 @@ class AITradingOrchestratorService {
     try {
       // Get performance metrics from MongoDB for comprehensive analysis
       const performance = await this.analyzePerformanceFromDatabase();
-      
+
       if (!performance) {
         this.logger.warn('⚠️ No performance data available for adaptive learning');
         return;
       }
-      
+
       this.logger.info('🧠 Performing adaptive learning with database analytics', {
         sessionId: this.currentSession?.id,
         performance: {
@@ -978,7 +1000,7 @@ class AITradingOrchestratorService {
 
         // Save the learning session
         await this.persistence.saveLearningSession(learningSession);
-        
+
         this.logger.info('✅ Learning session saved with adaptive optimizations', {
           sessionId: this.currentSession.id,
           actionsApplied: adaptiveActions.length
@@ -1002,13 +1024,13 @@ class AITradingOrchestratorService {
 
       // Get recent decisions and outcomes for this session
       const recentDecisions = await this.persistence.getAIDecisions(
-        { 
+        {
           sessionId: this.currentSession.id,
           startTime: Date.now() - (24 * 60 * 60 * 1000) // Last 24 hours
         },
-        { 
+        {
           sort: { timestamp: -1 },
-          limit: 1000 
+          limit: 1000
         }
       );
 
@@ -1017,7 +1039,7 @@ class AITradingOrchestratorService {
       }
 
       // Analyze decision outcomes
-      let totalDecisions = recentDecisions.length;
+      const totalDecisions = recentDecisions.length;
       let successfulDecisions = 0;
       let totalProfit = 0;
       let totalLoss = 0;
@@ -1033,7 +1055,7 @@ class AITradingOrchestratorService {
       for (const decision of recentDecisions) {
         if (decision.outcome) {
           const { success, profitLoss } = decision.outcome;
-          
+
           if (success) {
             successfulDecisions++;
             if (decision.confidence > 0.8) {
@@ -1121,7 +1143,7 @@ class AITradingOrchestratorService {
     for (const [actionType, actionStats] of Object.entries(performance.actionPerformance)) {
       if (actionStats.total > 10) { // Only analyze actions with sufficient data
         const actionSuccessRate = (actionStats.successful / actionStats.total) * 100;
-        
+
         if (actionSuccessRate < 30) {
           actions.push({
             type: 'REDUCE_ACTION_FREQUENCY',
@@ -1133,7 +1155,7 @@ class AITradingOrchestratorService {
     }
 
     // High confidence decisions performing poorly
-    if (performance.highConfidenceSuccesses < performance.lowConfidenceSuccesses && 
+    if (performance.highConfidenceSuccesses < performance.lowConfidenceSuccesses &&
         performance.totalDecisions > 50) {
       actions.push({
         type: 'RECALIBRATE_CONFIDENCE',
@@ -1156,38 +1178,38 @@ class AITradingOrchestratorService {
       });
 
       switch (action.type) {
-        case 'INCREASE_EXPLORATION':
-          // Increase exploration rate
-          this.adaptiveConfig.explorationBoost = true;
-          break;
+      case 'INCREASE_EXPLORATION':
+        // Increase exploration rate
+        this.adaptiveConfig.explorationBoost = true;
+        break;
 
-        case 'INCREASE_RISK_TOLERANCE':
-          // Adjust minimum profit threshold
-          if (action.parameters.minProfitThreshold) {
-            this.adaptiveConfig.minProfitMargin = action.parameters.minProfitThreshold / 100000; // Convert to percentage
-          }
-          break;
+      case 'INCREASE_RISK_TOLERANCE':
+        // Adjust minimum profit threshold
+        if (action.parameters.minProfitThreshold) {
+          this.adaptiveConfig.minProfitMargin = action.parameters.minProfitThreshold / 100000; // Convert to percentage
+        }
+        break;
 
-        case 'IMPROVE_RISK_MANAGEMENT':
-          // Tighten risk management parameters
-          this.adaptiveConfig.maxItemValue = Math.min(
-            this.adaptiveConfig.maxItemValue * 0.9,
-            1000000000 // Don't go below 1B
-          );
-          break;
+      case 'IMPROVE_RISK_MANAGEMENT':
+        // Tighten risk management parameters
+        this.adaptiveConfig.maxItemValue = Math.min(
+          this.adaptiveConfig.maxItemValue * 0.9,
+          1000000000 // Don't go below 1B
+        );
+        break;
 
-        case 'REDUCE_ACTION_FREQUENCY':
-          // This would be implemented in the agent's action selection logic
-          this.logger.info(`📉 Noted to reduce ${action.parameters.actionType} frequency`);
-          break;
+      case 'REDUCE_ACTION_FREQUENCY':
+        // This would be implemented in the agent's action selection logic
+        this.logger.info(`📉 Noted to reduce ${action.parameters.actionType} frequency`);
+        break;
 
-        case 'RECALIBRATE_CONFIDENCE':
-          // This would be implemented in the agent's confidence calculation
-          this.logger.info('🎯 Noted to recalibrate confidence scoring');
-          break;
+      case 'RECALIBRATE_CONFIDENCE':
+        // This would be implemented in the agent's confidence calculation
+        this.logger.info('🎯 Noted to recalibrate confidence scoring');
+        break;
 
-        default:
-          this.logger.warn(`Unknown adaptive action type: ${action.type}`);
+      default:
+        this.logger.warn(`Unknown adaptive action type: ${action.type}`);
       }
     } catch (error) {
       this.logger.error('❌ Error applying adaptive action', error, { action });
@@ -1215,9 +1237,9 @@ class AITradingOrchestratorService {
    */
   async findBestTradingOpportunities(currentPrices, options = {}) {
     try {
-      this.logger.info('🔍 Finding best trading opportunities', { 
+      this.logger.info('🔍 Finding best trading opportunities', {
         priceCount: Object.keys(currentPrices).length,
-        options 
+        options
       });
 
       // Get all tradeable items with business logic
@@ -1229,10 +1251,14 @@ class AITradingOrchestratorService {
 
       for (const item of tradeableItems) {
         const priceData = currentPrices[item.id.value];
-        if (!priceData || !item.market.tradeableOnGE) continue;
+        if (!priceData || !item.market.tradeableOnGE) {
+          continue;
+        }
 
         // Skip items over max value
-        if (priceData.high > this.adaptiveConfig.maxItemValue) continue;
+        if (priceData.high > this.adaptiveConfig.maxItemValue) {
+          continue;
+        }
 
         // Calculate profit potential
         const spread = priceData.high - priceData.low;
@@ -1240,35 +1266,37 @@ class AITradingOrchestratorService {
         const profitMargin = spreadPercentage / 100;
 
         // Skip if profit margin too low
-        if (profitMargin < this.adaptiveConfig.minProfitMargin) continue;
+        if (profitMargin < this.adaptiveConfig.minProfitMargin) {
+          continue;
+        }
 
         // Use domain logic for additional insights
         const opportunity = {
           itemId: item.id.value,
           itemName: item.name,
           category: item.getCategory(),
-          
+
           // Price data
           buyPrice: priceData.low,
           sellPrice: priceData.high,
           spread: spread,
           spreadPercentage: spreadPercentage,
           profitMargin: profitMargin,
-          
+
           // Business logic insights
           isProfitableAlchemy: item.isProfitableAlchemy(),
           alchemyProfit: item.getAlchemyProfit(),
           membershipTier: item.members ? 'members' : 'f2p',
-          
+
           // Trading factors
           buyLimit: item.market.buyLimit,
           stackable: item.market.stackable,
           volume: priceData.volume || 0,
-          
+
           // Risk assessment
           riskScore: this.calculateRiskScore(item, priceData),
           profitPotential: spread * (item.market.buyLimit || 1),
-          
+
           // AI features for training
           features: this.extractTradingFeatures(item, priceData)
         };
@@ -1316,21 +1344,33 @@ class AITradingOrchestratorService {
     let risk = 0;
 
     // High value items are riskier
-    if (priceData.high > 1000000) risk += 2;
-    else if (priceData.high > 100000) risk += 1;
+    if (priceData.high > 1000000) {
+      risk += 2;
+    } else if (priceData.high > 100000) {
+      risk += 1;
+    }
 
     // Members items have smaller market
-    if (item.members) risk += 1;
+    if (item.members) {
+      risk += 1;
+    }
 
     // Low volume is risky
-    if (priceData.volume < 100) risk += 2;
-    else if (priceData.volume < 1000) risk += 1;
+    if (priceData.volume < 100) {
+      risk += 2;
+    } else if (priceData.volume < 1000) {
+      risk += 1;
+    }
 
     // No buy limit means unlimited buying (good)
-    if (!item.market.buyLimit) risk -= 1;
+    if (!item.market.buyLimit) {
+      risk -= 1;
+    }
 
     // Stackable items easier to trade
-    if (item.market.stackable) risk -= 0.5;
+    if (item.market.stackable) {
+      risk -= 0.5;
+    }
 
     return Math.max(0, risk);
   }
@@ -1344,12 +1384,12 @@ class AITradingOrchestratorService {
       priceLevel: this.normalizePriceLevel(priceData.high),
       spreadRatio: (priceData.high - priceData.low) / priceData.high,
       volumeLevel: this.normalizeVolume(priceData.volume || 0),
-      
-      // Item features  
+
+      // Item features
       membershipFlag: item.members ? 1 : 0,
       stackableFlag: item.market.stackable ? 1 : 0,
       buyLimitLevel: this.normalizeBuyLimit(item.market.buyLimit),
-      
+
       // Category features (one-hot encoded)
       categoryRunes: item.getCategory() === 'runes' ? 1 : 0,
       categoryWeapons: item.getCategory() === 'weapons' ? 1 : 0,
@@ -1358,7 +1398,7 @@ class AITradingOrchestratorService {
       categoryPotions: item.getCategory() === 'potions' ? 1 : 0,
       categoryResources: item.getCategory() === 'resources' ? 1 : 0,
       categoryHighValue: item.getCategory() === 'high_value' ? 1 : 0,
-      
+
       // Business features
       alchemyProfitable: item.isProfitableAlchemy() ? 1 : 0,
       alchemyProfitLevel: this.normalizeAlchemyProfit(item.getAlchemyProfit())
@@ -1374,7 +1414,9 @@ class AITradingOrchestratorService {
   }
 
   normalizeBuyLimit(buyLimit) {
-    if (!buyLimit) return 5; // Unlimited = max score
+    if (!buyLimit) {
+      return 5;
+    } // Unlimited = max score
     return Math.min(buyLimit / 1000, 5);
   }
 
@@ -1393,9 +1435,13 @@ class AITradingOrchestratorService {
   analyzeRiskDistribution(opportunities) {
     const distribution = { low: 0, medium: 0, high: 0 };
     opportunities.forEach(op => {
-      if (op.riskScore < 1) distribution.low++;
-      else if (op.riskScore < 3) distribution.medium++;
-      else distribution.high++;
+      if (op.riskScore < 1) {
+        distribution.low++;
+      } else if (op.riskScore < 3) {
+        distribution.medium++;
+      } else {
+        distribution.high++;
+      }
     });
     return distribution;
   }
@@ -1407,7 +1453,7 @@ class AITradingOrchestratorService {
     if (this.currentSession) {
       this.currentSession.endTime = Date.now();
       this.currentSession.status = 'COMPLETED';
-      
+
       this.logger.info('🏁 Learning session finished', {
         sessionId: this.currentSession.id,
         duration: this.currentSession.endTime - this.currentSession.startTime,
@@ -1472,10 +1518,10 @@ class AITradingOrchestratorService {
       if (!modelData) {
         throw new Error('Model data is required');
       }
-      
+
       // Ensure modelData is a string (JSON)
       const modelString = typeof modelData === 'string' ? modelData : JSON.stringify(modelData);
-      
+
       this.agent.loadModel(modelString);
       this.logger.info('📁 Model loaded successfully');
     } catch (error) {
@@ -1586,11 +1632,11 @@ class AITradingOrchestratorService {
 
       // Save model to Python RL service
       const saveResult = await this.pythonRLClient.saveModel(modelId);
-      
+
       // Get current performance metrics
       const performance = this.outcomeTracker.calculatePerformanceMetrics();
       const modelStats = this.agent.getModelStats();
-      
+
       // Get Python RL model metrics if available
       let pythonMetrics = {};
       try {
@@ -1605,10 +1651,10 @@ class AITradingOrchestratorService {
         version,
         description,
         trainingDate: new Date(),
-        trainingDuration: this.currentSession ? 
+        trainingDuration: this.currentSession ?
           Date.now() - this.currentSession.startTime : 0,
         trainingEpisodes: this.currentSession?.episodeCount || 0,
-        
+
         performanceMetrics: {
           roi: performance.roi || 0,
           accuracy: performance.accuracy || 0,
@@ -1621,7 +1667,7 @@ class AITradingOrchestratorService {
           profitableTrades: performance.profitableTrades || 0,
           averageTradeDuration: performance.averageTradeDuration || 0
         },
-        
+
         technicalMetrics: {
           modelSize: saveResult.modelSize || 0,
           parameters: modelStats.networkLayers || 0,
@@ -1630,7 +1676,7 @@ class AITradingOrchestratorService {
           epsilon: modelStats.epsilon || 0,
           learningRate: modelStats.learningRate || 0
         },
-        
+
         modelConfig: {
           architecture: modelStats.architecture || 'Unknown',
           hyperparameters: {
@@ -1644,10 +1690,10 @@ class AITradingOrchestratorService {
             trainingEpisodes: this.currentSession?.episodeCount || 0
           }
         },
-        
+
         storagePath: saveResult.modelPath || `models/${modelId}`,
         storageSize: saveResult.modelSize || 0,
-        
+
         status: 'testing',
         createdBy: 'ai_trading_orchestrator',
         tags: ['reinforcement_learning', 'osrs_trading', 'neural_network']
@@ -1655,7 +1701,7 @@ class AITradingOrchestratorService {
 
       // Save metadata to database
       await modelMetadata.save();
-      
+
       this.logger.info('✅ Model saved with metadata successfully', {
         modelId,
         version,
@@ -1694,7 +1740,7 @@ class AITradingOrchestratorService {
 
       // Load model from Python RL service
       const loadResult = await this.pythonRLClient.loadModel(modelId);
-      
+
       // Update usage statistics
       await modelMetadata.updateUsageStats({
         totalPredictions: modelMetadata.usageStats.totalPredictions + 1,
@@ -1727,7 +1773,7 @@ class AITradingOrchestratorService {
   async getProductionModel() {
     try {
       const productionModel = await AIModelMetadata.getProductionModel();
-      
+
       if (!productionModel) {
         this.logger.warn('No production model found');
         return null;
@@ -1771,7 +1817,7 @@ class AITradingOrchestratorService {
 
       // Set as production
       await targetModel.markAsProduction();
-      
+
       // Load the model into the system
       await this.loadModelWithMetadata(modelId);
 
@@ -1799,7 +1845,7 @@ class AITradingOrchestratorService {
   async getModelPerformanceComparison(limit = 10) {
     try {
       const recentModels = await AIModelMetadata.getRecentModels(limit);
-      
+
       const comparison = recentModels.map(model => ({
         modelId: model.modelId,
         version: model.version,
@@ -1844,7 +1890,7 @@ class AITradingOrchestratorService {
       }
 
       await model.updatePerformanceMetrics(metrics);
-      
+
       this.logger.info('✅ Model performance metrics updated', {
         modelId,
         version: model.version,
@@ -1869,7 +1915,7 @@ class AITradingOrchestratorService {
   async getModelStatistics() {
     try {
       const statistics = await AIModelMetadata.getModelStatistics();
-      
+
       return {
         byStatus: statistics,
         totalModels: statistics.reduce((sum, stat) => sum + stat.count, 0),

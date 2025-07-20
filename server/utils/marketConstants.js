@@ -1,6 +1,6 @@
 /**
  * Market Trading Constants for OSRS Grand Exchange
- * 
+ *
  * These constants define the core trading parameters and fees
  * that affect profit calculations and market analysis.
  */
@@ -21,10 +21,10 @@ const GE_OFFER_TIMEOUT_HOURS = 7 * 24; // 7 days in hours
  * @returns {number} Tax amount in GP (rounded down)
  */
 function calculateGETax(price) {
-    if (price <= GE_TAX_THRESHOLD_GP) {
-        return 0;
-    }
-    return Math.floor(price * GE_TAX_RATE);
+  if (price <= GE_TAX_THRESHOLD_GP) {
+    return 0;
+  }
+  return Math.floor(price * GE_TAX_RATE);
 }
 
 /**
@@ -33,8 +33,8 @@ function calculateGETax(price) {
  * @returns {number} Net price after tax in GP
  */
 function calculateNetSellPrice(sellPrice) {
-    const tax = calculateGETax(sellPrice);
-    return sellPrice - tax;
+  const tax = calculateGETax(sellPrice);
+  return sellPrice - tax;
 }
 
 /**
@@ -44,8 +44,8 @@ function calculateNetSellPrice(sellPrice) {
  * @returns {number} Profit margin in GP after tax
  */
 function calculateProfitAfterTax(buyPrice, sellPrice) {
-    const netSellPrice = calculateNetSellPrice(sellPrice);
-    return netSellPrice - buyPrice;
+  const netSellPrice = calculateNetSellPrice(sellPrice);
+  return netSellPrice - buyPrice;
 }
 
 /**
@@ -55,9 +55,11 @@ function calculateProfitAfterTax(buyPrice, sellPrice) {
  * @returns {number} Profit margin percentage after tax
  */
 function calculateProfitPercentageAfterTax(buyPrice, sellPrice) {
-    const profit = calculateProfitAfterTax(buyPrice, sellPrice);
-    if (buyPrice <= 0) return 0;
-    return (profit / buyPrice) * 100;
+  const profit = calculateProfitAfterTax(buyPrice, sellPrice);
+  if (buyPrice <= 0) {
+    return 0;
+  }
+  return (profit / buyPrice) * 100;
 }
 
 /**
@@ -66,20 +68,20 @@ function calculateProfitPercentageAfterTax(buyPrice, sellPrice) {
  * @returns {boolean} True if item is tax-free
  */
 function isTaxFree(price) {
-    return price <= GE_TAX_THRESHOLD_GP;
+  return price <= GE_TAX_THRESHOLD_GP;
 }
 
 module.exports = {
-    // Constants
-    GE_TAX_RATE,
-    GE_TAX_THRESHOLD_GP,
-    GE_SLOT_LIMIT,
-    GE_OFFER_TIMEOUT_HOURS,
-    
-    // Functions
-    calculateGETax,
-    calculateNetSellPrice,
-    calculateProfitAfterTax,
-    calculateProfitPercentageAfterTax,
-    isTaxFree
+  // Constants
+  GE_TAX_RATE,
+  GE_TAX_THRESHOLD_GP,
+  GE_SLOT_LIMIT,
+  GE_OFFER_TIMEOUT_HOURS,
+
+  // Functions
+  calculateGETax,
+  calculateNetSellPrice,
+  calculateProfitAfterTax,
+  calculateProfitPercentageAfterTax,
+  isTaxFree
 };

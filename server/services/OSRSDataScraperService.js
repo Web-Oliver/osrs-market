@@ -1,6 +1,6 @@
 /**
  * 🏺 OSRS Data Scraper Service - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Comprehensive OSRS Grand Exchange Data Scraper
  * - Scrapes top 100 items from multiple categories (Most Traded, Greatest Rise, Greatest Fall, Most Valuable)
  * - Detects patterns and anomalies in market data
@@ -26,11 +26,11 @@ class OSRSDataScraperService {
     this.logger = new Logger('OSRSDataScraper');
     this.mongoPersistence = null;
     this.osrsWikiService = new OSRSWikiService();
-    
+
     // DOMAIN INTEGRATION - Initialize domain services
     this.itemRepository = new ItemRepository();
     this.itemDomainService = new ItemDomainService();
-    
+
     // OSRS Grand Exchange URLs for top 100 lists
     this.urls = {
       mostTraded: 'https://secure.runescape.com/m=itemdb_oldschool/top100?list=0&scale=3',
@@ -38,9 +38,9 @@ class OSRSDataScraperService {
       mostValuable: 'https://secure.runescape.com/m=itemdb_oldschool/top100?list=2&scale=3',
       greatestFall: 'https://secure.runescape.com/m=itemdb_oldschool/top100?list=3&scale=3'
     };
-    
+
     this.searchBaseUrl = 'https://secure.runescape.com/m=itemdb_oldschool/results';
-    
+
     this.config = {
       headless: true,
       timeout: 30000,
@@ -65,7 +65,7 @@ class OSRSDataScraperService {
       mostValuable: [],
       greatestFall: []
     };
-    
+
     this.detectedPatterns = [];
     this.itemHistoryCache = new Map();
   }
@@ -80,13 +80,13 @@ class OSRSDataScraperService {
         connectionString: process.env.MONGODB_CONNECTION_STRING || 'mongodb://localhost:27017',
         databaseName: process.env.MONGODB_DATABASE || 'osrs_market_data'
       };
-      
+
       this.mongoPersistence = new MongoDataPersistence(mongoConfig);
       await this.mongoPersistence.initialize();
-      
+
       // Launch browser
       await this.launchBrowser();
-      
+
       this.logger.info('✅ OSRS Data Scraper initialized with MongoDB persistence');
       return true;
     } catch (error) {
@@ -112,7 +112,7 @@ class OSRSDataScraperService {
           '--disable-gpu'
         ]
       });
-      
+
       this.logger.info('🚀 Browser launched successfully');
       return true;
     } catch (error) {
@@ -127,41 +127,41 @@ class OSRSDataScraperService {
   async performFullScrape() {
     try {
       this.logger.info('🏺 Starting comprehensive OSRS data scrape');
-      
+
       if (!this.mongoPersistence) {
         await this.initialize();
       }
-      
+
       if (!this.browser) {
         await this.launchBrowser();
       }
 
       const scrapeStartTime = Date.now();
-      
+
       // Phase 1: Scrape all top 100 lists
       await this.scrapeAllCategories();
-      
+
       // Phase 2: Analyze patterns and detect anomalies
       await this.analyzeMarketPatterns();
-      
+
       // Phase 3: Fetch detailed historical data for interesting items
       await this.fetchDetailedHistoricalData();
-      
+
       // Phase 4: Save all data with integrity checks
       await this.saveScrapedDataWithIntegrity();
-      
+
       const scrapeEndTime = Date.now();
       const totalTime = (scrapeEndTime - scrapeStartTime) / 1000;
-      
+
       this.lastScrapeTime = scrapeEndTime;
-      
+
       this.logger.info('✅ Full OSRS data scrape completed', {
         totalTime: `${totalTime}s`,
         itemsScraped: this.getTotalItemsScraped(),
         patternsDetected: this.detectedPatterns.length,
         timestamp: new Date().toISOString()
       });
-      
+
       return {
         success: true,
         totalTime,
@@ -170,7 +170,7 @@ class OSRSDataScraperService {
         data: this.scrapedData,
         patterns: this.detectedPatterns
       };
-      
+
     } catch (error) {
       this.logger.error('❌ Full scrape failed', error);
       throw error;
@@ -192,33 +192,33 @@ class OSRSDataScraperService {
     const url = `https://secure.runescape.com/m=itemdb_oldschool/top100?list=${listType}&scale=${scale}`;
     const page = await this.browser.newPage();
     const items = [];
-    
+
     try {
       await page.setExtraHTTPHeaders({
         'User-Agent': this.config.userAgent
       });
-      await page.goto(url, { 
-        waitUntil: 'networkidle', 
-        timeout: this.config.timeout 
+      await page.goto(url, {
+        waitUntil: 'networkidle',
+        timeout: this.config.timeout
       });
-      
+
       // Wait for the content to load
       await page.waitForSelector('tbody tr', { timeout: 10000 });
-      
+
       // Extract item data from the table rows
       const tableRows = await page.locator('tbody tr').all();
-      
+
       for (let index = 0; index < tableRows.length; index++) {
         try {
           const row = tableRows[index];
-          
+
           // Extract basic item info
           const itemLink = row.locator('td:first-child a.table-item-link');
           const nameElement = itemLink.locator('span');
           const name = await nameElement.textContent();
           const detailUrl = await itemLink.getAttribute('href');
           const itemId = detailUrl ? this.extractItemId(detailUrl) : null;
-          
+
           if (name && itemId) {
             items.push({
               itemId: itemId,
@@ -229,10 +229,10 @@ class OSRSDataScraperService {
           this.logger.debug('Failed to parse row in scrapeTop100List', error);
         }
       }
-      
+
       this.logger.debug(`Scraped ${items.length} items from listType ${listType} with scale ${scale}`);
       return items;
-      
+
     } catch (error) {
       this.logger.error(`Failed to scrape top 100 list for listType ${listType}`, error);
       return [];
@@ -252,33 +252,33 @@ class OSRSDataScraperService {
 
     const allItems = [];
     const listTypes = [0, 1, 2, 3]; // Most Traded, Greatest Rise, Most Valuable, Greatest Fall
-    
+
     this.logger.info('🔍 Discovering items from Top 100 lists (scale=3 - Last 6 months)');
-    
+
     for (const listType of listTypes) {
       try {
         const items = await this.scrapeTop100List(listType, 3); // Always use scale=3 (6 months)
         allItems.push(...items);
-        
+
         // Respectful delay between requests
         await this.delay(this.config.requestDelay);
-        
+
       } catch (error) {
         this.logger.error(`Failed to scrape listType ${listType}`, error);
       }
     }
-    
+
     // Consolidate results, ensuring unique items by itemId
     const uniqueItems = [];
     const seenItemIds = new Set();
-    
+
     for (const item of allItems) {
       if (!seenItemIds.has(item.itemId)) {
         seenItemIds.add(item.itemId);
         uniqueItems.push(item);
       }
     }
-    
+
     this.logger.info(`✅ Discovered ${uniqueItems.length} unique items from Top 100 lists`);
     return uniqueItems;
   }
@@ -288,19 +288,19 @@ class OSRSDataScraperService {
    */
   async scrapeAllCategories() {
     this.logger.info('📊 Scraping all top 100 categories');
-    
+
     for (const [category, url] of Object.entries(this.urls)) {
       try {
         this.logger.info(`📈 Scraping ${category} from ${url}`);
-        
+
         const categoryData = await this.scrapeCategoryList(url, category);
         this.scrapedData[category] = categoryData;
-        
+
         this.logger.info(`✅ Scraped ${categoryData.length} items from ${category}`);
-        
+
         // Respectful delay between categories
         await this.delay(this.config.requestDelay);
-        
+
       } catch (error) {
         this.logger.error(`❌ Failed to scrape ${category}`, error);
         this.scrapedData[category] = [];
@@ -314,37 +314,37 @@ class OSRSDataScraperService {
   async scrapeCategoryList(url, category) {
     const page = await this.browser.newPage();
     const items = [];
-    
+
     try {
       await page.setExtraHTTPHeaders({
         'User-Agent': this.config.userAgent
       });
-      await page.goto(url, { 
-        waitUntil: 'networkidle', 
-        timeout: this.config.timeout 
+      await page.goto(url, {
+        waitUntil: 'networkidle',
+        timeout: this.config.timeout
       });
-      
+
       // Wait for the content to load
       await page.waitForSelector('tbody tr', { timeout: 10000 });
-      
+
       // Extract item data from the table with proper column mapping
       const tableRows = await page.locator('tbody tr').all();
-      
+
       for (let index = 0; index < tableRows.length; index++) {
         try {
           const row = tableRows[index];
-          
+
           // Extract basic item info (same across all categories)
           const itemLink = row.locator('td:first-child a.table-item-link');
           const nameElement = itemLink.locator('span');
           const name = await nameElement.textContent();
           const detailUrl = await itemLink.getAttribute('href');
           const itemId = detailUrl ? this.extractItemId(detailUrl) : null;
-          
+
           // Check if it's a members item
           const secondTd = row.locator('td:nth-child(2)');
           const isMembersItem = await secondTd.getAttribute('class') === 'memberItem';
-          
+
           if (name && detailUrl) {
             const item = {
               rank: index + 1,
@@ -356,19 +356,19 @@ class OSRSDataScraperService {
               scrapedAt: Date.now(),
               source: 'OSRS_GE_Top100'
             };
-            
+
             // Parse category-specific data based on the category
             await this.parseCategorySpecificDataPlaywright(row, item, category);
-            
+
             items.push(item);
           }
         } catch (error) {
           this.logger.debug('Failed to parse row', error);
         }
       }
-      
+
       return items;
-      
+
     } catch (error) {
       this.logger.error(`Failed to scrape category ${category}`, error);
       return [];
@@ -376,55 +376,55 @@ class OSRSDataScraperService {
       await page.close();
     }
   }
-  
+
   /**
    * Context7 Pattern: Parse category-specific data based on column structure (Playwright)
    */
   async parseCategorySpecificDataPlaywright(row, item, category) {
     try {
       switch (category) {
-        case 'mostTraded':
-          // Columns: Item, Members, Min, Max, Median, Total (trade counts)
-          item.tradeData = {
-            min: this.parseTradeCount(await row.locator('td:nth-child(3)').textContent()),
-            max: this.parseTradeCount(await row.locator('td:nth-child(4)').textContent()),
-            median: this.parseTradeCount(await row.locator('td:nth-child(5)').textContent()),
-            total: this.parseTradeCount(await row.locator('td:nth-child(6)').textContent())
-          };
-          break;
-          
-        case 'greatestRise':
-          // Columns: Item, Members, Change, Min, Max, Median (prices)
-          item.priceChange = this.parseChange(await row.locator('td:nth-child(3)').textContent());
-          item.priceData = {
-            min: this.parsePrice(await row.locator('td:nth-child(4)').textContent()),
-            max: this.parsePrice(await row.locator('td:nth-child(5)').textContent()),
-            median: this.parsePrice(await row.locator('td:nth-child(6)').textContent())
-          };
-          break;
-          
-        case 'mostValuable':
-          // Columns: Item, Members, Start Price, End Price, Total Rise, Change
-          item.priceData = {
-            startPrice: this.parsePrice(await row.locator('td:nth-child(3)').textContent()),
-            endPrice: this.parsePrice(await row.locator('td:nth-child(4)').textContent()),
-            totalRise: this.parsePrice(await row.locator('td:nth-child(5)').textContent())
-          };
-          item.priceChange = this.parseChange(await row.locator('td:nth-child(6)').textContent());
-          break;
-          
-        case 'greatestFall':
-          // Similar structure to greatestRise but for falling prices
-          item.priceChange = this.parseChange(await row.locator('td:nth-child(3)').textContent());
-          item.priceData = {
-            min: this.parsePrice(await row.locator('td:nth-child(4)').textContent()),
-            max: this.parsePrice(await row.locator('td:nth-child(5)').textContent()),
-            median: this.parsePrice(await row.locator('td:nth-child(6)').textContent())
-          };
-          break;
-          
-        default:
-          this.logger.warn(`Unknown category: ${category}`);
+      case 'mostTraded':
+        // Columns: Item, Members, Min, Max, Median, Total (trade counts)
+        item.tradeData = {
+          min: this.parseTradeCount(await row.locator('td:nth-child(3)').textContent()),
+          max: this.parseTradeCount(await row.locator('td:nth-child(4)').textContent()),
+          median: this.parseTradeCount(await row.locator('td:nth-child(5)').textContent()),
+          total: this.parseTradeCount(await row.locator('td:nth-child(6)').textContent())
+        };
+        break;
+
+      case 'greatestRise':
+        // Columns: Item, Members, Change, Min, Max, Median (prices)
+        item.priceChange = this.parseChange(await row.locator('td:nth-child(3)').textContent());
+        item.priceData = {
+          min: this.parsePrice(await row.locator('td:nth-child(4)').textContent()),
+          max: this.parsePrice(await row.locator('td:nth-child(5)').textContent()),
+          median: this.parsePrice(await row.locator('td:nth-child(6)').textContent())
+        };
+        break;
+
+      case 'mostValuable':
+        // Columns: Item, Members, Start Price, End Price, Total Rise, Change
+        item.priceData = {
+          startPrice: this.parsePrice(await row.locator('td:nth-child(3)').textContent()),
+          endPrice: this.parsePrice(await row.locator('td:nth-child(4)').textContent()),
+          totalRise: this.parsePrice(await row.locator('td:nth-child(5)').textContent())
+        };
+        item.priceChange = this.parseChange(await row.locator('td:nth-child(6)').textContent());
+        break;
+
+      case 'greatestFall':
+        // Similar structure to greatestRise but for falling prices
+        item.priceChange = this.parseChange(await row.locator('td:nth-child(3)').textContent());
+        item.priceData = {
+          min: this.parsePrice(await row.locator('td:nth-child(4)').textContent()),
+          max: this.parsePrice(await row.locator('td:nth-child(5)').textContent()),
+          median: this.parsePrice(await row.locator('td:nth-child(6)').textContent())
+        };
+        break;
+
+      default:
+        this.logger.warn(`Unknown category: ${category}`);
       }
     } catch (error) {
       this.logger.debug(`Failed to parse category-specific data for ${category}`, error);
@@ -437,54 +437,54 @@ class OSRSDataScraperService {
   parseCategorySpecificData($row, item, category) {
     try {
       switch (category) {
-        case 'mostTraded':
-          // Columns: Item, Members, Min, Max, Median, Total (trade counts)
-          item.tradeData = {
-            min: this.parseTradeCount($row.find('td:nth-child(3)').text().trim()),
-            max: this.parseTradeCount($row.find('td:nth-child(4)').text().trim()),
-            median: this.parseTradeCount($row.find('td:nth-child(5)').text().trim()),
-            total: this.parseTradeCount($row.find('td:nth-child(6)').text().trim())
-          };
-          break;
-          
-        case 'greatestRise':
-          // Columns: Item, Members, Change, Min, Max, Median (prices)
-          item.priceChange = this.parseChange($row.find('td:nth-child(3)').text().trim());
-          item.priceData = {
-            min: this.parsePrice($row.find('td:nth-child(4)').text().trim()),
-            max: this.parsePrice($row.find('td:nth-child(5)').text().trim()),
-            median: this.parsePrice($row.find('td:nth-child(6)').text().trim())
-          };
-          break;
-          
-        case 'mostValuable':
-          // Columns: Item, Members, Start Price, End Price, Total Rise, Change
-          item.priceData = {
-            startPrice: this.parsePrice($row.find('td:nth-child(3)').text().trim()),
-            endPrice: this.parsePrice($row.find('td:nth-child(4)').text().trim()),
-            totalRise: this.parsePrice($row.find('td:nth-child(5)').text().trim())
-          };
-          item.priceChange = this.parseChange($row.find('td:nth-child(6)').text().trim());
-          break;
-          
-        case 'greatestFall':
-          // Similar structure to greatestRise but for falling prices
-          item.priceChange = this.parseChange($row.find('td:nth-child(3)').text().trim());
-          item.priceData = {
-            min: this.parsePrice($row.find('td:nth-child(4)').text().trim()),
-            max: this.parsePrice($row.find('td:nth-child(5)').text().trim()),
-            median: this.parsePrice($row.find('td:nth-child(6)').text().trim())
-          };
-          break;
-          
-        default:
-          this.logger.warn(`Unknown category: ${category}`);
+      case 'mostTraded':
+        // Columns: Item, Members, Min, Max, Median, Total (trade counts)
+        item.tradeData = {
+          min: this.parseTradeCount($row.find('td:nth-child(3)').text().trim()),
+          max: this.parseTradeCount($row.find('td:nth-child(4)').text().trim()),
+          median: this.parseTradeCount($row.find('td:nth-child(5)').text().trim()),
+          total: this.parseTradeCount($row.find('td:nth-child(6)').text().trim())
+        };
+        break;
+
+      case 'greatestRise':
+        // Columns: Item, Members, Change, Min, Max, Median (prices)
+        item.priceChange = this.parseChange($row.find('td:nth-child(3)').text().trim());
+        item.priceData = {
+          min: this.parsePrice($row.find('td:nth-child(4)').text().trim()),
+          max: this.parsePrice($row.find('td:nth-child(5)').text().trim()),
+          median: this.parsePrice($row.find('td:nth-child(6)').text().trim())
+        };
+        break;
+
+      case 'mostValuable':
+        // Columns: Item, Members, Start Price, End Price, Total Rise, Change
+        item.priceData = {
+          startPrice: this.parsePrice($row.find('td:nth-child(3)').text().trim()),
+          endPrice: this.parsePrice($row.find('td:nth-child(4)').text().trim()),
+          totalRise: this.parsePrice($row.find('td:nth-child(5)').text().trim())
+        };
+        item.priceChange = this.parseChange($row.find('td:nth-child(6)').text().trim());
+        break;
+
+      case 'greatestFall':
+        // Similar structure to greatestRise but for falling prices
+        item.priceChange = this.parseChange($row.find('td:nth-child(3)').text().trim());
+        item.priceData = {
+          min: this.parsePrice($row.find('td:nth-child(4)').text().trim()),
+          max: this.parsePrice($row.find('td:nth-child(5)').text().trim()),
+          median: this.parsePrice($row.find('td:nth-child(6)').text().trim())
+        };
+        break;
+
+      default:
+        this.logger.warn(`Unknown category: ${category}`);
       }
     } catch (error) {
       this.logger.debug(`Failed to parse category-specific data for ${category}`, error);
     }
   }
-  
+
   /**
    * Context7 Pattern: Extract item ID from URL
    */
@@ -496,15 +496,17 @@ class OSRSDataScraperService {
       return null;
     }
   }
-  
+
   /**
    * Context7 Pattern: Parse trade count values (handles k, m, b suffixes)
    */
   parseTradeCount(text) {
-    if (!text) return 0;
-    
+    if (!text) {
+      return 0;
+    }
+
     const cleanText = text.replace(/,/g, '').toLowerCase();
-    
+
     if (cleanText.includes('k')) {
       return Math.round(parseFloat(cleanText.replace('k', '')) * 1000);
     } else if (cleanText.includes('m')) {
@@ -512,7 +514,7 @@ class OSRSDataScraperService {
     } else if (cleanText.includes('b')) {
       return Math.round(parseFloat(cleanText.replace('b', '')) * 1000000000);
     }
-    
+
     return parseInt(cleanText) || 0;
   }
 
@@ -523,14 +525,14 @@ class OSRSDataScraperService {
     if (!this.config.enablePatternDetection) {
       return;
     }
-    
+
     this.logger.info('🔍 Analyzing market patterns and detecting anomalies');
-    
+
     const allItems = this.getAllScrapedItems();
     const itemFrequency = new Map();
     const highVolumeItems = [];
     const significantChanges = [];
-    
+
     // Analyze item frequency across categories
     for (const item of allItems) {
       const key = item.name.toLowerCase();
@@ -541,11 +543,11 @@ class OSRSDataScraperService {
       freq.count++;
       freq.categories.push(item.category);
     }
-    
+
     // Detect patterns
     for (const [itemName, data] of itemFrequency.entries()) {
       const { item, count, categories } = data;
-      
+
       // Multi-category appearance pattern
       if (count >= this.config.patternThresholds.multiCategoryAppearance) {
         this.detectedPatterns.push({
@@ -559,7 +561,7 @@ class OSRSDataScraperService {
           detectedAt: Date.now()
         });
       }
-      
+
       // Significant price change pattern
       if (item.priceChange && Math.abs(item.priceChange) >= this.config.patternThresholds.priceChangePercent) {
         this.detectedPatterns.push({
@@ -573,7 +575,7 @@ class OSRSDataScraperService {
           detectedAt: Date.now()
         });
       }
-      
+
       // High trading volume pattern
       if (item.tradeData && item.tradeData.total > this.config.patternThresholds.volumeThreshold) {
         this.detectedPatterns.push({
@@ -587,7 +589,7 @@ class OSRSDataScraperService {
           detectedAt: Date.now()
         });
       }
-      
+
       // High value items with unusual activity
       if (item.priceData && item.priceData.endPrice > 10000000 && item.category !== 'mostValuable') {
         this.detectedPatterns.push({
@@ -602,7 +604,7 @@ class OSRSDataScraperService {
         });
       }
     }
-    
+
     this.logger.info(`🎯 Detected ${this.detectedPatterns.length} market patterns`, {
       multiCategory: this.detectedPatterns.filter(p => p.type === 'MULTI_CATEGORY_APPEARANCE').length,
       priceChanges: this.detectedPatterns.filter(p => p.type === 'SIGNIFICANT_PRICE_CHANGE').length,
@@ -619,37 +621,37 @@ class OSRSDataScraperService {
       .filter(pattern => pattern.significance === 'HIGH' || pattern.significance === 'CRITICAL')
       .map(pattern => ({ name: pattern.item, itemId: pattern.itemId }))
       .slice(0, 20); // Limit to top 20 most interesting
-    
+
     // Also get top items from each category for detailed analysis
     const topItemsFromCategories = [];
     for (const [category, items] of Object.entries(this.scrapedData)) {
-      const topItems = items.slice(0, 5).map(item => ({ 
-        name: item.name, 
+      const topItems = items.slice(0, 5).map(item => ({
+        name: item.name,
         itemId: item.itemId,
-        detailUrl: item.detailUrl 
+        detailUrl: item.detailUrl
       }));
       topItemsFromCategories.push(...topItems);
     }
-    
+
     // Combine and deduplicate
     const itemsToAnalyze = [...interestingItems, ...topItemsFromCategories]
-      .filter((item, index, self) => 
+      .filter((item, index, self) =>
         item.itemId && self.findIndex(i => i.itemId === item.itemId) === index
       )
       .slice(0, 30); // Limit to top 30 items
-    
+
     if (itemsToAnalyze.length === 0) {
       this.logger.info('📊 No items identified for detailed historical analysis');
       return;
     }
-    
+
     this.logger.info(`📈 Fetching detailed data for ${itemsToAnalyze.length} items`);
-    
+
     // Process in batches to avoid overwhelming the servers
     for (let i = 0; i < itemsToAnalyze.length; i += this.config.batchSize) {
       const batch = itemsToAnalyze.slice(i, i + this.config.batchSize);
-      
-      await Promise.all(batch.map(async (item) => {
+
+      await Promise.all(batch.map(async(item) => {
         try {
           await this.fetchDetailedItemData(item);
           await this.delay(1000); // 1 second delay between items
@@ -657,35 +659,35 @@ class OSRSDataScraperService {
           this.logger.error(`Failed to fetch detailed data for ${item.name}`, error);
         }
       }));
-      
+
       // Delay between batches
       if (i + this.config.batchSize < itemsToAnalyze.length) {
         await this.delay(this.config.requestDelay);
       }
     }
   }
-  
+
   /**
    * Context7 Pattern: Fetch detailed data from individual item page with full historical data
    */
   async fetchDetailedItemData(item) {
     const page = await this.browser.newPage();
-    
+
     try {
-      const itemUrl = item.detailUrl || 
+      const itemUrl = item.detailUrl ||
         `https://secure.runescape.com/m=itemdb_oldschool/viewitem?obj=${item.itemId}`;
-      
+
       await page.setExtraHTTPHeaders({
         'User-Agent': this.config.userAgent
       });
-      await page.goto(itemUrl, { 
-        waitUntil: 'networkidle', 
-        timeout: this.config.timeout 
+      await page.goto(itemUrl, {
+        waitUntil: 'networkidle',
+        timeout: this.config.timeout
       });
-      
+
       // Wait for the content to load
       await page.waitForSelector('.stats', { timeout: 10000 });
-      
+
       // Click on 6 Months button to get full historical data
       try {
         await page.locator('a[href="#180"]').click();
@@ -693,48 +695,48 @@ class OSRSDataScraperService {
       } catch (error) {
         this.logger.debug('Could not click 6 months button, continuing with default view');
       }
-      
+
       const html = await page.content();
-      
+
       // Extract detailed item data using Playwright
       const detailedData = {
         itemId: item.itemId,
         name: item.name,
         description: await this.extractDescriptionPlaywright(page),
-        
+
         // Extract current guide price
         currentPrice: await this.extractCurrentPricePlaywright(page),
-        
+
         // Extract price changes
         priceChanges: await this.extractPriceChangesPlaywright(page),
-        
+
         // Extract historical price and trading data
         historicalData: this.extractHistoricalData(html),
-        
+
         // Extract additional item details
         itemDetails: {
           imageUrl: await this.extractImageUrlPlaywright(page, item.name),
           fullDescription: await this.extractDescriptionPlaywright(page)
         },
-        
+
         // Metadata
         scrapedAt: Date.now(),
         source: 'OSRS_GE_DetailPage',
         url: itemUrl
       };
-      
+
       // Store in historical data cache
       this.itemHistoryCache.set(item.name, detailedData);
-      
+
       this.logger.debug(`📊 Fetched detailed data for ${item.name} (ID: ${item.itemId}) with ${detailedData.historicalData.average180.length} days of historical data`);
-      
+
     } catch (error) {
       this.logger.error(`Failed to fetch detailed data for ${item.name}`, error);
     } finally {
       await page.close();
     }
   }
-  
+
   /**
    * Context7 Pattern: Extract historical price and trading data from JavaScript arrays
    */
@@ -748,28 +750,28 @@ class OSRSDataScraperService {
         trade90: [],
         trade180: []
       };
-      
+
       // Extract price data arrays (30, 90, 180 days)
       const priceData30 = this.extractJSArrayData(html, 'average30');
-      const priceData90 = this.extractJSArrayData(html, 'average90'); 
+      const priceData90 = this.extractJSArrayData(html, 'average90');
       const priceData180 = this.extractJSArrayData(html, 'average180');
-      
+
       // Extract trading data arrays (30, 90, 180 days)
       const tradeData30 = this.extractJSArrayData(html, 'trade30');
       const tradeData90 = this.extractJSArrayData(html, 'trade90');
       const tradeData180 = this.extractJSArrayData(html, 'trade180');
-      
+
       // Process and structure the data
       historicalData.average30 = this.processHistoricalPriceData(priceData30);
       historicalData.average90 = this.processHistoricalPriceData(priceData90);
       historicalData.average180 = this.processHistoricalPriceData(priceData180);
-      
+
       historicalData.trade30 = this.processHistoricalTradeData(tradeData30);
       historicalData.trade90 = this.processHistoricalTradeData(tradeData90);
       historicalData.trade180 = this.processHistoricalTradeData(tradeData180);
-      
+
       return historicalData;
-      
+
     } catch (error) {
       this.logger.debug('Failed to extract historical data', error);
       return {
@@ -782,7 +784,7 @@ class OSRSDataScraperService {
       };
     }
   }
-  
+
   /**
    * Context7 Pattern: Extract JavaScript array data from HTML
    */
@@ -791,7 +793,7 @@ class OSRSDataScraperService {
       const regex = new RegExp(`${arrayName}\\.push\\(\\[new Date\\('([^']+)'\\), ([^,]+)(?:, ([^\\]]+))?\\]\\);`, 'g');
       const matches = [];
       let match;
-      
+
       while ((match = regex.exec(html)) !== null) {
         matches.push({
           date: match[1],
@@ -799,14 +801,14 @@ class OSRSDataScraperService {
           value2: match[3] ? parseFloat(match[3]) : null
         });
       }
-      
+
       return matches;
     } catch (error) {
       this.logger.debug(`Failed to extract ${arrayName} data`, error);
       return [];
     }
   }
-  
+
   /**
    * Context7 Pattern: Process historical price data
    */
@@ -818,7 +820,7 @@ class OSRSDataScraperService {
       timestamp: new Date(item.date).getTime()
     }));
   }
-  
+
   /**
    * Context7 Pattern: Process historical trading data
    */
@@ -829,7 +831,7 @@ class OSRSDataScraperService {
       timestamp: new Date(item.date).getTime()
     }));
   }
-  
+
   /**
    * Context7 Pattern: Extract description using Playwright
    */
@@ -868,12 +870,12 @@ class OSRSDataScraperService {
       const changes = {};
       const listItems = page.locator('.stats ul li');
       const count = await listItems.count();
-      
+
       for (let i = 0; i < count; i++) {
         const item = listItems.nth(i);
         const text = await item.textContent();
-        
-        if (text && text.includes("Today's Change")) {
+
+        if (text && text.includes('Today\'s Change')) {
           changes.today = await this.extractChangeFromTextPlaywright(item);
         } else if (text && text.includes('1 Month Change')) {
           changes.oneMonth = await this.extractChangeFromTextPlaywright(item);
@@ -883,7 +885,7 @@ class OSRSDataScraperService {
           changes.sixMonth = await this.extractChangeFromTextPlaywright(item);
         }
       }
-      
+
       return changes;
     } catch (error) {
       this.logger.debug('Failed to extract price changes', error);
@@ -900,7 +902,7 @@ class OSRSDataScraperService {
       const pcChange = await listItem.locator('.stats__pc-change').textContent() || '';
       const isPositive = await listItem.locator('.stats__change').getAttribute('class') === 'stats__change--positive';
       const rawText = await listItem.textContent() || '';
-      
+
       return {
         gpChange: this.parsePrice(gpChange),
         percentChange: this.parseChange(pcChange),
@@ -944,20 +946,20 @@ class OSRSDataScraperService {
       return null;
     }
   }
-  
+
   /**
    * Context7 Pattern: Extract price changes from item detail page
    */
   extractPriceChanges($) {
     try {
       const changes = {};
-      
+
       // Extract different time period changes
       $('.stats ul li').each((index, element) => {
         const $li = $(element);
         const text = $li.text().trim();
-        
-        if (text.includes("Today's Change")) {
+
+        if (text.includes('Today\'s Change')) {
           changes.today = this.extractChangeFromText($li);
         } else if (text.includes('1 Month Change')) {
           changes.oneMonth = this.extractChangeFromText($li);
@@ -967,14 +969,14 @@ class OSRSDataScraperService {
           changes.sixMonth = this.extractChangeFromText($li);
         }
       });
-      
+
       return changes;
     } catch (error) {
       this.logger.debug('Failed to extract price changes', error);
       return {};
     }
   }
-  
+
   /**
    * Context7 Pattern: Extract change data from list item
    */
@@ -983,7 +985,7 @@ class OSRSDataScraperService {
       const gpChange = $li.find('.stats__gp-change').text().trim();
       const pcChange = $li.find('.stats__pc-change').text().trim();
       const isPositive = $li.find('.stats__change').hasClass('stats__change--positive');
-      
+
       return {
         gpChange: this.parsePrice(gpChange),
         percentChange: this.parseChange(pcChange),
@@ -1003,7 +1005,7 @@ class OSRSDataScraperService {
       // First, search in our existing Item repository
       const existingItems = await this.itemRepository.searchByName(itemName, { limit: 5 });
       let targetItem = null;
-      
+
       if (existingItems.length > 0) {
         // Use existing domain entity
         targetItem = existingItems[0];
@@ -1011,11 +1013,11 @@ class OSRSDataScraperService {
       } else {
         // Fallback to OSRS Wiki API
         const mapping = await this.osrsWikiService.getItemMapping();
-        const mappingItem = mapping.find(m => 
+        const mappingItem = mapping.find(m =>
           m.name.toLowerCase().includes(itemName.toLowerCase()) ||
           itemName.toLowerCase().includes(m.name.toLowerCase())
         );
-        
+
         if (mappingItem) {
           // Create domain entity from mapping data
           try {
@@ -1025,17 +1027,17 @@ class OSRSDataScraperService {
           }
         }
       }
-      
+
       if (targetItem) {
         // Get historical price data from OSRS Wiki API
         const itemId = targetItem.id ? targetItem.id.value : targetItem.itemId || targetItem.id;
-        
+
         const [latest, fiveMin, oneHour] = await Promise.all([
           this.osrsWikiService.getLatestPrices(),
           this.osrsWikiService.get5MinutePrices(),
           this.osrsWikiService.get1HourPrices()
         ]);
-        
+
         const historicalData = {
           itemId: itemId,
           itemName: targetItem.name,
@@ -1048,14 +1050,14 @@ class OSRSDataScraperService {
           fetchedAt: Date.now(),
           source: 'DOMAIN_ENHANCED_API'
         };
-        
+
         this.itemHistoryCache.set(itemName, historicalData);
-        
+
         this.logger.debug(`📊 Fetched enhanced historical data for ${itemName} (ID: ${itemId})`);
       } else {
         this.logger.debug(`❓ Could not find or create item entity for ${itemName}`);
       }
-      
+
     } catch (error) {
       this.logger.error(`Failed to fetch historical data for ${itemName}`, error);
     }
@@ -1094,7 +1096,7 @@ class OSRSDataScraperService {
         return await this.itemRepository.createItem(itemData);
       }
     } catch (error) {
-      this.logger.error(`Failed to create item entity from mapping`, error);
+      this.logger.error('Failed to create item entity from mapping', error);
       return null;
     }
   }
@@ -1128,25 +1130,41 @@ class OSRSDataScraperService {
   calculateTradingPotential(item) {
     try {
       let score = 0;
-      
+
       // Volume indicator (if tradeable)
-      if (item.tradeable) score += 30;
-      
+      if (item.tradeable) {
+        score += 30;
+      }
+
       // Value tier scoring
-      if (item.value > 10000000) score += 25; // 10M+
-      else if (item.value > 1000000) score += 20; // 1M+
-      else if (item.value > 100000) score += 15; // 100K+
-      else if (item.value > 10000) score += 10; // 10K+
-      
+      if (item.value > 10000000) {
+        score += 25;
+      } // 10M+
+      else if (item.value > 1000000) {
+        score += 20;
+      } // 1M+
+      else if (item.value > 100000) {
+        score += 15;
+      } // 100K+
+      else if (item.value > 10000) {
+        score += 10;
+      } // 10K+
+
       // Alchemy potential
-      if (item.isProfitableAlchemy && item.isProfitableAlchemy()) score += 15;
-      
+      if (item.isProfitableAlchemy && item.isProfitableAlchemy()) {
+        score += 15;
+      }
+
       // Grand Exchange availability
-      if (item.grandExchange) score += 20;
-      
+      if (item.grandExchange) {
+        score += 20;
+      }
+
       // Stackable items have different trading dynamics
-      if (item.stackable) score += 10;
-      
+      if (item.stackable) {
+        score += 10;
+      }
+
       return Math.min(100, score);
     } catch (error) {
       return 0;
@@ -1158,9 +1176,15 @@ class OSRSDataScraperService {
    */
   assessRiskLevel(item) {
     try {
-      if (item.value > 50000000) return 'HIGH'; // 50M+ very risky
-      if (item.value > 10000000) return 'MEDIUM'; // 10M+ moderate risk
-      if (item.value > 1000000) return 'LOW'; // 1M+ low risk
+      if (item.value > 50000000) {
+        return 'HIGH';
+      } // 50M+ very risky
+      if (item.value > 10000000) {
+        return 'MEDIUM';
+      } // 10M+ moderate risk
+      if (item.value > 1000000) {
+        return 'LOW';
+      } // 1M+ low risk
       return 'MINIMAL'; // Under 1M minimal risk
     } catch (error) {
       return 'UNKNOWN';
@@ -1172,16 +1196,32 @@ class OSRSDataScraperService {
    */
   inferItemCategory(mappingItem) {
     const name = mappingItem.name.toLowerCase();
-    
-    if (name.includes('weapon') || name.includes('sword') || name.includes('bow')) return 'WEAPON';
-    if (name.includes('armour') || name.includes('helm') || name.includes('shield')) return 'ARMOUR';
-    if (name.includes('rune') || name.includes('staff') || name.includes('spell')) return 'MAGIC';
-    if (name.includes('potion') || name.includes('food') || name.includes('drink')) return 'CONSUMABLE';
-    if (name.includes('ore') || name.includes('bar') || name.includes('coal')) return 'MATERIAL';
-    if (name.includes('seed') || name.includes('tree') || name.includes('herb')) return 'FARMING';
-    if (name.includes('fish') || name.includes('cooking')) return 'COOKING';
-    if (name.includes('gem') || name.includes('ring') || name.includes('necklace')) return 'JEWELRY';
-    
+
+    if (name.includes('weapon') || name.includes('sword') || name.includes('bow')) {
+      return 'WEAPON';
+    }
+    if (name.includes('armour') || name.includes('helm') || name.includes('shield')) {
+      return 'ARMOUR';
+    }
+    if (name.includes('rune') || name.includes('staff') || name.includes('spell')) {
+      return 'MAGIC';
+    }
+    if (name.includes('potion') || name.includes('food') || name.includes('drink')) {
+      return 'CONSUMABLE';
+    }
+    if (name.includes('ore') || name.includes('bar') || name.includes('coal')) {
+      return 'MATERIAL';
+    }
+    if (name.includes('seed') || name.includes('tree') || name.includes('herb')) {
+      return 'FARMING';
+    }
+    if (name.includes('fish') || name.includes('cooking')) {
+      return 'COOKING';
+    }
+    if (name.includes('gem') || name.includes('ring') || name.includes('necklace')) {
+      return 'JEWELRY';
+    }
+
     return 'OTHER';
   }
 
@@ -1192,9 +1232,9 @@ class OSRSDataScraperService {
     if (!this.mongoPersistence) {
       throw new Error('MongoDB persistence not initialized');
     }
-    
+
     this.logger.info('💾 Saving scraped data with integrity checks');
-    
+
     const saveOperation = {
       timestamp: Date.now(),
       scrapeId: `osrs_scrape_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -1215,12 +1255,12 @@ class OSRSDataScraperService {
         lastScrapeTime: this.lastScrapeTime
       }
     };
-    
+
     try {
       // Save main scrape data
       const scrapeDataCollection = this.mongoPersistence.database.collection('osrs_scrape_data');
       await scrapeDataCollection.insertOne(saveOperation);
-      
+
       // Save individual items as historical price data for AI training
       const allItems = this.getAllScrapedItems();
       const historicalPrices = allItems.map(item => ({
@@ -1238,11 +1278,11 @@ class OSRSDataScraperService {
           detailUrl: item.detailUrl
         }
       }));
-      
+
       if (historicalPrices.length > 0) {
         await this.mongoPersistence.bulkSaveHistoricalPrices(historicalPrices);
       }
-      
+
       // Save detected patterns for analysis
       if (this.detectedPatterns.length > 0) {
         const patternsCollection = this.mongoPersistence.database.collection('osrs_market_patterns');
@@ -1252,7 +1292,7 @@ class OSRSDataScraperService {
           savedAt: Date.now()
         })));
       }
-      
+
       // Save historical data cache
       if (this.itemHistoryCache.size > 0) {
         const historicalCollection = this.mongoPersistence.database.collection('osrs_item_historical');
@@ -1262,16 +1302,16 @@ class OSRSDataScraperService {
           savedAt: Date.now()
         })));
       }
-      
+
       this.logger.info('✅ Scraped data saved successfully with integrity checks', {
         scrapeId: saveOperation.scrapeId,
         totalItems: saveOperation.integrity.totalItems,
         patterns: saveOperation.integrity.patternsDetected,
         historicalItems: saveOperation.integrity.historicalItemsFetched
       });
-      
+
       return saveOperation.scrapeId;
-      
+
     } catch (error) {
       this.logger.error('❌ Failed to save scraped data', error);
       throw error;
@@ -1281,13 +1321,15 @@ class OSRSDataScraperService {
   /**
    * Context7 Pattern: Helper methods
    */
-  
+
   parsePrice(priceText) {
-    if (!priceText) return 0;
-    
+    if (!priceText) {
+      return 0;
+    }
+
     // Remove commas and handle k/m suffixes
     const cleanPrice = priceText.replace(/,/g, '').toLowerCase();
-    
+
     if (cleanPrice.includes('k')) {
       return Math.round(parseFloat(cleanPrice.replace('k', '')) * 1000);
     } else if (cleanPrice.includes('m')) {
@@ -1295,17 +1337,19 @@ class OSRSDataScraperService {
     } else if (cleanPrice.includes('b')) {
       return Math.round(parseFloat(cleanPrice.replace('b', '')) * 1000000000);
     }
-    
+
     return parseInt(cleanPrice) || 0;
   }
-  
+
   parseChange(changeText) {
-    if (!changeText) return 0;
-    
+    if (!changeText) {
+      return 0;
+    }
+
     const match = changeText.match(/([+-]?\d+\.?\d*)%/);
     return match ? parseFloat(match[1]) : 0;
   }
-  
+
   formatPrice(price) {
     if (price >= 1000000000) {
       return `${(price / 1000000000).toFixed(1)}b`;
@@ -1316,7 +1360,7 @@ class OSRSDataScraperService {
     }
     return price.toString();
   }
-  
+
   formatTradeVolume(volume) {
     if (volume >= 1000000000) {
       return `${(volume / 1000000000).toFixed(1)}B`;
@@ -1327,20 +1371,20 @@ class OSRSDataScraperService {
     }
     return volume.toString();
   }
-  
+
   getAllScrapedItems() {
     return Object.values(this.scrapedData).flat();
   }
-  
+
   getTotalItemsScraped() {
     return this.getAllScrapedItems().length;
   }
-  
+
   calculateDataChecksum(data) {
     const crypto = require('crypto');
     return crypto.createHash('md5').update(JSON.stringify(data)).digest('hex');
   }
-  
+
   delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
@@ -1369,46 +1413,46 @@ class OSRSDataScraperService {
   async scrapeIndividualItemPage(itemId, itemName) {
     const page = await this.browser.newPage();
     const historicalData = [];
-    
+
     try {
       this.logger.info(`📊 Scraping 6-month historical data for item: ${itemName} (ID: ${itemId})`);
-      
+
       // Construct individual item page URL
       const itemPageUrl = `https://secure.runescape.com/m=itemdb_oldschool/${encodeURIComponent(itemName)}/viewitem?obj=${itemId}`;
-      
+
       await page.setExtraHTTPHeaders({
         'User-Agent': this.config.userAgent
       });
-      await page.goto(itemPageUrl, { 
-        waitUntil: 'networkidle', 
-        timeout: this.config.timeout 
+      await page.goto(itemPageUrl, {
+        waitUntil: 'networkidle',
+        timeout: this.config.timeout
       });
-      
+
       // Wait for the page to load and JavaScript arrays to be available
       await page.waitForTimeout(3000); // Wait for JavaScript to execute
-      
+
       // Extract historical data from JavaScript arrays (average180 and trade180)
       const priceData = await page.evaluate(() => {
         const extractedData = [];
-        
+
         try {
           // Check if the 6-month data arrays exist
           if (typeof average180 !== 'undefined' && typeof trade180 !== 'undefined') {
             // Skip header row and process data
             const priceRows = average180.slice(1);
             const tradeRows = trade180.slice(1);
-            
+
             // Combine price and trade data
             for (let i = 0; i < Math.min(priceRows.length, tradeRows.length); i++) {
               const priceRow = priceRows[i];
               const tradeRow = tradeRows[i];
-              
+
               if (priceRow && tradeRow && priceRow.length >= 3 && tradeRow.length >= 2) {
                 const dateStr = priceRow[0]; // ISO date string
                 const dailyPrice = priceRow[1]; // Daily price
                 const avgPrice = priceRow[2]; // Average price
                 const totalVolume = tradeRow[1]; // Total volume
-                
+
                 extractedData.push({
                   timestamp: new Date(dateStr).getTime(),
                   date: dateStr,
@@ -1419,7 +1463,7 @@ class OSRSDataScraperService {
                 });
               }
             }
-            
+
             return {
               success: true,
               data: extractedData,
@@ -1441,7 +1485,7 @@ class OSRSDataScraperService {
           };
         }
       });
-      
+
       // Process the response from page evaluation
       if (priceData.success && priceData.data && priceData.data.length > 0) {
         this.logger.info(`✅ Successfully extracted ${priceData.data.length} historical data points for ${itemName}`);
@@ -1449,10 +1493,10 @@ class OSRSDataScraperService {
       } else {
         this.logger.warn(`⚠️ No historical data extracted for ${itemName}: ${priceData.message || priceData.error || 'Unknown error'}`);
       }
-      
+
       // Return empty array if no data found (no mock data - we want real data only)
       return [];
-      
+
     } catch (error) {
       this.logger.error(`❌ Failed to scrape individual item page for ${itemName} (ID: ${itemId})`, error);
       throw error;
@@ -1470,12 +1514,12 @@ class OSRSDataScraperService {
         await this.browser.close();
         this.browser = null;
       }
-      
+
       if (this.mongoPersistence) {
         await this.mongoPersistence.close();
         this.mongoPersistence = null;
       }
-      
+
       this.logger.info('✅ OSRS Data Scraper cleanup completed');
     } catch (error) {
       this.logger.error('❌ Error during cleanup', error);

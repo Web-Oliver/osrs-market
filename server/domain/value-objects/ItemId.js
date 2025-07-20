@@ -1,13 +1,11 @@
 /**
  * 🆔 ItemId Value Object - Immutable item identifier
- * 
+ *
  * Context7 Pattern: Value Object for type safety and validation
  * - DRY: Centralized ID validation and behavior
  * - SOLID: Single responsibility for item identification
  * - Immutable: Cannot be changed after creation
  */
-
-const { Logger } = require('../../utils/Logger');
 
 class ItemId {
   /**
@@ -39,7 +37,7 @@ class ItemId {
     }
 
     const numericValue = Number(value);
-    
+
     if (!Number.isInteger(numericValue)) {
       throw new Error(`ItemId must be an integer, got: ${value}`);
     }

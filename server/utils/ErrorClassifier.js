@@ -1,6 +1,6 @@
 /**
  * 🔍 Error Classifier - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Centralized Error Classification System
  * - Intelligent error categorization
  * - Severity assessment
@@ -36,7 +36,7 @@ class ErrorClassifier {
         category: 'database',
         severity: 'high'
       },
-      
+
       // Network errors
       network: {
         patterns: [
@@ -52,7 +52,7 @@ class ErrorClassifier {
         category: 'network',
         severity: 'medium'
       },
-      
+
       // Authentication errors
       authentication: {
         patterns: [
@@ -66,7 +66,7 @@ class ErrorClassifier {
         category: 'authentication',
         severity: 'medium'
       },
-      
+
       // Authorization errors
       authorization: {
         patterns: [
@@ -79,7 +79,7 @@ class ErrorClassifier {
         category: 'authorization',
         severity: 'medium'
       },
-      
+
       // Validation errors
       validation: {
         patterns: [
@@ -93,7 +93,7 @@ class ErrorClassifier {
         category: 'validation',
         severity: 'low'
       },
-      
+
       // Rate limiting errors
       rateLimit: {
         patterns: [
@@ -106,7 +106,7 @@ class ErrorClassifier {
         category: 'rate_limit',
         severity: 'medium'
       },
-      
+
       // File system errors
       filesystem: {
         patterns: [
@@ -119,7 +119,7 @@ class ErrorClassifier {
         category: 'filesystem',
         severity: 'medium'
       },
-      
+
       // Memory errors
       memory: {
         patterns: [
@@ -132,7 +132,7 @@ class ErrorClassifier {
         category: 'memory',
         severity: 'high'
       },
-      
+
       // External service errors
       external: {
         patterns: [
@@ -146,7 +146,7 @@ class ErrorClassifier {
         category: 'external',
         severity: 'medium'
       },
-      
+
       // Configuration errors
       configuration: {
         patterns: [
@@ -159,7 +159,7 @@ class ErrorClassifier {
         category: 'configuration',
         severity: 'high'
       },
-      
+
       // Timeout errors
       timeout: {
         patterns: [
@@ -214,7 +214,7 @@ class ErrorClassifier {
     const classification = this.categorizeError(errorMessage);
     const severity = this.assessSeverity(error, classification);
     const recovery = this.suggestRecovery(error, classification);
-    
+
     return {
       category: classification.category,
       severity: severity.level,
@@ -238,15 +238,15 @@ class ErrorClassifier {
     if (typeof error === 'string') {
       return error;
     }
-    
+
     if (error && error.message) {
       return error.message;
     }
-    
+
     if (error && error.toString) {
       return error.toString();
     }
-    
+
     return 'Unknown error';
   }
 
@@ -255,7 +255,7 @@ class ErrorClassifier {
    */
   categorizeError(errorMessage) {
     const matches = [];
-    
+
     // Test against all patterns
     for (const [type, config] of Object.entries(this.errorPatterns)) {
       for (const pattern of config.patterns) {
@@ -269,14 +269,14 @@ class ErrorClassifier {
         }
       }
     }
-    
+
     // Return best match or default
     if (matches.length > 0) {
-      return matches.reduce((best, current) => 
+      return matches.reduce((best, current) =>
         current.confidence > best.confidence ? current : best
       );
     }
-    
+
     return {
       type: 'unknown',
       category: 'unknown',
@@ -290,13 +290,15 @@ class ErrorClassifier {
    */
   calculateConfidence(message, pattern) {
     const match = message.match(pattern);
-    if (!match) return 0;
-    
+    if (!match) {
+      return 0;
+    }
+
     // Higher confidence for more specific matches
     const matchLength = match[0].length;
     const messageLength = message.length;
     const specificity = matchLength / messageLength;
-    
+
     return Math.min(specificity * 100, 100);
   }
 
@@ -305,20 +307,20 @@ class ErrorClassifier {
    */
   assessSeverity(error, classification) {
     let baseSeverity = classification.severity;
-    
+
     // Adjust severity based on error characteristics
     if (error.statusCode >= 500) {
       baseSeverity = this.elevateSeverity(baseSeverity);
     }
-    
+
     if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
       baseSeverity = this.elevateSeverity(baseSeverity);
     }
-    
+
     if (this.isRecurringError(error)) {
       baseSeverity = this.elevateSeverity(baseSeverity);
     }
-    
+
     return {
       level: baseSeverity,
       ...this.severityLevels[baseSeverity]
@@ -338,7 +340,7 @@ class ErrorClassifier {
   /**
    * Context7 Pattern: Check if error is recurring
    */
-  isRecurringError(error) {
+  isRecurringError() {
     // This would typically check against a history of errors
     // For now, we'll return false as a placeholder
     return false;
@@ -349,85 +351,85 @@ class ErrorClassifier {
    */
   suggestRecovery(error, classification) {
     const suggestions = [];
-    
+
     switch (classification.category) {
-      case 'database':
-        suggestions.push('Check database connection');
-        suggestions.push('Verify database server status');
-        suggestions.push('Review connection pool settings');
-        suggestions.push('Check database credentials');
-        break;
-        
-      case 'network':
-        suggestions.push('Verify network connectivity');
-        suggestions.push('Check firewall settings');
-        suggestions.push('Retry with exponential backoff');
-        suggestions.push('Check DNS resolution');
-        break;
-        
-      case 'authentication':
-        suggestions.push('Verify credentials');
-        suggestions.push('Check token expiration');
-        suggestions.push('Refresh authentication tokens');
-        suggestions.push('Review authentication configuration');
-        break;
-        
-      case 'authorization':
-        suggestions.push('Check user permissions');
-        suggestions.push('Verify role assignments');
-        suggestions.push('Review access control rules');
-        suggestions.push('Check resource ownership');
-        break;
-        
-      case 'validation':
-        suggestions.push('Validate input data');
-        suggestions.push('Check required fields');
-        suggestions.push('Verify data formats');
-        suggestions.push('Review validation rules');
-        break;
-        
-      case 'rate_limit':
-        suggestions.push('Implement exponential backoff');
-        suggestions.push('Reduce request frequency');
-        suggestions.push('Check rate limit quotas');
-        suggestions.push('Consider request batching');
-        break;
-        
-      case 'memory':
-        suggestions.push('Check memory usage');
-        suggestions.push('Review memory leaks');
-        suggestions.push('Optimize data structures');
-        suggestions.push('Consider garbage collection');
-        break;
-        
-      case 'external':
-        suggestions.push('Check external service status');
-        suggestions.push('Implement circuit breaker');
-        suggestions.push('Add retry logic');
-        suggestions.push('Use fallback mechanisms');
-        break;
-        
-      case 'configuration':
-        suggestions.push('Review configuration files');
-        suggestions.push('Check environment variables');
-        suggestions.push('Verify config syntax');
-        suggestions.push('Validate config values');
-        break;
-        
-      case 'timeout':
-        suggestions.push('Increase timeout values');
-        suggestions.push('Optimize slow operations');
-        suggestions.push('Check network latency');
-        suggestions.push('Implement async processing');
-        break;
-        
-      default:
-        suggestions.push('Review error details');
-        suggestions.push('Check application logs');
-        suggestions.push('Verify system resources');
-        suggestions.push('Contact system administrator');
+    case 'database':
+      suggestions.push('Check database connection');
+      suggestions.push('Verify database server status');
+      suggestions.push('Review connection pool settings');
+      suggestions.push('Check database credentials');
+      break;
+
+    case 'network':
+      suggestions.push('Verify network connectivity');
+      suggestions.push('Check firewall settings');
+      suggestions.push('Retry with exponential backoff');
+      suggestions.push('Check DNS resolution');
+      break;
+
+    case 'authentication':
+      suggestions.push('Verify credentials');
+      suggestions.push('Check token expiration');
+      suggestions.push('Refresh authentication tokens');
+      suggestions.push('Review authentication configuration');
+      break;
+
+    case 'authorization':
+      suggestions.push('Check user permissions');
+      suggestions.push('Verify role assignments');
+      suggestions.push('Review access control rules');
+      suggestions.push('Check resource ownership');
+      break;
+
+    case 'validation':
+      suggestions.push('Validate input data');
+      suggestions.push('Check required fields');
+      suggestions.push('Verify data formats');
+      suggestions.push('Review validation rules');
+      break;
+
+    case 'rate_limit':
+      suggestions.push('Implement exponential backoff');
+      suggestions.push('Reduce request frequency');
+      suggestions.push('Check rate limit quotas');
+      suggestions.push('Consider request batching');
+      break;
+
+    case 'memory':
+      suggestions.push('Check memory usage');
+      suggestions.push('Review memory leaks');
+      suggestions.push('Optimize data structures');
+      suggestions.push('Consider garbage collection');
+      break;
+
+    case 'external':
+      suggestions.push('Check external service status');
+      suggestions.push('Implement circuit breaker');
+      suggestions.push('Add retry logic');
+      suggestions.push('Use fallback mechanisms');
+      break;
+
+    case 'configuration':
+      suggestions.push('Review configuration files');
+      suggestions.push('Check environment variables');
+      suggestions.push('Verify config syntax');
+      suggestions.push('Validate config values');
+      break;
+
+    case 'timeout':
+      suggestions.push('Increase timeout values');
+      suggestions.push('Optimize slow operations');
+      suggestions.push('Check network latency');
+      suggestions.push('Implement async processing');
+      break;
+
+    default:
+      suggestions.push('Review error details');
+      suggestions.push('Check application logs');
+      suggestions.push('Verify system resources');
+      suggestions.push('Contact system administrator');
     }
-    
+
     return {
       immediate: suggestions.slice(0, 2),
       longTerm: suggestions.slice(2),
@@ -440,16 +442,16 @@ class ErrorClassifier {
    */
   getRecoveryPriority(severity) {
     switch (severity) {
-      case 'critical':
-        return 'urgent';
-      case 'high':
-        return 'high';
-      case 'medium':
-        return 'medium';
-      case 'low':
-        return 'low';
-      default:
-        return 'medium';
+    case 'critical':
+      return 'urgent';
+    case 'high':
+      return 'high';
+    case 'medium':
+      return 'medium';
+    case 'low':
+      return 'low';
+    default:
+      return 'medium';
     }
   }
 
@@ -459,7 +461,7 @@ class ErrorClassifier {
   getStatistics() {
     const categories = Object.keys(this.errorPatterns);
     const severities = Object.keys(this.severityLevels);
-    
+
     return {
       categories,
       severities,
@@ -474,11 +476,11 @@ class ErrorClassifier {
   testCategory(error, category) {
     const errorMessage = this.extractErrorMessage(error);
     const config = this.errorPatterns[category];
-    
+
     if (!config) {
       return false;
     }
-    
+
     return config.patterns.some(pattern => pattern.test(errorMessage));
   }
 
@@ -493,7 +495,7 @@ class ErrorClassifier {
         severity
       };
     }
-    
+
     this.errorPatterns[category].patterns.push(pattern);
   }
 
@@ -502,7 +504,7 @@ class ErrorClassifier {
    */
   removePattern(category, pattern) {
     if (this.errorPatterns[category]) {
-      this.errorPatterns[category].patterns = 
+      this.errorPatterns[category].patterns =
         this.errorPatterns[category].patterns.filter(p => p !== pattern);
     }
   }

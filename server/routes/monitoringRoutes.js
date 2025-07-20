@@ -1,6 +1,6 @@
 /**
  * 📊 Monitoring Routes - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Express Router with Modern Patterns
  * - Layered architecture with proper separation
  * - Middleware integration for validation and security
@@ -55,10 +55,10 @@ router.post(
       profit: { type: 'number', required: true },
       memoryUsage: { type: 'number', required: true, min: 0 },
       responseTime: { type: 'number', required: true, min: 0 },
-      rateLimitStatus: { 
-        type: 'string', 
-        required: true, 
-        enum: ['HEALTHY', 'THROTTLED', 'COOLDOWN', 'OVERLOADED'] 
+      rateLimitStatus: {
+        type: 'string',
+        required: true,
+        enum: ['HEALTHY', 'THROTTLED', 'COOLDOWN', 'OVERLOADED']
       },
       itemSelectionEfficiency: { type: 'number', required: true, min: 0, max: 100 },
       dataQuality: { type: 'number', required: true, min: 0, max: 100 }

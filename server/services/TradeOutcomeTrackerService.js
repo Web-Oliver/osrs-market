@@ -1,6 +1,6 @@
 /**
  * 📋 Trade Outcome Tracker Service - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Service Layer for Trade Outcome Tracking
  * - Tracks trade lifecycle from initiation to completion
  * - Calculates performance metrics and analytics
@@ -25,7 +25,7 @@ class TradeOutcomeTrackerService {
       currentDrawdown: 0,
       peakProfit: 0
     };
-    
+
     this.logger.info('📋 Trade Outcome Tracker initialized');
   }
 
@@ -107,15 +107,15 @@ class TradeOutcomeTrackerService {
 
     // Base risk from action type
     switch (action.type) {
-      case 'BUY':
-        risk += 0.3;
-        break;
-      case 'SELL':
-        risk += 0.3;
-        break;
-      case 'HOLD':
-        risk += 0.1;
-        break;
+    case 'BUY':
+      risk += 0.3;
+      break;
+    case 'SELL':
+      risk += 0.3;
+      break;
+    case 'HOLD':
+      risk += 0.1;
+      break;
     }
 
     // Market volatility risk
@@ -125,12 +125,20 @@ class TradeOutcomeTrackerService {
     risk += (marketState.spread / 100) * 0.2;
 
     // Trend risk
-    if (marketState.trend === 'DOWN' && action.type === 'BUY') risk += 0.2;
-    if (marketState.trend === 'UP' && action.type === 'SELL') risk += 0.2;
+    if (marketState.trend === 'DOWN' && action.type === 'BUY') {
+      risk += 0.2;
+    }
+    if (marketState.trend === 'UP' && action.type === 'SELL') {
+      risk += 0.2;
+    }
 
     // RSI risk
-    if (marketState.rsi > 70 && action.type === 'BUY') risk += 0.1;
-    if (marketState.rsi < 30 && action.type === 'SELL') risk += 0.1;
+    if (marketState.rsi > 70 && action.type === 'BUY') {
+      risk += 0.1;
+    }
+    if (marketState.rsi < 30 && action.type === 'SELL') {
+      risk += 0.1;
+    }
 
     return Math.min(1, Math.max(0, risk));
   }
@@ -139,24 +147,26 @@ class TradeOutcomeTrackerService {
    * Context7 Pattern: Calculate trade profit/loss
    */
   calculateProfit(trade, finalPrice, success) {
-    if (!success) return -50; // Fixed loss for failed trades
+    if (!success) {
+      return -50;
+    } // Fixed loss for failed trades
 
     const { action, initialPrice } = trade;
     let profit = 0;
 
     switch (action.type) {
-      case 'BUY':
-        // Profit if price goes up
-        profit = (finalPrice - initialPrice) * action.quantity;
-        break;
-      case 'SELL':
-        // Profit if price goes down
-        profit = (initialPrice - finalPrice) * action.quantity;
-        break;
-      case 'HOLD':
-        // Small profit for holding (avoiding bad trades)
-        profit = 10;
-        break;
+    case 'BUY':
+      // Profit if price goes up
+      profit = (finalPrice - initialPrice) * action.quantity;
+      break;
+    case 'SELL':
+      // Profit if price goes down
+      profit = (initialPrice - finalPrice) * action.quantity;
+      break;
+    case 'HOLD':
+      // Small profit for holding (avoiding bad trades)
+      profit = 10;
+      break;
     }
 
     // Apply trading fees (simplified)
@@ -203,7 +213,7 @@ class TradeOutcomeTrackerService {
   updatePerformanceMetrics(outcome) {
     try {
       this.performanceMetrics.totalTrades++;
-      
+
       if (outcome.success) {
         this.performanceMetrics.successfulTrades++;
       }
@@ -235,7 +245,7 @@ class TradeOutcomeTrackerService {
   calculatePerformanceMetrics(timeRange = null) {
     try {
       let trades = this.completedTrades;
-      
+
       if (timeRange) {
         const cutoff = Date.now() - timeRange;
         trades = trades.filter(trade => trade.timestamp >= cutoff);
@@ -284,10 +294,10 @@ class TradeOutcomeTrackerService {
       const winRate = (profits.length / totalTrades) * 100;
       const averageDuration = trades.reduce((sum, t) => sum + t.duration, 0) / trades.length;
 
-      const bestTrade = trades.reduce((best, current) => 
+      const bestTrade = trades.reduce((best, current) =>
         current.profit > best.profit ? current : best
       );
-      const worstTrade = trades.reduce((worst, current) => 
+      const worstTrade = trades.reduce((worst, current) =>
         current.profit < worst.profit ? current : worst
       );
 
@@ -390,7 +400,7 @@ class TradeOutcomeTrackerService {
           if (trades.length > 0) {
             const successfulTrades = trades.filter(t => t.success).length;
             const avgProfit = trades.reduce((sum, t) => sum + t.profit, 0) / trades.length;
-            
+
             result[category][condition] = {
               totalTrades: trades.length,
               successfulTrades,
@@ -444,7 +454,7 @@ class TradeOutcomeTrackerService {
     const activeTrades = this.activeTrades.size;
     const completedTrades = this.completedTrades.length;
     const totalTrades = activeTrades + completedTrades;
-    
+
     return {
       activeTrades,
       completedTrades,
@@ -460,11 +470,15 @@ class TradeOutcomeTrackerService {
   getTradeById(tradeId) {
     // Check active trades first
     const activeTrade = this.activeTrades.get(tradeId);
-    if (activeTrade) return { ...activeTrade, status: 'ACTIVE' };
+    if (activeTrade) {
+      return { ...activeTrade, status: 'ACTIVE' };
+    }
 
     // Check completed trades
     const completedTrade = this.completedTrades.find(t => t.id === tradeId);
-    if (completedTrade) return { ...completedTrade, status: 'COMPLETED' };
+    if (completedTrade) {
+      return { ...completedTrade, status: 'COMPLETED' };
+    }
 
     return null;
   }
@@ -481,7 +495,7 @@ class TradeOutcomeTrackerService {
       }
 
       this.activeTrades.delete(tradeId);
-      
+
       // Add to completed trades as cancelled
       const cancelledOutcome = {
         ...trade,
@@ -519,7 +533,7 @@ class TradeOutcomeTrackerService {
       currentDrawdown: 0,
       peakProfit: 0
     };
-    
+
     this.logger.info('🔄 Trade outcome tracker reset');
   }
 

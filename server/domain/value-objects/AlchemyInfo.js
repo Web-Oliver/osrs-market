@@ -1,6 +1,6 @@
 /**
  * 🧪 AlchemyInfo Value Object - Immutable alchemy calculation data
- * 
+ *
  * Context7 Pattern: Value Object with business logic encapsulation
  * - DRY: Centralized alchemy calculations and validation
  * - SOLID: Single responsibility for alchemy-related behavior
@@ -36,11 +36,11 @@ class AlchemyInfo {
    */
   constructor({ lowalch, highalch, natureRuneCost = 200 }) {
     this.#validateInputs(lowalch, highalch, natureRuneCost);
-    
+
     this.#lowalch = lowalch;
     this.#highalch = highalch;
     this.#natureRuneCost = natureRuneCost;
-    
+
     Object.freeze(this);
   }
 

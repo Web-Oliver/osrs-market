@@ -1,6 +1,6 @@
 /**
  * 📈 Market Data Controller - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Controller Layer for Market Data Operations
  * - Handles OSRS market data requests
  * - Thin controllers with business logic in services
@@ -18,7 +18,7 @@ class MarketDataController {
   constructor() {
     this.marketDataService = new MarketDataService();
     this.logger = new Logger('MarketDataController');
-    
+
     // Context7 Pattern: Bind methods to preserve 'this' context
     this.getMarketData = this.getMarketData.bind(this);
     this.saveMarketData = this.saveMarketData.bind(this);
@@ -416,7 +416,7 @@ class MarketDataController {
       // Use SmartItemSelectorService to get popular items
       const { SmartItemSelectorService } = require('../services/SmartItemSelectorService');
       const smartItemSelector = new SmartItemSelectorService();
-      
+
       const popularItems = await smartItemSelector.getHighValueItems(this.marketDataService, options.limit);
 
       this.logger.info('Successfully fetched popular items', {
@@ -752,16 +752,16 @@ class MarketDataController {
 
       // Set appropriate content type based on format
       switch (format) {
-        case 'csv':
-          res.setHeader('Content-Type', 'text/csv');
-          res.setHeader('Content-Disposition', 'attachment; filename=market-data.csv');
-          break;
-        case 'xlsx':
-          res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-          res.setHeader('Content-Disposition', 'attachment; filename=market-data.xlsx');
-          break;
-        default:
-          res.setHeader('Content-Type', 'application/json');
+      case 'csv':
+        res.setHeader('Content-Type', 'text/csv');
+        res.setHeader('Content-Disposition', 'attachment; filename=market-data.csv');
+        break;
+      case 'xlsx':
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=market-data.xlsx');
+        break;
+      default:
+        res.setHeader('Content-Type', 'application/json');
       }
 
       return res.send(exportData);
@@ -842,7 +842,7 @@ class MarketDataController {
       let portfolioItems;
       try {
         portfolioItems = JSON.parse(items);
-      } catch (parseError) {
+      } catch {
         return ApiResponse.badRequest(res, 'Invalid JSON format for items parameter');
       }
 

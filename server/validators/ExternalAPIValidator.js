@@ -1,6 +1,6 @@
 /**
  * 🌐 External API Validator - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Validation Layer for External API Requests
  * - Centralized validation logic for external API endpoints
  * - Reusable validation schemas
@@ -26,10 +26,10 @@ class ExternalAPIValidator extends BaseValidator {
           itemId: { type: 'number', required: true, min: 1, max: 50000 }
         },
         query: {
-          timestep: { 
-            type: 'string', 
-            optional: true, 
-            enum: ['5m', '1h', '6h', '24h'] 
+          timestep: {
+            type: 'string',
+            optional: true,
+            enum: ['5m', '1h', '6h', '24h']
           }
         }
       },
@@ -46,10 +46,10 @@ class ExternalAPIValidator extends BaseValidator {
       },
       getBulkItemData: {
         body: {
-          itemIds: { 
-            type: 'array', 
-            required: true, 
-            minItems: 1, 
+          itemIds: {
+            type: 'array',
+            required: true,
+            minItems: 1,
             maxItems: 100,
             items: { type: 'number', min: 1, max: 50000 }
           }
@@ -63,7 +63,7 @@ class ExternalAPIValidator extends BaseValidator {
    */
   getTimeseries(data) {
     const validation = this.validateData(data, this.validationSchemas.getTimeseries);
-    
+
     if (!validation.isValid) {
       return validation;
     }
@@ -85,7 +85,7 @@ class ExternalAPIValidator extends BaseValidator {
    */
   searchItems(data) {
     const validation = this.validateData(data, this.validationSchemas.searchItems);
-    
+
     if (!validation.isValid) {
       return validation;
     }
@@ -123,7 +123,7 @@ class ExternalAPIValidator extends BaseValidator {
    */
   getItemData(data) {
     const validation = this.validateData(data, this.validationSchemas.getItemData);
-    
+
     if (!validation.isValid) {
       return validation;
     }
@@ -145,7 +145,7 @@ class ExternalAPIValidator extends BaseValidator {
    */
   getBulkItemData(data) {
     const validation = this.validateData(data, this.validationSchemas.getBulkItemData);
-    
+
     if (!validation.isValid) {
       return validation;
     }
@@ -175,10 +175,10 @@ class ExternalAPIValidator extends BaseValidator {
     // Validate each item ID
     const errors = [];
     const validItemIds = [];
-    
+
     data.itemIds.forEach((itemId, index) => {
       const numericId = parseInt(itemId);
-      
+
       if (isNaN(numericId)) {
         errors.push(`Item ID at index ${index} is not a valid number`);
       } else if (numericId < 1 || numericId > 50000) {
@@ -212,22 +212,22 @@ class ExternalAPIValidator extends BaseValidator {
    */
   validateTimestep(timestep) {
     const validTimesteps = ['5m', '1h', '6h', '24h'];
-    
+
     if (!timestep) {
       return { isValid: true, timestep: '5m' }; // Default
     }
-    
+
     if (typeof timestep !== 'string') {
       return { isValid: false, error: 'Timestep must be a string' };
     }
-    
+
     if (!validTimesteps.includes(timestep)) {
-      return { 
-        isValid: false, 
-        error: `Timestep must be one of: ${validTimesteps.join(', ')}` 
+      return {
+        isValid: false,
+        error: `Timestep must be one of: ${validTimesteps.join(', ')}`
       };
     }
-    
+
     return { isValid: true, timestep };
   }
 
@@ -238,17 +238,17 @@ class ExternalAPIValidator extends BaseValidator {
     if (!itemId) {
       return { isValid: false, error: 'Item ID is required' };
     }
-    
+
     const numericId = parseInt(itemId);
-    
+
     if (isNaN(numericId)) {
       return { isValid: false, error: 'Item ID must be a number' };
     }
-    
+
     if (numericId < 1 || numericId > 50000) {
       return { isValid: false, error: 'Item ID must be between 1 and 50000' };
     }
-    
+
     return { isValid: true, itemId: numericId };
   }
 
@@ -259,21 +259,21 @@ class ExternalAPIValidator extends BaseValidator {
     if (!query) {
       return { isValid: false, error: 'Search query is required' };
     }
-    
+
     if (typeof query !== 'string') {
       return { isValid: false, error: 'Search query must be a string' };
     }
-    
+
     const trimmedQuery = query.trim();
-    
+
     if (trimmedQuery.length < 2) {
       return { isValid: false, error: 'Search query must be at least 2 characters long' };
     }
-    
+
     if (trimmedQuery.length > 100) {
       return { isValid: false, error: 'Search query must not exceed 100 characters' };
     }
-    
+
     // Check for potentially malicious patterns
     const dangerousPatterns = [
       /<script/i,
@@ -288,7 +288,7 @@ class ExternalAPIValidator extends BaseValidator {
     if (dangerousPatterns.some(pattern => pattern.test(trimmedQuery))) {
       return { isValid: false, error: 'Search query contains invalid characters' };
     }
-    
+
     return { isValid: true, query: trimmedQuery };
   }
 
@@ -299,21 +299,21 @@ class ExternalAPIValidator extends BaseValidator {
     if (!limit) {
       return { isValid: true, limit: 20 }; // Default
     }
-    
+
     const numericLimit = parseInt(limit);
-    
+
     if (isNaN(numericLimit)) {
       return { isValid: false, error: 'Limit must be a number' };
     }
-    
+
     if (numericLimit < 1) {
       return { isValid: false, error: 'Limit must be at least 1' };
     }
-    
+
     if (numericLimit > 100) {
       return { isValid: false, error: 'Limit cannot exceed 100' };
     }
-    
+
     return { isValid: true, limit: numericLimit };
   }
 
@@ -324,38 +324,38 @@ class ExternalAPIValidator extends BaseValidator {
     if (!Array.isArray(itemIds)) {
       return { isValid: false, error: 'Item IDs must be an array' };
     }
-    
+
     if (itemIds.length === 0) {
       return { isValid: false, error: 'Item IDs array cannot be empty' };
     }
-    
+
     if (itemIds.length > 100) {
       return { isValid: false, error: 'Cannot request more than 100 items at once' };
     }
-    
+
     const errors = [];
     const validItemIds = [];
-    
+
     itemIds.forEach((itemId, index) => {
       const validation = this.validateItemId(itemId);
-      
+
       if (!validation.isValid) {
         errors.push(`Item ID at index ${index}: ${validation.error}`);
       } else {
         validItemIds.push(validation.itemId);
       }
     });
-    
+
     if (errors.length > 0) {
       return { isValid: false, errors };
     }
-    
+
     // Check for duplicates
     const uniqueIds = new Set(validItemIds);
     if (uniqueIds.size !== validItemIds.length) {
       return { isValid: false, error: 'Duplicate item IDs are not allowed' };
     }
-    
+
     return { isValid: true, itemIds: validItemIds };
   }
 
@@ -365,22 +365,22 @@ class ExternalAPIValidator extends BaseValidator {
   validateHeaders(headers) {
     const requiredHeaders = ['user-agent'];
     const errors = [];
-    
+
     for (const header of requiredHeaders) {
       if (!headers[header]) {
         errors.push(`Missing required header: ${header}`);
       }
     }
-    
+
     // Check User-Agent format
     if (headers['user-agent']) {
       const userAgent = headers['user-agent'];
-      
+
       // Basic validation for User-Agent format
       if (userAgent.length < 5 || userAgent.length > 200) {
         errors.push('User-Agent header must be between 5 and 200 characters');
       }
-      
+
       // Check for potentially malicious patterns
       const dangerousPatterns = [
         /<script/i,
@@ -392,7 +392,7 @@ class ExternalAPIValidator extends BaseValidator {
         errors.push('User-Agent header contains invalid characters');
       }
     }
-    
+
     return {
       isValid: errors.length === 0,
       errors
@@ -408,21 +408,21 @@ class ExternalAPIValidator extends BaseValidator {
       max = 30, // 30 requests per minute
       skipFailedRequests = false
     } = params;
-    
+
     const errors = [];
-    
+
     if (typeof windowMs !== 'number' || windowMs < 1000 || windowMs > 3600000) {
       errors.push('Window time must be between 1 second and 1 hour');
     }
-    
+
     if (typeof max !== 'number' || max < 1 || max > 1000) {
       errors.push('Max requests must be between 1 and 1000');
     }
-    
+
     if (typeof skipFailedRequests !== 'boolean') {
       errors.push('skipFailedRequests must be a boolean');
     }
-    
+
     return {
       isValid: errors.length === 0,
       errors,
@@ -439,21 +439,21 @@ class ExternalAPIValidator extends BaseValidator {
       maxSize = 1000,
       enabled = true
     } = params;
-    
+
     const errors = [];
-    
+
     if (typeof ttl !== 'number' || ttl < 1000 || ttl > 3600000) {
       errors.push('TTL must be between 1 second and 1 hour');
     }
-    
+
     if (typeof maxSize !== 'number' || maxSize < 1 || maxSize > 10000) {
       errors.push('Max cache size must be between 1 and 10000');
     }
-    
+
     if (typeof enabled !== 'boolean') {
       errors.push('Enabled must be a boolean');
     }
-    
+
     return {
       isValid: errors.length === 0,
       errors,

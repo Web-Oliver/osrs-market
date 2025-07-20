@@ -1,12 +1,12 @@
 /**
  * 📅 Scheduler Service - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Background Job Scheduling and Management
  * - Schedules market data collection jobs
  * - Manages scrape queue processing
  * - Provides job health monitoring
  * - Handles job failures and retries
- * 
+ *
  * DRY: Centralized scheduling logic
  * SOLID: Single responsibility for job scheduling
  * Hierarchical: Foundation for background operations
@@ -29,11 +29,11 @@ const activeIntervals = new Map();
 async function startMarketDataPolling() {
   try {
     logger.info('🚀 Starting market data polling jobs');
-    
+
     const dataCollectionService = new DataCollectionService();
-    
+
     // Schedule 5-minute data collection every 5 minutes
-    const fiveMinInterval = setInterval(async () => {
+    const fiveMinInterval = setInterval(async() => {
       try {
         logger.info('🔄 Starting 5-minute data collection');
         await dataCollectionService.collect5mMarketData();
@@ -42,11 +42,11 @@ async function startMarketDataPolling() {
         logger.error('❌ 5-minute data collection failed', error);
       }
     }, 5 * 60 * 1000); // 5 minutes
-    
+
     activeIntervals.set('5min_collection', fiveMinInterval);
-    
+
     // Schedule 1-hour data collection every hour
-    const oneHourInterval = setInterval(async () => {
+    const oneHourInterval = setInterval(async() => {
       try {
         logger.info('🔄 Starting 1-hour data collection');
         await dataCollectionService.collect1hMarketData();
@@ -55,11 +55,11 @@ async function startMarketDataPolling() {
         logger.error('❌ 1-hour data collection failed', error);
       }
     }, 60 * 60 * 1000); // 1 hour
-    
+
     activeIntervals.set('1hour_collection', oneHourInterval);
-    
+
     // Schedule scrape queue processing every 15 minutes
-    const scrapeQueueInterval = setInterval(async () => {
+    const scrapeQueueInterval = setInterval(async() => {
       try {
         logger.info('🔄 Starting scrape queue processing');
         const result = await dataCollectionService.processScrapeQueue();
@@ -72,9 +72,9 @@ async function startMarketDataPolling() {
         logger.error('❌ Scrape queue processing failed', error);
       }
     }, 15 * 60 * 1000); // 15 minutes
-    
+
     activeIntervals.set('scrape_queue', scrapeQueueInterval);
-    
+
     // Run initial collections immediately
     try {
       logger.info('🔄 Running initial data collections');
@@ -86,7 +86,7 @@ async function startMarketDataPolling() {
     } catch (error) {
       logger.error('⚠️ Initial data collections failed', error);
     }
-    
+
     // Run initial scrape queue processing
     try {
       logger.info('🔄 Running initial scrape queue processing');
@@ -99,7 +99,7 @@ async function startMarketDataPolling() {
     } catch (error) {
       logger.error('⚠️ Initial scrape queue processing failed', error);
     }
-    
+
     logger.info('✅ Market data polling jobs started successfully', {
       jobs: [
         '5-minute data collection (every 5 minutes)',
@@ -107,7 +107,7 @@ async function startMarketDataPolling() {
         'Scrape queue processing (every 15 minutes)'
       ]
     });
-    
+
   } catch (error) {
     logger.error('❌ Failed to start market data polling jobs', error);
     throw error;
@@ -120,15 +120,15 @@ async function startMarketDataPolling() {
 function stopMarketDataPolling() {
   try {
     logger.info('🛑 Stopping market data polling jobs');
-    
+
     for (const [jobName, intervalId] of activeIntervals) {
       clearInterval(intervalId);
       logger.info(`✅ Stopped ${jobName} job`);
     }
-    
+
     activeIntervals.clear();
     logger.info('✅ All market data polling jobs stopped');
-    
+
   } catch (error) {
     logger.error('❌ Error stopping market data polling jobs', error);
     throw error;
@@ -156,8 +156,8 @@ function getJobStatus() {
  */
 function scheduleOneTimeJob(jobName, jobFunction, delayMs) {
   logger.info(`📅 Scheduling one-time job: ${jobName} (delay: ${delayMs}ms)`);
-  
-  const timeoutId = setTimeout(async () => {
+
+  const timeoutId = setTimeout(async() => {
     try {
       logger.info(`🔄 Executing one-time job: ${jobName}`);
       await jobFunction();
@@ -166,7 +166,7 @@ function scheduleOneTimeJob(jobName, jobFunction, delayMs) {
       logger.error(`❌ One-time job failed: ${jobName}`, error);
     }
   }, delayMs);
-  
+
   return timeoutId;
 }
 
@@ -175,8 +175,8 @@ function scheduleOneTimeJob(jobName, jobFunction, delayMs) {
  */
 function scheduleRecurringJob(jobName, jobFunction, intervalMs) {
   logger.info(`📅 Scheduling recurring job: ${jobName} (interval: ${intervalMs}ms)`);
-  
-  const intervalId = setInterval(async () => {
+
+  const intervalId = setInterval(async() => {
     try {
       logger.info(`🔄 Executing recurring job: ${jobName}`);
       await jobFunction();
@@ -185,9 +185,9 @@ function scheduleRecurringJob(jobName, jobFunction, intervalMs) {
       logger.error(`❌ Recurring job failed: ${jobName}`, error);
     }
   }, intervalMs);
-  
+
   activeIntervals.set(jobName, intervalId);
-  
+
   return intervalId;
 }
 
@@ -201,7 +201,7 @@ function cancelJob(jobName) {
     logger.info(`✅ Cancelled job: ${jobName}`);
     return true;
   }
-  
+
   logger.warn(`⚠️ Job not found: ${jobName}`);
   return false;
 }

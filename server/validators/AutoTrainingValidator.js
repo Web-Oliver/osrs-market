@@ -1,6 +1,6 @@
 /**
  * 🔄 Auto Training Validator - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Validation Layer for Auto Training Operations
  * - Comprehensive input validation for auto training configurations
  * - Validates neural network, adaptive learning, and training parameters
@@ -367,7 +367,7 @@ class AutoTrainingValidator {
     // Try to parse as JSON to validate format
     try {
       JSON.parse(modelData);
-    } catch (error) {
+    } catch {
       errors.push('Model data must be valid JSON');
     }
 

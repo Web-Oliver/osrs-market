@@ -1,6 +1,6 @@
 /**
  * 🌐 External API Controller - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Controller Layer for External API Operations
  * - Handles external API requests (OSRS Wiki, etc.)
  * - Thin controllers with business logic in services
@@ -17,7 +17,7 @@ class ExternalAPIController {
   constructor() {
     this.osrsWikiService = new OSRSWikiService();
     this.logger = new Logger('ExternalAPIController');
-    
+
     // Context7 Pattern: Bind methods to preserve 'this' context
     this.getLatestPrices = this.getLatestPrices.bind(this);
     this.getItemMapping = this.getItemMapping.bind(this);
@@ -99,7 +99,7 @@ class ExternalAPIController {
         ...req.params,
         ...req.query
       });
-      
+
       if (!validation.isValid) {
         return ApiResponse.badRequest(res, 'Invalid request parameters', validation.errors);
       }
@@ -141,7 +141,7 @@ class ExternalAPIController {
 
       // Context7 Pattern: Validate request parameters
       const validation = validateRequest.searchItems(req.query);
-      
+
       if (!validation.isValid) {
         return ApiResponse.badRequest(res, 'Invalid search parameters', validation.errors);
       }
@@ -180,7 +180,7 @@ class ExternalAPIController {
 
       // Context7 Pattern: Validate request parameters
       const validation = validateRequest.getItemData(req.params);
-      
+
       if (!validation.isValid) {
         return ApiResponse.badRequest(res, 'Invalid item ID', validation.errors);
       }
@@ -217,7 +217,7 @@ class ExternalAPIController {
 
       // Context7 Pattern: Validate request body
       const validation = validateRequest.getBulkItemData(req.body);
-      
+
       if (!validation.isValid) {
         return ApiResponse.badRequest(res, 'Invalid request body', validation.errors);
       }
@@ -368,7 +368,7 @@ class ExternalAPIController {
 
       // Get latest prices
       const latestPrices = await this.osrsWikiService.getLatestPrices();
-      
+
       // Calculate trending items based on price data freshness
       const trendingItems = this.calculateTrendingItems(latestPrices, limit);
 
@@ -395,27 +395,27 @@ class ExternalAPIController {
     const priceData = latestPrices.data || {};
     const totalItems = itemMapping.length;
     const itemsWithPrices = Object.keys(priceData).length;
-    
+
     let totalValue = 0;
     let totalSpread = 0;
     let highestPrice = 0;
     let lowestPrice = Infinity;
-    
-    for (const [itemId, prices] of Object.entries(priceData)) {
+
+    for (const [, prices] of Object.entries(priceData)) {
       if (prices.high) {
         totalValue += prices.high;
         highestPrice = Math.max(highestPrice, prices.high);
         lowestPrice = Math.min(lowestPrice, prices.high);
       }
-      
+
       if (prices.high && prices.low) {
         totalSpread += (prices.high - prices.low);
       }
     }
-    
+
     const averagePrice = itemsWithPrices > 0 ? totalValue / itemsWithPrices : 0;
     const averageSpread = itemsWithPrices > 0 ? totalSpread / itemsWithPrices : 0;
-    
+
     return {
       totalItems,
       itemsWithPrices,
@@ -435,19 +435,19 @@ class ExternalAPIController {
   calculateTrendingItems(latestPrices, limit) {
     const priceData = latestPrices.data || {};
     const trending = [];
-    
+
     for (const [itemId, prices] of Object.entries(priceData)) {
       if (prices.high && prices.low && prices.highTime && prices.lowTime) {
         const now = Date.now();
         const avgAge = ((now - prices.highTime) + (now - prices.lowTime)) / 2;
         const spread = prices.high - prices.low;
         const profitMargin = (spread / prices.low) * 100;
-        
+
         // Score based on recent activity and profitability
         const freshnessScore = Math.max(0, 100 - (avgAge / (1000 * 60 * 60))); // Hours since update
         const profitScore = Math.min(100, profitMargin * 2);
         const trendingScore = (freshnessScore * 0.6) + (profitScore * 0.4);
-        
+
         trending.push({
           itemId: parseInt(itemId),
           trendingScore: Math.round(trendingScore),
@@ -459,7 +459,7 @@ class ExternalAPIController {
         });
       }
     }
-    
+
     return trending
       .sort((a, b) => b.trendingScore - a.trendingScore)
       .slice(0, limit);

@@ -1,6 +1,6 @@
 /**
  * 🤖 AI Trading Controller - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Controller Layer for AI Trading Operations
  * - Handles AI trading session management
  * - Manages neural network training and prediction
@@ -22,7 +22,7 @@ class AITradingController {
     this.logger = new Logger('AITradingController');
     this.tradingAnalysis = new TradingAnalysisService();
     this.orchestratorInstances = new Map(); // Multiple orchestrator instances
-    
+
     // Default neural network configuration
     this.defaultNetworkConfig = {
       inputSize: 8,
@@ -45,7 +45,7 @@ class AITradingController {
       performanceThreshold: 0.6,
       explorationBoost: true
     };
-    
+
     // Context7 Pattern: Bind methods to preserve 'this' context
     this.startTradingSession = this.startTradingSession.bind(this);
     this.stopTradingSession = this.stopTradingSession.bind(this);
@@ -61,7 +61,7 @@ class AITradingController {
     this.generateTradingSignals = this.generateTradingSignals.bind(this);
     this.getSystemStatus = this.getSystemStatus.bind(this);
     this.getActiveSessions = this.getActiveSessions.bind(this);
-    
+
     this.logger.info('🤖 AI Trading Controller initialized');
   }
 
@@ -83,7 +83,7 @@ class AITradingController {
         return ApiResponse.badRequest(res, 'Invalid request parameters', validation.errors);
       }
 
-      const { 
+      const {
         networkConfig = this.defaultNetworkConfig,
         adaptiveConfig = this.defaultAdaptiveConfig,
         sessionName = 'Default Session'
@@ -92,7 +92,7 @@ class AITradingController {
       // Create new orchestrator instance
       const orchestrator = new AITradingOrchestratorService(networkConfig, adaptiveConfig);
       const sessionId = orchestrator.startLearningSession();
-      
+
       // Store orchestrator instance
       this.orchestratorInstances.set(sessionId, {
         orchestrator,
@@ -132,7 +132,7 @@ class AITradingController {
   async stopTradingSession(req, res, next) {
     try {
       const { sessionId } = req.params;
-      
+
       this.logger.info('🛑 Stopping AI trading session', {
         sessionId,
         requestId: req.id
@@ -145,10 +145,10 @@ class AITradingController {
 
       // Stop the session
       await sessionInstance.orchestrator.finishLearningSession();
-      
+
       // Get final performance data
       const finalPerformance = sessionInstance.orchestrator.getPerformanceAnalytics();
-      
+
       // Remove from active sessions
       this.orchestratorInstances.delete(sessionId);
 
@@ -183,7 +183,7 @@ class AITradingController {
   async pauseTradingSession(req, res, next) {
     try {
       const { sessionId } = req.params;
-      
+
       this.logger.info('⏸️ Pausing AI trading session', {
         sessionId,
         requestId: req.id
@@ -221,7 +221,7 @@ class AITradingController {
   async resumeTradingSession(req, res, next) {
     try {
       const { sessionId } = req.params;
-      
+
       this.logger.info('▶️ Resuming AI trading session', {
         sessionId,
         requestId: req.id
@@ -260,7 +260,7 @@ class AITradingController {
     try {
       const { sessionId } = req.params;
       const { items } = req.body;
-      
+
       // EXTENSIVE DEBUGGING: Log everything we can about the request
       this.logger.info('🔍 [DETAILED DEBUG] processMarketData called', {
         sessionId,
@@ -425,7 +425,7 @@ class AITradingController {
   async getTrainingProgress(req, res, next) {
     try {
       const { sessionId } = req.params;
-      
+
       this.logger.info('📈 Getting training progress', {
         sessionId,
         requestId: req.id
@@ -462,7 +462,7 @@ class AITradingController {
   async getPerformanceAnalytics(req, res, next) {
     try {
       const { sessionId } = req.params;
-      
+
       this.logger.info('📊 Getting performance analytics', {
         sessionId,
         requestId: req.id
@@ -501,7 +501,7 @@ class AITradingController {
     try {
       const { sessionId } = req.params;
       const { config } = req.body;
-      
+
       this.logger.info('⚙️ Updating adaptive configuration', {
         sessionId,
         config,
@@ -542,7 +542,7 @@ class AITradingController {
   async saveModel(req, res, next) {
     try {
       const { sessionId } = req.params;
-      
+
       this.logger.info('💾 Saving AI model', {
         sessionId,
         requestId: req.id
@@ -584,7 +584,7 @@ class AITradingController {
     try {
       const { sessionId } = req.params;
       const { modelData } = req.body;
-      
+
       this.logger.info('📁 Loading AI model', {
         sessionId,
         modelSize: modelData?.length,
@@ -627,7 +627,7 @@ class AITradingController {
   async exportTrainingData(req, res, next) {
     try {
       const { sessionId } = req.params;
-      
+
       this.logger.info('📤 Exporting training data', {
         sessionId,
         requestId: req.id
@@ -668,7 +668,7 @@ class AITradingController {
   async generateTradingSignals(req, res, next) {
     try {
       const { items } = req.body;
-      
+
       this.logger.info('🎯 Generating trading signals', {
         requestBody: req.body,
         hasItems: !!items,
@@ -708,7 +708,7 @@ class AITradingController {
         }
 
         const prices = item.priceHistory.map(point => point.price || point.high || 0).filter(p => p > 0);
-        
+
         if (prices.length >= 3) {
           const analysis = this.tradingAnalysis.getMarketAnalysis(prices, item.priceData);
           const flippingOpportunity = this.tradingAnalysis.identifyFlippingOpportunity(

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import type { AutoTrainingConfig } from '../types/autoTraining'
 
 // Environment-based configuration

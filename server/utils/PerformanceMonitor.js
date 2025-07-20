@@ -1,6 +1,6 @@
 /**
  * 📊 Performance Monitor - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Comprehensive Performance Monitoring System
  * - Request performance tracking
  * - Resource usage monitoring
@@ -32,7 +32,7 @@ class PerformanceMonitor {
     };
 
     this.activeMonitors.set(requestId, monitor);
-    
+
     return {
       addMarker: (name, data = {}) => this.addMarker(requestId, name, data),
       finish: () => this.finishMonitoring(requestId),
@@ -45,7 +45,9 @@ class PerformanceMonitor {
    */
   addMarker(requestId, name, data = {}) {
     const monitor = this.activeMonitors.get(requestId);
-    if (!monitor) return;
+    if (!monitor) {
+      return;
+    }
 
     monitor.markers.push({
       name,
@@ -60,7 +62,9 @@ class PerformanceMonitor {
    */
   finishMonitoring(requestId) {
     const monitor = this.activeMonitors.get(requestId);
-    if (!monitor) return null;
+    if (!monitor) {
+      return null;
+    }
 
     const endTime = Date.now();
     const endCpuUsage = process.cpuUsage(monitor.startCpuUsage);
@@ -85,7 +89,7 @@ class PerformanceMonitor {
 
     // Store metrics
     this.metrics.requests.push(metrics);
-    
+
     // Keep only recent metrics
     if (this.metrics.requests.length > this.maxMetrics) {
       this.metrics.requests.shift();
@@ -102,7 +106,9 @@ class PerformanceMonitor {
    */
   getMonitorMetrics(requestId) {
     const monitor = this.activeMonitors.get(requestId);
-    if (!monitor) return null;
+    if (!monitor) {
+      return null;
+    }
 
     const currentTime = Date.now();
     const currentCpuUsage = process.cpuUsage(monitor.startCpuUsage);
@@ -143,7 +149,7 @@ class PerformanceMonitor {
     };
 
     this.metrics.resources.push(resourceMetric);
-    
+
     // Keep only recent metrics
     if (this.metrics.resources.length > this.maxMetrics) {
       this.metrics.resources.shift();
@@ -170,7 +176,7 @@ class PerformanceMonitor {
     };
 
     this.metrics.errors.push(errorMetric);
-    
+
     // Keep only recent metrics
     if (this.metrics.errors.length > this.maxMetrics) {
       this.metrics.errors.shift();
@@ -257,19 +263,21 @@ class PerformanceMonitor {
    */
   detectMemoryLeaks(threshold = 50 * 1024 * 1024) { // 50MB
     const recentRequests = this.metrics.requests.slice(-100); // Last 100 requests
-    
+
     if (recentRequests.length < 10) {
       return { detected: false, reason: 'Insufficient data' };
     }
 
     const memoryTrend = recentRequests.map(r => r.memoryUsage.heapUsed);
     const avgMemoryIncrease = memoryTrend.reduce((acc, curr, index) => {
-      if (index === 0) return 0;
+      if (index === 0) {
+        return 0;
+      }
       return acc + (curr - memoryTrend[index - 1]);
     }, 0) / (memoryTrend.length - 1);
 
     const detected = avgMemoryIncrease > threshold;
-    
+
     return {
       detected,
       avgMemoryIncrease,
@@ -284,7 +292,7 @@ class PerformanceMonitor {
    */
   getBottlenecks(limit = 5) {
     const markerStats = new Map();
-    
+
     // Analyze markers across all requests
     this.metrics.requests.forEach(request => {
       request.markers.forEach(marker => {
@@ -297,7 +305,7 @@ class PerformanceMonitor {
             minTime: Infinity
           });
         }
-        
+
         const stats = markerStats.get(marker.name);
         stats.count++;
         stats.totalTime += marker.elapsedTime;
@@ -340,11 +348,11 @@ class PerformanceMonitor {
     };
 
     switch (format) {
-      case 'csv':
-        return this.convertToCSV(data);
-      case 'json':
-      default:
-        return JSON.stringify(data, null, 2);
+    case 'csv':
+      return this.convertToCSV(data);
+    case 'json':
+    default:
+      return JSON.stringify(data, null, 2);
     }
   }
 
@@ -364,7 +372,7 @@ class PerformanceMonitor {
    */
   getActiveMonitors() {
     const monitors = [];
-    
+
     for (const [requestId, monitor] of this.activeMonitors.entries()) {
       monitors.push({
         requestId,
@@ -385,8 +393,8 @@ class PerformanceMonitor {
   calculateMedian(values) {
     const sorted = values.slice().sort((a, b) => a - b);
     const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 === 0 ? 
-      (sorted[mid - 1] + sorted[mid]) / 2 : 
+    return sorted.length % 2 === 0 ?
+      (sorted[mid - 1] + sorted[mid]) / 2 :
       sorted[mid];
   }
 
@@ -412,11 +420,13 @@ class PerformanceMonitor {
       timestamp: new Date(r.timestamp).toISOString()
     }));
 
-    if (requests.length === 0) return '';
+    if (requests.length === 0) {
+      return '';
+    }
 
     const headers = Object.keys(requests[0]).join(',');
     const rows = requests.map(r => Object.values(r).join(','));
-    
+
     return [headers, ...rows].join('\n');
   }
 }

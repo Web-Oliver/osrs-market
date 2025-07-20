@@ -1,6 +1,6 @@
 /**
  * 🏺 Item Domain Entity - Rich domain model with business behavior
- * 
+ *
  * Context7 Pattern: Domain Entity with encapsulated business logic
  * - DRY: Centralized item business rules and behavior
  * - SOLID: Single responsibility for item domain logic
@@ -137,7 +137,7 @@ class Item {
    */
   #initializeFromData(data) {
     const now = new Date();
-    
+
     this.#id = new ItemId(data.itemId);
     this.#name = data.name.trim();
     this.#examine = data.examine.trim();
@@ -177,17 +177,39 @@ class Item {
   }
 
   // Getters for accessing properties
-  get id() { return this.#id; }
-  get name() { return this.#name; }
-  get examine() { return this.#examine; }
-  get members() { return this.#members; }
-  get alchemy() { return this.#alchemy; }
-  get market() { return this.#market; }
-  get weight() { return this.#weight; }
-  get icon() { return this.#icon; }
-  get status() { return this.#status; }
-  get dataSource() { return this.#dataSource; }
-  get audit() { return this.#audit; }
+  get id() {
+    return this.#id;
+  }
+  get name() {
+    return this.#name;
+  }
+  get examine() {
+    return this.#examine;
+  }
+  get members() {
+    return this.#members;
+  }
+  get alchemy() {
+    return this.#alchemy;
+  }
+  get market() {
+    return this.#market;
+  }
+  get weight() {
+    return this.#weight;
+  }
+  get icon() {
+    return this.#icon;
+  }
+  get status() {
+    return this.#status;
+  }
+  get dataSource() {
+    return this.#dataSource;
+  }
+  get audit() {
+    return this.#audit;
+  }
 
   /**
    * Update item properties
@@ -241,11 +263,11 @@ class Item {
 
     // Update alchemy info if provided
     if (updateData.lowalch !== undefined || updateData.highalch !== undefined) {
-      const newLowalch = updateData.lowalch !== undefined ? 
+      const newLowalch = updateData.lowalch !== undefined ?
         Math.max(0, Number(updateData.lowalch)) : this.#alchemy.lowalch;
-      const newHighalch = updateData.highalch !== undefined ? 
+      const newHighalch = updateData.highalch !== undefined ?
         Math.max(0, Number(updateData.highalch)) : this.#alchemy.highalch;
-      
+
       updates.alchemy = new AlchemyInfo({
         lowalch: newLowalch,
         highalch: newHighalch
@@ -263,7 +285,7 @@ class Item {
     }
 
     if (updateData.buyLimit !== undefined) {
-      marketUpdates.buyLimit = updateData.buyLimit ? 
+      marketUpdates.buyLimit = updateData.buyLimit ?
         Math.max(0, Number(updateData.buyLimit)) : null;
       hasMarketChanges = true;
     }
@@ -295,8 +317,12 @@ class Item {
 
     // Apply updates
     Object.assign(this, updates);
-    if (updates.alchemy) this.#alchemy = updates.alchemy;
-    if (updates.market) this.#market = updates.market;
+    if (updates.alchemy) {
+      this.#alchemy = updates.alchemy;
+    }
+    if (updates.market) {
+      this.#market = updates.market;
+    }
 
     // Update audit info
     this.#audit.updatedAt = new Date();
@@ -330,51 +356,51 @@ class Item {
    */
   getCategory() {
     const name = this.#name.toLowerCase();
-    
+
     // Specific category patterns
     if (name.includes('rune') && !name.includes('weapon') && !name.includes('armor')) {
       return 'runes';
     }
-    
+
     if (name.includes('potion') || name.includes('brew') || name.includes('barbarian herblore')) {
       return 'potions';
     }
-    
-    if (name.includes('food') || name.includes('fish') || name.includes('meat') || 
+
+    if (name.includes('food') || name.includes('fish') || name.includes('meat') ||
         name.includes('bread') || name.includes('cake') || name.includes('pie')) {
       return 'food';
     }
-    
-    if (name.includes('sword') || name.includes('bow') || name.includes('staff') || 
+
+    if (name.includes('sword') || name.includes('bow') || name.includes('staff') ||
         name.includes('dagger') || name.includes('axe') || name.includes('mace')) {
       return 'weapons';
     }
-    
-    if (name.includes('helmet') || name.includes('chestplate') || name.includes('platebody') || 
+
+    if (name.includes('helmet') || name.includes('chestplate') || name.includes('platebody') ||
         name.includes('shield') || name.includes('boots') || name.includes('gloves')) {
       return 'armor';
     }
-    
-    if (name.includes('pickaxe') || name.includes('hatchet') || name.includes('hammer') || 
+
+    if (name.includes('pickaxe') || name.includes('hatchet') || name.includes('hammer') ||
         name.includes('chisel') || name.includes('needle')) {
       return 'tools';
     }
-    
-    if (name.includes('ore') || name.includes('log') || name.includes('hide') || 
+
+    if (name.includes('ore') || name.includes('log') || name.includes('hide') ||
         name.includes('bone') || name.includes('gem')) {
       return 'resources';
     }
-    
+
     // Value-based categories
     if (this.#alchemy.highalch > 10000) {
       return 'high_value';
     }
-    
+
     // Membership-based categories
     if (this.#members) {
       return 'members';
     }
-    
+
     return 'general';
   }
 
@@ -394,7 +420,7 @@ class Item {
   markSynced() {
     this.#audit.lastSyncedAt = new Date();
     this.#audit.updatedAt = new Date();
-    
+
     this.#logger.debug('Item marked as synced', { itemId: this.#id.value });
   }
 
@@ -405,7 +431,7 @@ class Item {
     this.#status = 'deprecated';
     this.#audit.updatedAt = new Date();
     this.#audit.version += 1;
-    
+
     this.#logger.info('Item deprecated', { itemId: this.#id.value });
   }
 
@@ -416,7 +442,7 @@ class Item {
     this.#status = 'removed';
     this.#audit.updatedAt = new Date();
     this.#audit.version += 1;
-    
+
     this.#logger.info('Item removed', { itemId: this.#id.value });
   }
 
@@ -513,10 +539,18 @@ class Item {
     });
 
     // Restore audit information
-    if (data.createdAt) item.#audit.createdAt = new Date(data.createdAt);
-    if (data.updatedAt) item.#audit.updatedAt = new Date(data.updatedAt);
-    if (data.lastSyncedAt) item.#audit.lastSyncedAt = new Date(data.lastSyncedAt);
-    if (data.version) item.#audit.version = data.version;
+    if (data.createdAt) {
+      item.#audit.createdAt = new Date(data.createdAt);
+    }
+    if (data.updatedAt) {
+      item.#audit.updatedAt = new Date(data.updatedAt);
+    }
+    if (data.lastSyncedAt) {
+      item.#audit.lastSyncedAt = new Date(data.lastSyncedAt);
+    }
+    if (data.version) {
+      item.#audit.version = data.version;
+    }
 
     return item;
   }

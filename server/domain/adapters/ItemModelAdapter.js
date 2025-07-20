@@ -1,6 +1,6 @@
 /**
  * 🔌 Item Model Adapter - Bridge between existing ItemModel and new domain entities
- * 
+ *
  * Context7 Pattern: Adapter Pattern for gradual migration
  * - DRY: Reuses existing MongoDB schema while adding domain behavior
  * - SOLID: Single responsibility for model transformation
@@ -8,7 +8,6 @@
  */
 
 const { Item } = require('../entities/Item');
-const { ItemId } = require('../value-objects/ItemId');
 const { ItemModel } = require('../../models/ItemModel');
 const { Logger } = require('../../utils/Logger');
 
@@ -29,7 +28,9 @@ class ItemModelAdapter {
    * @returns {Item} Domain Item entity
    */
   toDomainEntity(mongoDoc) {
-    if (!mongoDoc) return null;
+    if (!mongoDoc) {
+      return null;
+    }
 
     try {
       // Convert MongoDB document to creation data format
@@ -114,11 +115,11 @@ class ItemModelAdapter {
    */
   async findByIdEnhanced(itemId, options = {}) {
     try {
-      const mongoDoc = await ItemModel.findOne({ 
-        itemId, 
-        status: 'active' 
+      const mongoDoc = await ItemModel.findOne({
+        itemId,
+        status: 'active'
       }).exec();
-      
+
       return this.toDomainEntity(mongoDoc);
     } catch (error) {
       this.#logger.error('Error in enhanced findById', error, { itemId });
@@ -135,11 +136,17 @@ class ItemModelAdapter {
   async findEnhanced(query = {}, options = {}) {
     try {
       const mongoQuery = ItemModel.find(query);
-      
-      if (options.sort) mongoQuery.sort(options.sort);
-      if (options.limit) mongoQuery.limit(options.limit);
-      if (options.skip) mongoQuery.skip(options.skip);
-      
+
+      if (options.sort) {
+        mongoQuery.sort(options.sort);
+      }
+      if (options.limit) {
+        mongoQuery.limit(options.limit);
+      }
+      if (options.skip) {
+        mongoQuery.skip(options.skip);
+      }
+
       const mongoDocs = await mongoQuery.exec();
       return this.toDomainEntities(mongoDocs);
     } catch (error) {
@@ -156,14 +163,14 @@ class ItemModelAdapter {
   async saveEnhanced(domainItem) {
     try {
       const mongoData = this.toMongoDocument(domainItem);
-      
+
       const savedDoc = await ItemModel.findOneAndUpdate(
         { itemId: domainItem.id.value },
         { $set: mongoData },
-        { 
-          new: true, 
-          upsert: true, 
-          runValidators: true 
+        {
+          new: true,
+          upsert: true,
+          runValidators: true
         }
       );
 
@@ -186,7 +193,7 @@ class ItemModelAdapter {
     try {
       // Get all active items first (could be optimized with better query mapping)
       const allItems = await this.findEnhanced({ status: 'active' }, options);
-      
+
       // Apply domain specification
       return allItems.filter(item => specification.isSatisfiedBy(item));
     } catch (error) {

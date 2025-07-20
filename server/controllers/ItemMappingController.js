@@ -1,6 +1,6 @@
 /**
  * 🎯 Item Mapping Controller - Context7 API Layer
- * 
+ *
  * Context7 Pattern: Controller Layer for Item Mapping API
  * - SOLID: Single Responsibility - Handle HTTP requests for item mapping
  * - DRY: Reusable response patterns and error handling
@@ -19,7 +19,7 @@ class ItemMappingController {
     this.itemMappingService = new ItemMappingService();
     this.itemValidator = new ItemValidator();
     this.logger = new Logger('ItemMappingController');
-    
+
     // Context7 Pattern: Bind methods to preserve 'this' context
     this.importMappings = this.importMappings.bind(this);
     this.getItem = this.getItem.bind(this);
@@ -32,7 +32,7 @@ class ItemMappingController {
     this.createItem = this.createItem.bind(this);
     this.updateItem = this.updateItem.bind(this);
     this.deleteItem = this.deleteItem.bind(this);
-    
+
     // Enhanced domain-driven endpoints
     this.getItemEnhanced = this.getItemEnhanced.bind(this);
     this.getBusinessInsights = this.getBusinessInsights.bind(this);
@@ -84,7 +84,7 @@ class ItemMappingController {
   async getItem(req, res, next) {
     try {
       const itemId = parseInt(req.params.itemId);
-      
+
       this.logger.debug('Get item request', {
         itemId,
         requestId: req.id
@@ -178,7 +178,7 @@ class ItemMappingController {
       }
 
       const items = await this.itemMappingService.searchItems(
-        searchTerm, 
+        searchTerm,
         validation.sanitizedParams
       );
 
@@ -216,7 +216,7 @@ class ItemMappingController {
 
       // Validate and sanitize parameters
       const options = {};
-      
+
       if (req.query.limit) {
         const limit = parseInt(req.query.limit);
         if (limit < 1 || limit > 100) {
@@ -267,7 +267,7 @@ class ItemMappingController {
   async getItemsByCategory(req, res, next) {
     try {
       const { category } = req.params;
-      
+
       this.logger.debug('Get items by category request', {
         category,
         query: req.query,
@@ -282,7 +282,7 @@ class ItemMappingController {
 
       // Validate query parameters
       const options = {};
-      
+
       if (req.query.limit) {
         const limit = parseInt(req.query.limit);
         if (limit < 1 || limit > 100) {
@@ -304,7 +304,7 @@ class ItemMappingController {
       }
 
       const items = await this.itemMappingService.getItemsByCategory(
-        categoryValidation.sanitizedCategory, 
+        categoryValidation.sanitizedCategory,
         options
       );
 
@@ -361,6 +361,7 @@ class ItemMappingController {
    * Context7 Pattern: Health check endpoint
    * GET /api/items/health
    */
+  // eslint-disable-next-line no-unused-vars
   async healthCheck(req, res, next) {
     try {
       this.logger.debug('Health check request', {
@@ -381,7 +382,7 @@ class ItemMappingController {
       this.logger.error('Error in health check', error, {
         requestId: req.id
       });
-      
+
       return res.status(503).json({
         success: false,
         data: {
@@ -444,7 +445,7 @@ class ItemMappingController {
   async updateItem(req, res, next) {
     try {
       const itemId = parseInt(req.params.itemId);
-      
+
       this.logger.info('Update item request', {
         itemId,
         body: req.body,
@@ -459,7 +460,7 @@ class ItemMappingController {
       }
 
       const updatedItem = await this.itemMappingService.itemRepository.updateItem(
-        itemId, 
+        itemId,
         validation.sanitizedData
       );
 
@@ -493,7 +494,7 @@ class ItemMappingController {
   async deleteItem(req, res, next) {
     try {
       const itemId = parseInt(req.params.itemId);
-      
+
       this.logger.info('Delete item request', {
         itemId,
         ip: req.ip,
@@ -543,7 +544,7 @@ class ItemMappingController {
   async getItemEnhanced(req, res, next) {
     try {
       const itemId = parseInt(req.params.itemId);
-      
+
       this.logger.debug('Get enhanced item request', {
         itemId,
         requestId: req.id
@@ -639,7 +640,7 @@ class ItemMappingController {
       // Validate criteria
       const validCriteria = [
         'profitableAlchemy',
-        'highValueTradeable', 
+        'highValueTradeable',
         'flippingCandidates',
         'freeToPlayTradeable',
         'highEndMembersEquipment',

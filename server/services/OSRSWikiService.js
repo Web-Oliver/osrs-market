@@ -1,6 +1,6 @@
 /**
  * 🏺 OSRS Wiki Service - Context7 Optimized
- * 
+ *
  * Context7 Pattern: External API Integration Service
  * - Centralized OSRS Wiki API communication
  * - Rate limiting and caching
@@ -18,18 +18,18 @@ class OSRSWikiService {
     this.logger = new Logger('OSRSWikiService');
     this.cache = new CacheManager('osrs_wiki', 300000); // 5 minutes cache default
     this.rateLimiter = new RateLimiter();
-    
+
     // Enhanced caching configuration
     this.cacheConfig = {
-      latest_prices: 120000,    // 2 minutes for latest prices
-      item_mapping: 3600000,    // 1 hour for item mapping (stable data)
-      timeseries: 60000,        // 1 minute for timeseries
-      search_results: 600000,   // 10 minutes for search results
-      item_data: 300000,        // 5 minutes for individual item data
-      '5m_prices': 60000,       // 1 minute for 5-minute prices
-      '1h_prices': 300000       // 5 minutes for 1-hour prices
+      latest_prices: 120000, // 2 minutes for latest prices
+      item_mapping: 3600000, // 1 hour for item mapping (stable data)
+      timeseries: 60000, // 1 minute for timeseries
+      search_results: 600000, // 10 minutes for search results
+      item_data: 300000, // 5 minutes for individual item data
+      '5m_prices': 60000, // 1 minute for 5-minute prices
+      '1h_prices': 300000 // 5 minutes for 1-hour prices
     };
-    
+
     // Circuit breaker for API downtime handling
     this.circuitBreaker = {
       failureCount: 0,
@@ -37,34 +37,34 @@ class OSRSWikiService {
       state: 'CLOSED', // CLOSED, OPEN, HALF_OPEN
       failureThreshold: 5,
       timeoutThreshold: 60000, // 1 minute timeout
-      resetTimeout: 300000     // 5 minutes before retry
+      resetTimeout: 300000 // 5 minutes before retry
     };
-    
+
     // Per-item rate limiting - track last fetch time for each item
     this.itemLastFetchTime = new Map();
     this.ITEM_RATE_LIMIT_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
-    
+
     // OSRS Wiki API configuration
     this.baseURL = 'https://prices.runescape.wiki/api/v1/osrs';
     this.userAgent = 'OSRS-Market-Tracker/1.0 (Educational AI Trading Research; Contact: github.com/your-repo/issues)';
     this.timeout = 10000; // 10 seconds
-    
+
     // Rate limiting configuration (respectful usage)
     this.rateLimitConfig = {
       windowMs: 60000, // 1 minute
       max: 20, // 20 requests per minute (very conservative)
       key: 'osrs_wiki_api'
     };
-    
+
     // Enhanced rate limiting for different endpoint types
     this.endpointLimits = {
-      latest: { windowMs: 60000, max: 10 },    // 10/min for latest prices
-      mapping: { windowMs: 300000, max: 2 },   // 2 per 5 minutes for mapping
+      latest: { windowMs: 60000, max: 10 }, // 10/min for latest prices
+      mapping: { windowMs: 300000, max: 2 }, // 2 per 5 minutes for mapping
       timeseries: { windowMs: 60000, max: 5 }, // 5/min for timeseries
-      '5m': { windowMs: 60000, max: 10 },      // 10/min for 5-minute data
-      '1h': { windowMs: 60000, max: 10 }       // 10/min for 1-hour data
+      '5m': { windowMs: 60000, max: 10 }, // 10/min for 5-minute data
+      '1h': { windowMs: 60000, max: 10 } // 10/min for 1-hour data
     };
-    
+
     this.axiosConfig = {
       timeout: this.timeout,
       headers: {
@@ -80,24 +80,24 @@ class OSRSWikiService {
    */
   checkCircuitBreaker() {
     const now = Date.now();
-    
+
     switch (this.circuitBreaker.state) {
-      case 'OPEN':
-        // Check if enough time has passed to try again
-        if (now - this.circuitBreaker.lastFailureTime >= this.circuitBreaker.resetTimeout) {
-          this.circuitBreaker.state = 'HALF_OPEN';
-          this.logger.info('Circuit breaker state changed to HALF_OPEN - attempting recovery');
-          return true;
-        }
-        this.logger.warn('Circuit breaker is OPEN - API calls blocked');
-        return false;
-        
-      case 'HALF_OPEN':
-      case 'CLOSED':
+    case 'OPEN':
+      // Check if enough time has passed to try again
+      if (now - this.circuitBreaker.lastFailureTime >= this.circuitBreaker.resetTimeout) {
+        this.circuitBreaker.state = 'HALF_OPEN';
+        this.logger.info('Circuit breaker state changed to HALF_OPEN - attempting recovery');
         return true;
-        
-      default:
-        return true;
+      }
+      this.logger.warn('Circuit breaker is OPEN - API calls blocked');
+      return false;
+
+    case 'HALF_OPEN':
+    case 'CLOSED':
+      return true;
+
+    default:
+      return true;
     }
   }
 
@@ -107,7 +107,7 @@ class OSRSWikiService {
   recordFailure(error) {
     this.circuitBreaker.failureCount++;
     this.circuitBreaker.lastFailureTime = Date.now();
-    
+
     if (this.circuitBreaker.failureCount >= this.circuitBreaker.failureThreshold) {
       this.circuitBreaker.state = 'OPEN';
       this.logger.error('Circuit breaker opened due to repeated failures', {
@@ -135,7 +135,7 @@ class OSRSWikiService {
   getStaleData(cacheKey, maxAge = 3600000) { // 1 hour max stale age
     const cache = this.cache.cache || new Map();
     const entry = cache.get(cacheKey);
-    
+
     if (entry) {
       const age = Date.now() - entry.timestamp;
       if (age <= maxAge) {
@@ -147,7 +147,7 @@ class OSRSWikiService {
         return entry.value;
       }
     }
-    
+
     return null;
   }
 
@@ -185,7 +185,7 @@ class OSRSWikiService {
       // Check cache first
       const cacheKey = 'latest_prices';
       const cachedData = this.cache.get(cacheKey);
-      
+
       if (cachedData) {
         this.logger.debug('Returning cached latest prices');
         return cachedData;
@@ -193,19 +193,19 @@ class OSRSWikiService {
 
       // Fetch from API
       const response = await axios.get(`${this.baseURL}/latest`, this.axiosConfig);
-      
+
       if (response.status !== 200) {
         throw new Error(`API returned status ${response.status}`);
       }
 
       const data = this.transformLatestPrices(response.data);
-      
+
       // Cache the response with enhanced timeout
       this.cache.set(cacheKey, data, this.cacheConfig.latest_prices);
-      
+
       // Record success for circuit breaker
       this.recordSuccess();
-      
+
       this.logger.debug('Successfully fetched latest prices', {
         itemCount: Object.keys(data.data || {}).length,
         timestamp: data.timestamp
@@ -214,16 +214,16 @@ class OSRSWikiService {
       return data;
     } catch (error) {
       this.logger.error('Failed to fetch latest prices', error);
-      
+
       // Record failure for circuit breaker
       this.recordFailure(error);
-      
+
       // Try to return stale cached data if available
       const staleData = this.getStaleData('latest_prices');
       if (staleData) {
         return staleData;
       }
-      
+
       throw error;
     }
   }
@@ -261,7 +261,7 @@ class OSRSWikiService {
       // Check cache first
       const cacheKey = '5m_prices';
       const cachedData = this.cache.get(cacheKey);
-      
+
       if (cachedData) {
         this.logger.debug('Returning cached 5-minute prices');
         return cachedData;
@@ -269,19 +269,19 @@ class OSRSWikiService {
 
       // Fetch from API
       const response = await axios.get(`${this.baseURL}/5m`, this.axiosConfig);
-      
+
       if (response.status !== 200) {
         throw new Error(`API returned status ${response.status}`);
       }
 
       const data = this.transform5MinutePrices(response.data);
-      
+
       // Cache the response with enhanced timeout
       this.cache.set(cacheKey, data, this.cacheConfig['5m_prices']);
-      
+
       // Record success for circuit breaker
       this.recordSuccess();
-      
+
       this.logger.debug('Successfully fetched 5-minute prices', {
         itemCount: Object.keys(data.data || {}).length,
         timestamp: data.timestamp
@@ -290,16 +290,16 @@ class OSRSWikiService {
       return data;
     } catch (error) {
       this.logger.error('Failed to fetch 5-minute prices', error);
-      
+
       // Record failure for circuit breaker
       this.recordFailure(error);
-      
+
       // Try to return stale cached data if available
       const staleData = this.getStaleData('5m_prices');
       if (staleData) {
         return staleData;
       }
-      
+
       throw error;
     }
   }
@@ -337,7 +337,7 @@ class OSRSWikiService {
       // Check cache first
       const cacheKey = '1h_prices';
       const cachedData = this.cache.get(cacheKey);
-      
+
       if (cachedData) {
         this.logger.debug('Returning cached 1-hour prices');
         return cachedData;
@@ -345,19 +345,19 @@ class OSRSWikiService {
 
       // Fetch from API
       const response = await axios.get(`${this.baseURL}/1h`, this.axiosConfig);
-      
+
       if (response.status !== 200) {
         throw new Error(`API returned status ${response.status}`);
       }
 
       const data = this.transform1HourPrices(response.data);
-      
+
       // Cache the response with enhanced timeout
       this.cache.set(cacheKey, data, this.cacheConfig['1h_prices']);
-      
+
       // Record success for circuit breaker
       this.recordSuccess();
-      
+
       this.logger.debug('Successfully fetched 1-hour prices', {
         itemCount: Object.keys(data.data || {}).length,
         timestamp: data.timestamp
@@ -366,16 +366,16 @@ class OSRSWikiService {
       return data;
     } catch (error) {
       this.logger.error('Failed to fetch 1-hour prices', error);
-      
+
       // Record failure for circuit breaker
       this.recordFailure(error);
-      
+
       // Try to return stale cached data if available
       const staleData = this.getStaleData('1h_prices');
       if (staleData) {
         return staleData;
       }
-      
+
       throw error;
     }
   }
@@ -400,7 +400,7 @@ class OSRSWikiService {
       // Check cache first (longer cache for mapping as it changes less frequently)
       const cacheKey = 'item_mapping';
       const cachedData = this.cache.get(cacheKey);
-      
+
       if (cachedData) {
         this.logger.debug('Returning cached item mapping');
         return cachedData;
@@ -408,16 +408,16 @@ class OSRSWikiService {
 
       // Fetch from API
       const response = await axios.get(`${this.baseURL}/mapping`, this.axiosConfig);
-      
+
       if (response.status !== 200) {
         throw new Error(`API returned status ${response.status}`);
       }
 
       const data = this.transformItemMapping(response.data);
-      
+
       // Cache for longer period (mapping changes less frequently)
       this.cache.set(cacheKey, data, this.cacheConfig.item_mapping);
-      
+
       this.logger.debug('Successfully fetched item mapping', {
         itemCount: data.length
       });
@@ -425,14 +425,14 @@ class OSRSWikiService {
       return data;
     } catch (error) {
       this.logger.error('Failed to fetch item mapping', error);
-      
+
       // Try to return cached data if available
       const fallbackData = this.cache.get('item_mapping');
       if (fallbackData) {
         this.logger.info('Returning stale cached mapping due to API error');
         return fallbackData;
       }
-      
+
       throw error;
     }
   }
@@ -457,12 +457,12 @@ class OSRSWikiService {
       // Check per-item rate limit first
       if (!this.canFetchItem(itemId)) {
         const cooldownTime = this.getItemCooldownTime(itemId);
-        this.logger.debug('Item rate limited for timeseries', { 
-          itemId, 
+        this.logger.debug('Item rate limited for timeseries', {
+          itemId,
           timestep,
-          cooldownRemaining: Math.ceil(cooldownTime / 1000) + 's' 
+          cooldownRemaining: Math.ceil(cooldownTime / 1000) + 's'
         });
-        
+
         // Return cached data if available
         const cacheKey = `timeseries_${itemId}_${timestep}`;
         const cachedData = this.cache.get(cacheKey);
@@ -470,7 +470,7 @@ class OSRSWikiService {
           this.logger.debug('Returning cached timeseries data due to rate limit', { itemId, timestep });
           return cachedData;
         }
-        
+
         throw new Error(`Item ${itemId} is rate limited for timeseries. Try again in ${Math.ceil(cooldownTime / 1000)} seconds.`);
       }
 
@@ -487,7 +487,7 @@ class OSRSWikiService {
       // Check cache first
       const cacheKey = `timeseries_${itemId}_${timestep}`;
       const cachedData = this.cache.get(cacheKey);
-      
+
       if (cachedData) {
         this.logger.debug('Returning cached timeseries data');
         return cachedData;
@@ -498,19 +498,19 @@ class OSRSWikiService {
         `${this.baseURL}/timeseries?timestep=${timestep}&id=${itemId}`,
         this.axiosConfig
       );
-      
+
       if (response.status !== 200) {
         throw new Error(`API returned status ${response.status}`);
       }
 
       const data = this.transformTimeseriesData(response.data, itemId, timestep);
-      
+
       // Cache the response with enhanced timeout
       this.cache.set(cacheKey, data, this.cacheConfig.timeseries);
-      
+
       // Mark item as fetched for rate limiting
       this.markItemFetched(itemId);
-      
+
       this.logger.debug('Successfully fetched timeseries data', {
         itemId,
         timestep,
@@ -537,10 +537,10 @@ class OSRSWikiService {
 
       // Get item mapping first
       const mapping = await this.getItemMapping();
-      
+
       // Search through mapping
       const searchResults = this.searchInMapping(mapping, query.trim(), limit);
-      
+
       this.logger.debug('Search completed', {
         query,
         resultCount: searchResults.length
@@ -566,7 +566,7 @@ class OSRSWikiService {
     if (!lastFetchTime) {
       return true; // Never fetched before
     }
-    
+
     const timeSinceLastFetch = Date.now() - lastFetchTime;
     return timeSinceLastFetch >= this.ITEM_RATE_LIMIT_MS;
   }
@@ -586,7 +586,7 @@ class OSRSWikiService {
     if (!lastFetchTime) {
       return 0; // No cooldown
     }
-    
+
     const timeSinceLastFetch = Date.now() - lastFetchTime;
     const remainingTime = this.ITEM_RATE_LIMIT_MS - timeSinceLastFetch;
     return Math.max(0, remainingTime);
@@ -602,11 +602,11 @@ class OSRSWikiService {
       // Check per-item rate limit first
       if (!this.canFetchItem(itemId)) {
         const cooldownTime = this.getItemCooldownTime(itemId);
-        this.logger.debug('Item rate limited', { 
-          itemId, 
-          cooldownRemaining: Math.ceil(cooldownTime / 1000) + 's' 
+        this.logger.debug('Item rate limited', {
+          itemId,
+          cooldownRemaining: Math.ceil(cooldownTime / 1000) + 's'
         });
-        
+
         // Return cached data if available
         const cacheKey = `item_data_${itemId}`;
         const cachedData = this.cache.get(cacheKey);
@@ -614,7 +614,7 @@ class OSRSWikiService {
           this.logger.debug('Returning cached item data due to rate limit', { itemId });
           return cachedData;
         }
-        
+
         throw new Error(`Item ${itemId} is rate limited. Try again in ${Math.ceil(cooldownTime / 1000)} seconds.`);
       }
 
@@ -660,7 +660,7 @@ class OSRSWikiService {
 
       // Cache the result with enhanced timeout
       this.cache.set(cacheKey, itemData, this.cacheConfig.item_data);
-      
+
       // Mark item as fetched for rate limiting
       this.markItemFetched(itemId);
 
@@ -689,7 +689,7 @@ class OSRSWikiService {
       }
 
       // Validate all item IDs
-      const validItemIds = itemIds.filter(id => 
+      const validItemIds = itemIds.filter(id =>
         typeof id === 'number' && id > 0
       );
 
@@ -816,7 +816,7 @@ class OSRSWikiService {
   async getAPIStatus() {
     try {
       const startTime = Date.now();
-      
+
       // Make a simple request to check API health
       const response = await axios.get(`${this.baseURL}/latest`, {
         ...this.axiosConfig,
@@ -824,7 +824,7 @@ class OSRSWikiService {
       });
 
       const responseTime = Date.now() - startTime;
-      
+
       return {
         status: 'healthy',
         responseTime,
@@ -834,7 +834,7 @@ class OSRSWikiService {
       };
     } catch (error) {
       this.logger.error('API status check failed', error);
-      
+
       return {
         status: 'unhealthy',
         error: error.message,
@@ -920,10 +920,12 @@ class OSRSWikiService {
     const results = [];
 
     for (const item of mapping) {
-      if (results.length >= limit) break;
-      
+      if (results.length >= limit) {
+        break;
+      }
+
       const nameLower = item.name.toLowerCase();
-      
+
       // Calculate relevance score
       let score = 0;
       if (nameLower === queryLower) {
@@ -936,7 +938,7 @@ class OSRSWikiService {
         // Check for word matches
         const words = queryLower.split(' ');
         const nameWords = nameLower.split(' ');
-        
+
         for (const word of words) {
           if (nameWords.some(nameWord => nameWord.includes(word))) {
             score = Math.max(score, 40);
@@ -984,7 +986,7 @@ class OSRSWikiService {
 
     for (const [itemId, lastFetchTime] of this.itemLastFetchTime.entries()) {
       const cooldownTime = this.getItemCooldownTime(itemId);
-      
+
       if (cooldownTime > 0) {
         itemRateLimitStats.itemsInCooldown++;
         totalCooldownTime += cooldownTime;

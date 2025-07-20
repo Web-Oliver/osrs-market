@@ -1,6 +1,6 @@
 /**
  * 🔄 Auto Training Controller - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Controller Layer for Auto Training Management
  * - Handles HTTP requests for automated training operations
  * - Manages training service lifecycle and configuration
@@ -56,7 +56,7 @@ class AutoTrainingController {
       this.trainingServices.set(userId, service);
 
       const status = service.getStatus();
-      
+
       this.logger.info('✅ Auto training service started', {
         userId,
         sessionId: status.sessionId
@@ -426,12 +426,7 @@ class AutoTrainingController {
 
       res.json({
         success: true,
-        data: {
-          userId,
-          itemId: itemId ? parseInt(itemId) : null,
-          timeRange: timeRange ? parseInt(timeRange) : null,
-          historicalData
-        }
+        data: historicalData.historicalData // Frontend expects data to be the array directly
       });
 
     } catch (error) {
@@ -498,7 +493,7 @@ class AutoTrainingController {
       for (const [userId, service] of this.trainingServices.entries()) {
         const status = service.getStatus();
         const healthStatus = service.getHealthStatus();
-        
+
         activeServices.push({
           userId,
           status,

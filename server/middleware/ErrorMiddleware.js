@@ -1,6 +1,6 @@
 /**
  * ⚠️ Error Middleware - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Error Handling Middleware
  * - Centralized error handling
  * - Proper error logging and monitoring
@@ -19,7 +19,7 @@ class ErrorMiddleware {
     this.logger = new Logger('ErrorMiddleware');
     this.errorClassifier = new ErrorClassifier();
     this.notificationService = new NotificationService();
-    
+
     // Context7 Pattern: Bind methods to preserve context
     this.handleError = this.handleError.bind(this);
     this.handleNotFound = this.handleNotFound.bind(this);
@@ -35,21 +35,21 @@ class ErrorMiddleware {
     try {
       // Context7 Pattern: Classify error for appropriate handling
       const errorInfo = this.errorClassifier.classify(err);
-      
+
       // Context7 Pattern: Log error with context
       this.logError(err, req, errorInfo);
-      
+
       // Context7 Pattern: Send notifications for critical errors
       if (errorInfo.severity === 'critical') {
         this.notificationService.sendCriticalErrorAlert(err, req);
       }
-      
+
       // Context7 Pattern: Generate appropriate response
       const response = this.generateErrorResponse(err, req, errorInfo);
-      
+
       // Context7 Pattern: Set appropriate HTTP status code
       const statusCode = this.getStatusCode(err, errorInfo);
-      
+
       // Context7 Pattern: Send error response
       return ApiResponse.error(res, response.message, response.details, statusCode);
     } catch (handlerError) {
@@ -58,7 +58,7 @@ class ErrorMiddleware {
         originalError: err.message,
         requestId: req.id
       });
-      
+
       return ApiResponse.error(res, 'Internal server error', null, 500);
     }
   }
@@ -288,20 +288,20 @@ class ErrorMiddleware {
 
     // Context7 Pattern: Log with appropriate level
     switch (errorInfo.severity) {
-      case 'critical':
-        this.logger.error('Critical error occurred', err, logData);
-        break;
-      case 'high':
-        this.logger.error('High severity error', err, logData);
-        break;
-      case 'medium':
-        this.logger.warn('Medium severity error', logData);
-        break;
-      case 'low':
-        this.logger.info('Low severity error', logData);
-        break;
-      default:
-        this.logger.error('Unknown severity error', err, logData);
+    case 'critical':
+      this.logger.error('Critical error occurred', err, logData);
+      break;
+    case 'high':
+      this.logger.error('High severity error', err, logData);
+      break;
+    case 'medium':
+      this.logger.warn('Medium severity error', logData);
+      break;
+    case 'low':
+      this.logger.info('Low severity error', logData);
+      break;
+    default:
+      this.logger.error('Unknown severity error', err, logData);
     }
   }
 
@@ -310,7 +310,7 @@ class ErrorMiddleware {
    */
   generateErrorResponse(err, req, errorInfo) {
     const isProduction = process.env.NODE_ENV === 'production';
-    
+
     // Context7 Pattern: Different responses for production vs development
     if (isProduction) {
       return {
@@ -336,28 +336,32 @@ class ErrorMiddleware {
    */
   getStatusCode(err, errorInfo) {
     // Context7 Pattern: Map error types to status codes
-    if (err.statusCode) return err.statusCode;
-    if (err.status) return err.status;
-    
+    if (err.statusCode) {
+      return err.statusCode;
+    }
+    if (err.status) {
+      return err.status;
+    }
+
     switch (errorInfo.category) {
-      case 'validation':
-        return 400;
-      case 'authentication':
-        return 401;
-      case 'authorization':
-        return 403;
-      case 'not_found':
-        return 404;
-      case 'rate_limit':
-        return 429;
-      case 'timeout':
-        return 408;
-      case 'service_unavailable':
-        return 503;
-      case 'database':
-        return 500;
-      default:
-        return 500;
+    case 'validation':
+      return 400;
+    case 'authentication':
+      return 401;
+    case 'authorization':
+      return 403;
+    case 'not_found':
+      return 404;
+    case 'rate_limit':
+      return 429;
+    case 'timeout':
+      return 408;
+    case 'service_unavailable':
+      return 503;
+    case 'database':
+      return 500;
+    default:
+      return 500;
     }
   }
 
@@ -389,7 +393,7 @@ class ErrorMiddleware {
         suggestion: 'Please check the request data and try again'
       };
     }
-    
+
     return null;
   }
 
@@ -402,16 +406,16 @@ class ErrorMiddleware {
     }
 
     const sanitized = { ...data };
-    
+
     // Context7 Pattern: Remove sensitive data from logs
     const sensitiveFields = ['password', 'token', 'secret', 'key', 'auth'];
-    
+
     for (const field of sensitiveFields) {
       if (sanitized[field]) {
         sanitized[field] = '[REDACTED]';
       }
     }
-    
+
     return sanitized;
   }
 
@@ -428,25 +432,25 @@ class ErrorMiddleware {
       'GET /api/system-status',
       'GET /api/efficiency-metrics',
       'POST /api/cleanup',
-      
+
       // Market data routes
       'GET /api/market-data',
       'POST /api/market-data',
       'GET /api/market-data/summary',
-      
+
       // AI Trading routes
       'GET /api/ai-trading',
       'POST /api/ai-trading/sessions',
       'GET /api/ai-trading/sessions',
       'GET /api/ai-trading/system-status',
       'POST /api/ai-trading/signals',
-      
+
       // Auto Training routes
       'POST /api/auto-training/start',
       'POST /api/auto-training/stop',
       'GET /api/auto-training/status',
       'PUT /api/auto-training/config',
-      
+
       // Utility routes
       'GET /api/ping',
       'GET /api/version'

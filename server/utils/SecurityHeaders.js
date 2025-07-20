@@ -1,6 +1,6 @@
 /**
  * 🔒 Security Headers - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Comprehensive Security Headers Management
  * - OWASP recommended security headers
  * - Content Security Policy (CSP)
@@ -14,15 +14,15 @@ class SecurityHeaders {
       csp: {
         enabled: true,
         directives: {
-          'default-src': ["'self'"],
-          'script-src': ["'self'", "'unsafe-inline'"],
-          'style-src': ["'self'", "'unsafe-inline'"],
-          'img-src': ["'self'", 'data:', 'https:'],
-          'font-src': ["'self'"],
-          'connect-src': ["'self'", 'https://prices.runescape.wiki'],
-          'frame-ancestors': ["'none'"],
-          'base-uri': ["'self'"],
-          'object-src': ["'none'"]
+          'default-src': ['\'self\''],
+          'script-src': ['\'self\'', '\'unsafe-inline\''],
+          'style-src': ['\'self\'', '\'unsafe-inline\''],
+          'img-src': ['\'self\'', 'data:', 'https:'],
+          'font-src': ['\'self\''],
+          'connect-src': ['\'self\'', 'https://prices.runescape.wiki'],
+          'frame-ancestors': ['\'none\''],
+          'base-uri': ['\'self\''],
+          'object-src': ['\'none\'']
         },
         ...options.csp
       },
@@ -125,7 +125,7 @@ class SecurityHeaders {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    
+
     this.appliedHeaders['Cache-Control'] = 'no-cache, no-store, must-revalidate';
     this.appliedHeaders['Pragma'] = 'no-cache';
     this.appliedHeaders['Expires'] = '0';
@@ -136,7 +136,7 @@ class SecurityHeaders {
    */
   buildCSP() {
     const directives = [];
-    
+
     for (const [directive, sources] of Object.entries(this.options.csp.directives)) {
       if (Array.isArray(sources)) {
         directives.push(`${directive} ${sources.join(' ')}`);
@@ -153,11 +153,11 @@ class SecurityHeaders {
    */
   buildHSTS() {
     const parts = [`max-age=${this.options.hsts.maxAge}`];
-    
+
     if (this.options.hsts.includeSubDomains) {
       parts.push('includeSubDomains');
     }
-    
+
     if (this.options.hsts.preload) {
       parts.push('preload');
     }
@@ -170,15 +170,15 @@ class SecurityHeaders {
    */
   buildCrossOriginPolicies() {
     const policies = {};
-    
+
     if (this.options.crossOriginPolicies.embedderPolicy) {
       policies['Cross-Origin-Embedder-Policy'] = this.options.crossOriginPolicies.embedderPolicy;
     }
-    
+
     if (this.options.crossOriginPolicies.openerPolicy) {
       policies['Cross-Origin-Opener-Policy'] = this.options.crossOriginPolicies.openerPolicy;
     }
-    
+
     if (this.options.crossOriginPolicies.resourcePolicy) {
       policies['Cross-Origin-Resource-Policy'] = this.options.crossOriginPolicies.resourcePolicy;
     }
@@ -237,7 +237,7 @@ class SecurityHeaders {
     if (!this.options.csp.directives) {
       this.options.csp.directives = {};
     }
-    
+
     this.options.csp.directives[directive] = sources;
   }
 
@@ -248,7 +248,7 @@ class SecurityHeaders {
     if (!this.options.csp.directives[directive]) {
       this.options.csp.directives[directive] = [];
     }
-    
+
     if (!this.options.csp.directives[directive].includes(source)) {
       this.options.csp.directives[directive].push(source);
     }
@@ -259,7 +259,7 @@ class SecurityHeaders {
    */
   removeCSPSource(directive, source) {
     if (this.options.csp.directives[directive]) {
-      this.options.csp.directives[directive] = 
+      this.options.csp.directives[directive] =
         this.options.csp.directives[directive].filter(s => s !== source);
     }
   }
@@ -298,9 +298,9 @@ class SecurityHeaders {
       if (!this.options.csp.directives['default-src']) {
         issues.push('CSP: default-src directive is missing');
       }
-      
-      if (this.options.csp.directives['script-src'] && 
-          this.options.csp.directives['script-src'].includes("'unsafe-eval'")) {
+
+      if (this.options.csp.directives['script-src'] &&
+          this.options.csp.directives['script-src'].includes('\'unsafe-eval\'')) {
         issues.push('CSP: unsafe-eval in script-src reduces security');
       }
     }
@@ -334,8 +334,8 @@ class SecurityHeaders {
 
     // CSP recommendations
     if (this.options.csp.enabled) {
-      if (this.options.csp.directives['script-src'] && 
-          this.options.csp.directives['script-src'].includes("'unsafe-inline'")) {
+      if (this.options.csp.directives['script-src'] &&
+          this.options.csp.directives['script-src'].includes('\'unsafe-inline\'')) {
         recommendations.push('Consider removing unsafe-inline from script-src for better security');
       }
     }

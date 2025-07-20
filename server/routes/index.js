@@ -1,6 +1,6 @@
 /**
  * 🚀 Routes Index - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Centralized Route Management
  * - Modular route organization
  * - Consistent middleware application
@@ -140,7 +140,7 @@ router.get('/', (req, res) => {
         baseUrl: '/api/osrs-scraper',
         routes: [
           'POST /import/start - Start comprehensive OSRS data import',
-          'GET /status - Get current scraping operation status', 
+          'GET /status - Get current scraping operation status',
           'GET /data/latest - Get latest scraped market data',
           'GET /patterns - Get detected market patterns and anomalies',
           'GET /search - Search for specific item data',
@@ -180,10 +180,10 @@ router.get('/', (req, res) => {
 /**
  * Context7 Pattern: API Status endpoint
  */
-router.get('/status', async (req, res) => {
+router.get('/status', async(req, res) => {
   try {
     const startTime = Date.now();
-    
+
     // Quick health checks
     const status = {
       api: 'operational',
@@ -313,7 +313,7 @@ router.use('/', monitoringRoutes);
  * Context7 Pattern: Health check endpoint (simplified)
  */
 router.get('/ping', (req, res) => {
-  return ApiResponse.success(res, { 
+  return ApiResponse.success(res, {
     message: 'pong',
     timestamp: new Date().toISOString(),
     uptime: process.uptime()

@@ -1,6 +1,6 @@
 /**
  * 📤 API Response - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Standardized API Response System
  * - Consistent response format across all endpoints
  * - HTTP status code management
@@ -72,12 +72,12 @@ class ApiResponse {
         ...meta
       }
     };
-    
+
     // Add debugging info in development mode
     if (process.env.NODE_ENV !== 'production') {
       console.log('🔍 [ApiResponse] Bad Request Debug:', JSON.stringify(response, null, 2));
     }
-    
+
     return ApiResponse.send(res, response, 400);
   }
 
@@ -140,7 +140,7 @@ class ApiResponse {
    */
   static methodNotAllowed(res, message = 'Method not allowed', allowedMethods = [], meta = {}) {
     res.set('Allow', allowedMethods.join(', '));
-    
+
     return ApiResponse.send(res, {
       success: false,
       error: {
@@ -203,7 +203,7 @@ class ApiResponse {
     if (details && details.retryAfter) {
       res.set('Retry-After', details.retryAfter);
     }
-    
+
     return ApiResponse.send(res, {
       success: false,
       error: {
@@ -277,7 +277,7 @@ class ApiResponse {
    */
   static custom(res, statusCode, data, message = null, meta = {}) {
     const isSuccess = statusCode >= 200 && statusCode < 300;
-    
+
     const response = {
       success: isSuccess,
       ...(isSuccess ? { data } : { error: data }),
@@ -320,7 +320,7 @@ class ApiResponse {
    */
   static health(res, status, checks = {}, meta = {}) {
     const statusCode = status === 'healthy' ? 200 : 503;
-    
+
     return ApiResponse.send(res, {
       success: status === 'healthy',
       status,
@@ -366,10 +366,10 @@ class ApiResponse {
   static send(res, data, statusCode = 200, headers = {}) {
     // Set status code
     res.status(statusCode);
-    
+
     // Set headers
     ApiResponse.setHeaders(res, { headers });
-    
+
     // Send response
     return res.json(data);
   }
@@ -394,34 +394,34 @@ class ApiResponse {
    */
   static getCustomHeaders(meta = {}) {
     const customHeaders = {};
-    
+
     // Add request ID if present
     if (meta.requestId) {
       customHeaders['X-Request-ID'] = meta.requestId;
     }
-    
+
     // Add response time if present
     if (meta.responseTime) {
       customHeaders['X-Response-Time'] = `${meta.responseTime}ms`;
     }
-    
+
     // Add rate limit headers if present
     if (meta.rateLimit) {
       customHeaders['X-RateLimit-Limit'] = meta.rateLimit.limit;
       customHeaders['X-RateLimit-Remaining'] = meta.rateLimit.remaining;
       customHeaders['X-RateLimit-Reset'] = meta.rateLimit.reset;
     }
-    
+
     // Add API version if present
     if (meta.apiVersion) {
       customHeaders['X-API-Version'] = meta.apiVersion;
     }
-    
+
     // Add additional headers from meta
     if (meta.headers) {
       Object.assign(customHeaders, meta.headers);
     }
-    
+
     return customHeaders;
   }
 
@@ -460,7 +460,7 @@ class ApiResponse {
     try {
       JSON.stringify(data);
       return true;
-    } catch (error) {
+    } catch {
       return false;
     }
   }

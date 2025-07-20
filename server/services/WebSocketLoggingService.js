@@ -1,6 +1,6 @@
 /**
  * 🔌 WebSocket Logging Service - Context7 Optimized
- * 
+ *
  * Context7 Pattern: WebSocket Service for Live Console Output
  * - Streams backend logs to connected frontend clients
  * - Implements structured logging with filtering capabilities
@@ -26,16 +26,16 @@ class WebSocketLoggingService {
       services: options.services || [], // Empty means all services
       ...options
     };
-    
+
     this.clients = new Map();
     this.logBuffer = [];
     this.maxBufferSize = 1000;
     this.heartbeatInterval = null;
     this.isRunning = false;
-    
+
     // Initialize WebSocket server
     this.initializeWebSocketServer();
-    
+
     this.logger.info('🔌 WebSocket Logging Service initialized', {
       port: this.options.port,
       path: this.options.path,
@@ -61,12 +61,12 @@ class WebSocketLoggingService {
         ws.on('error', (error) => {
           this.logger.error('WebSocket client error', error);
         });
-        
+
         // Context7 Pattern: Heartbeat pong handler
         ws.on('pong', () => {
           ws.isAlive = true;
         });
-        
+
         this.handleConnection(ws, request);
       });
 
@@ -80,7 +80,7 @@ class WebSocketLoggingService {
 
       this.startHeartbeat();
       this.isRunning = true;
-      
+
       this.logger.info('✅ WebSocket server initialized successfully', {
         port: this.options.port,
         path: this.options.path
@@ -124,7 +124,7 @@ class WebSocketLoggingService {
 
       // Store client
       this.clients.set(clientId, clientInfo);
-      
+
       // Set up connection handlers
       ws.on('message', (message) => {
         this.handleMessage(clientId, message);
@@ -176,35 +176,37 @@ class WebSocketLoggingService {
   handleMessage(clientId, message) {
     try {
       const client = this.clients.get(clientId);
-      if (!client) return;
+      if (!client) {
+        return;
+      }
 
       const data = JSON.parse(message.toString());
-      
+
       switch (data.type) {
-        case 'filter':
-          this.handleFilterUpdate(clientId, data.filters);
-          break;
-        case 'ping':
-          this.sendToClient(clientId, { type: 'pong', timestamp: Date.now() });
-          break;
-        case 'subscribe':
-          this.handleSubscription(clientId, data.subscription);
-          break;
-        case 'unsubscribe':
-          this.handleUnsubscription(clientId, data.subscription);
-          break;
-        case 'request_buffer':
-          this.sendBufferedLogs(clientId);
-          break;
-        default:
-          this.logger.warn('Unknown message type received', { 
-            clientId, 
-            type: data.type 
-          });
+      case 'filter':
+        this.handleFilterUpdate(clientId, data.filters);
+        break;
+      case 'ping':
+        this.sendToClient(clientId, { type: 'pong', timestamp: Date.now() });
+        break;
+      case 'subscribe':
+        this.handleSubscription(clientId, data.subscription);
+        break;
+      case 'unsubscribe':
+        this.handleUnsubscription(clientId, data.subscription);
+        break;
+      case 'request_buffer':
+        this.sendBufferedLogs(clientId);
+        break;
+      default:
+        this.logger.warn('Unknown message type received', {
+          clientId,
+          type: data.type
+        });
       }
     } catch (error) {
-      this.logger.error('❌ Error handling WebSocket message', error, { 
-        clientId 
+      this.logger.error('❌ Error handling WebSocket message', error, {
+        clientId
       });
     }
   }
@@ -215,7 +217,9 @@ class WebSocketLoggingService {
   handleFilterUpdate(clientId, filters) {
     try {
       const client = this.clients.get(clientId);
-      if (!client) return;
+      if (!client) {
+        return;
+      }
 
       client.filters = {
         levels: filters.levels || this.options.logLevels,
@@ -234,8 +238,8 @@ class WebSocketLoggingService {
         filters: client.filters
       });
     } catch (error) {
-      this.logger.error('❌ Error updating client filters', error, { 
-        clientId 
+      this.logger.error('❌ Error updating client filters', error, {
+        clientId
       });
     }
   }
@@ -246,7 +250,9 @@ class WebSocketLoggingService {
   handleSubscription(clientId, subscription) {
     try {
       const client = this.clients.get(clientId);
-      if (!client) return;
+      if (!client) {
+        return;
+      }
 
       // Add subscription logic here
       // For now, just acknowledge
@@ -261,8 +267,8 @@ class WebSocketLoggingService {
         subscription
       });
     } catch (error) {
-      this.logger.error('❌ Error handling subscription', error, { 
-        clientId 
+      this.logger.error('❌ Error handling subscription', error, {
+        clientId
       });
     }
   }
@@ -273,7 +279,9 @@ class WebSocketLoggingService {
   handleUnsubscription(clientId, subscription) {
     try {
       const client = this.clients.get(clientId);
-      if (!client) return;
+      if (!client) {
+        return;
+      }
 
       // Add unsubscription logic here
       // For now, just acknowledge
@@ -288,8 +296,8 @@ class WebSocketLoggingService {
         subscription
       });
     } catch (error) {
-      this.logger.error('❌ Error handling unsubscription', error, { 
-        clientId 
+      this.logger.error('❌ Error handling unsubscription', error, {
+        clientId
       });
     }
   }
@@ -300,12 +308,14 @@ class WebSocketLoggingService {
   handleDisconnection(clientId, code, reason) {
     try {
       const client = this.clients.get(clientId);
-      if (!client) return;
+      if (!client) {
+        return;
+      }
 
       const duration = Date.now() - client.connectedAt.getTime();
-      
+
       this.clients.delete(clientId);
-      
+
       this.logger.info('🔌 WebSocket client disconnected', {
         clientId,
         code,
@@ -314,8 +324,8 @@ class WebSocketLoggingService {
         totalClients: this.clients.size
       });
     } catch (error) {
-      this.logger.error('❌ Error handling client disconnection', error, { 
-        clientId 
+      this.logger.error('❌ Error handling client disconnection', error, {
+        clientId
       });
     }
   }
@@ -334,8 +344,8 @@ class WebSocketLoggingService {
       client.ws.send(messageStr);
       return true;
     } catch (error) {
-      this.logger.error('❌ Error sending message to client', error, { 
-        clientId 
+      this.logger.error('❌ Error sending message to client', error, {
+        clientId
       });
       return false;
     }
@@ -362,8 +372,8 @@ class WebSocketLoggingService {
             failed++;
           }
         } catch (error) {
-          this.logger.error('❌ Error broadcasting to client', error, { 
-            clientId 
+          this.logger.error('❌ Error broadcasting to client', error, {
+            clientId
           });
           failed++;
         }
@@ -382,9 +392,11 @@ class WebSocketLoggingService {
   sendBufferedLogs(clientId) {
     try {
       const client = this.clients.get(clientId);
-      if (!client) return;
+      if (!client) {
+        return;
+      }
 
-      const filteredLogs = this.logBuffer.filter(log => 
+      const filteredLogs = this.logBuffer.filter(log =>
         this.shouldSendLogToClient(client, log)
       );
 
@@ -397,8 +409,8 @@ class WebSocketLoggingService {
         });
       }
     } catch (error) {
-      this.logger.error('❌ Error sending buffered logs', error, { 
-        clientId 
+      this.logger.error('❌ Error sending buffered logs', error, {
+        clientId
       });
     }
   }
@@ -414,14 +426,14 @@ class WebSocketLoggingService {
       }
 
       // Check service filter
-      if (client.filters.services.length > 0 && 
+      if (client.filters.services.length > 0 &&
           !client.filters.services.includes(log.service)) {
         return false;
       }
 
       // Check item ID filter
-      if (client.filters.itemIds.length > 0 && 
-          log.itemId && 
+      if (client.filters.itemIds.length > 0 &&
+          log.itemId &&
           !client.filters.itemIds.includes(log.itemId)) {
         return false;
       }
@@ -440,7 +452,7 @@ class WebSocketLoggingService {
     try {
       // Add to buffer
       this.logBuffer.push(logEntry);
-      
+
       // Maintain buffer size
       if (this.logBuffer.length > this.maxBufferSize) {
         this.logBuffer.shift();
@@ -454,7 +466,7 @@ class WebSocketLoggingService {
       };
 
       // Broadcast to filtered clients
-      const result = this.broadcastToClients(message, (client, msg) => 
+      const result = this.broadcastToClients(message, (client, msg) =>
         this.shouldSendLogToClient(client, msg.log)
       );
 
@@ -481,7 +493,7 @@ class WebSocketLoggingService {
           ws.terminate();
           return;
         }
-        
+
         ws.isAlive = false;
         ws.ping();
       });
@@ -538,7 +550,7 @@ class WebSocketLoggingService {
    */
   updateOptions(newOptions) {
     this.options = { ...this.options, ...newOptions };
-    
+
     this.logger.info('📝 WebSocket logging options updated', {
       newOptions: Object.keys(newOptions)
     });
@@ -550,25 +562,25 @@ class WebSocketLoggingService {
   async shutdown() {
     try {
       this.logger.info('🔌 Shutting down WebSocket Logging Service');
-      
+
       this.isRunning = false;
       this.stopHeartbeat();
-      
+
       // Close all client connections
       for (const [clientId, client] of this.clients) {
         if (client.ws.readyState === WebSocket.OPEN) {
           client.ws.close(1001, 'Server shutting down');
         }
       }
-      
+
       // Close WebSocket server
       if (this.wss) {
         this.wss.close();
       }
-      
+
       this.clients.clear();
       this.logBuffer = [];
-      
+
       this.logger.info('✅ WebSocket Logging Service shutdown completed');
     } catch (error) {
       this.logger.error('❌ Error shutting down WebSocket Logging Service', error);

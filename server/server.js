@@ -1,6 +1,6 @@
 /**
  * 🚀 OSRS Market Tracker Server - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Modern Express.js Application Architecture
  * - Layered architecture with proper separation of concerns
  * - Centralized error handling and logging
@@ -75,14 +75,14 @@ async function setupApplication() {
     app.use(requestMiddleware.requestTracking());
     app.use(requestMiddleware.performanceMonitoring());
     app.use(requestMiddleware.rateLimit(config.security.rateLimiting));
-    
+
     // Context7 Pattern: Body parsing middleware
     app.use(express.json({ limit: '10mb' }));
     app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-    
+
     // Context7 Pattern: Request sanitization
     app.use(requestMiddleware.sanitizeRequest());
-    
+
     // Context7 Pattern: Static file serving
     app.use(express.static(path.join(__dirname, '../dist'), {
       maxAge: config.environment === 'production' ? '1d' : '0',
@@ -99,7 +99,7 @@ async function setupApplication() {
       if (req.path.startsWith('/api/')) {
         return errorMiddleware.handleNotFound(req, res);
       }
-      
+
       res.sendFile(path.join(__dirname, '../dist/index.html'));
     });
 
@@ -120,31 +120,31 @@ async function setupApplication() {
 async function startServer() {
   try {
     const app = await setupApplication();
-    
+
     const server = app.listen(config.port, () => {
       logger.startup('OSRS Market Tracker', '1.0.0', config.port, {
         environment: config.environment,
         mongodb: config.mongodb.connectionString,
         cors: config.cors.origin
       });
-      
+
       console.log(`🚀 Server running on port ${config.port}`);
       console.log(`📊 Dashboard: http://localhost:${config.port}`);
       console.log(`🔗 API: http://localhost:${config.port}/api`);
-      console.log(`✅ Context7 optimizations active:`);
-      console.log(`   - Layered architecture with proper separation`);
-      console.log(`   - Centralized error handling and logging`);
-      console.log(`   - Performance monitoring and optimization`);
-      console.log(`   - Request validation and sanitization`);
-      console.log(`   - Rate limiting and security headers`);
-      console.log(`   - Graceful shutdown handling`);
-      
+      console.log('✅ Context7 optimizations active:');
+      console.log('   - Layered architecture with proper separation');
+      console.log('   - Centralized error handling and logging');
+      console.log('   - Performance monitoring and optimization');
+      console.log('   - Request validation and sanitization');
+      console.log('   - Rate limiting and security headers');
+      console.log('   - Graceful shutdown handling');
+
       // Start the OSRS market data scheduler (5m + 1h data)
       try {
         const { MarketDataScheduler } = require('./services/MarketDataScheduler');
         marketDataScheduler = new MarketDataScheduler();
         marketDataScheduler.start();
-        console.log(`📅 Market data scheduler started - collecting 5m + 1h data every 5 minutes`);
+        console.log('📅 Market data scheduler started - collecting 5m + 1h data every 5 minutes');
       } catch (schedulerError) {
         logger.error('Failed to start market data scheduler', schedulerError);
       }
@@ -153,7 +153,7 @@ async function startServer() {
     // Context7 Pattern: Server error handling
     server.on('error', (error) => {
       logger.error('Server error', error);
-      
+
       if (error.code === 'EADDRINUSE') {
         logger.error(`Port ${config.port} is already in use`);
         process.exit(1);
@@ -162,7 +162,7 @@ async function startServer() {
 
     // Context7 Pattern: Graceful shutdown setup
     setupGracefulShutdown(server);
-    
+
     return server;
   } catch (error) {
     logger.error('Failed to start server', error);
@@ -174,36 +174,36 @@ async function startServer() {
  * Context7 Pattern: Graceful shutdown handling
  */
 function setupGracefulShutdown(server) {
-  const gracefulShutdown = async (signal) => {
+  const gracefulShutdown = async(signal) => {
     logger.info(`Received ${signal}, starting graceful shutdown`);
-    
+
     // Stop accepting new connections
-    server.close(async () => {
+    server.close(async() => {
       logger.info('HTTP server closed');
-      
+
       try {
         // Close database connections and cleanup resources
         await performCleanup();
-        
+
         logger.shutdown('OSRS Market Tracker', 'Graceful shutdown', {
           signal,
           uptime: process.uptime()
         });
-        
+
         process.exit(0);
       } catch (error) {
         logger.error('Error during graceful shutdown', error);
         process.exit(1);
       }
     });
-    
+
     // Force shutdown after 30 seconds
     setTimeout(() => {
       logger.error('Forcing shutdown after 30 seconds');
       process.exit(1);
     }, 30000);
   };
-  
+
   // Handle shutdown signals
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
@@ -214,7 +214,7 @@ function setupGracefulShutdown(server) {
  */
 async function performCleanup() {
   logger.info('Performing application cleanup');
-  
+
   try {
     // Stop the market data scheduler
     if (marketDataScheduler) {
@@ -222,7 +222,7 @@ async function performCleanup() {
       marketDataScheduler.stop();
       marketDataScheduler = null;
     }
-    
+
     // Cleanup operations would go here
     // For example: close database connections, clear caches, etc.
     logger.info('Application cleanup completed');
@@ -239,7 +239,7 @@ function setupProcessErrorHandling() {
   // Handle uncaught exceptions
   process.on('uncaughtException', (error) => {
     logger.fatal('Uncaught Exception', error);
-    
+
     // Perform emergency cleanup
     performCleanup()
       .finally(() => {
@@ -252,7 +252,7 @@ function setupProcessErrorHandling() {
     logger.fatal('Unhandled Rejection', reason, {
       promise: promise.toString()
     });
-    
+
     // Perform emergency cleanup
     performCleanup()
       .finally(() => {
@@ -278,7 +278,7 @@ function setupHealthMonitoring() {
   setInterval(() => {
     const memoryUsage = process.memoryUsage();
     const memoryUsedMB = Math.round(memoryUsage.heapUsed / 1024 / 1024);
-    
+
     if (memoryUsedMB > 500) { // 500MB threshold
       logger.warn('High memory usage detected', {
         memoryUsedMB,
@@ -286,20 +286,20 @@ function setupHealthMonitoring() {
       });
     }
   }, 60000); // Check every minute
-  
+
   // CPU usage monitoring
   let previousCpuUsage = process.cpuUsage();
   setInterval(() => {
     const currentCpuUsage = process.cpuUsage(previousCpuUsage);
     const cpuPercent = (currentCpuUsage.user + currentCpuUsage.system) / 1000000; // Convert to seconds
-    
+
     if (cpuPercent > 80) { // 80% threshold
       logger.warn('High CPU usage detected', {
         cpuPercent,
         cpuUsage: currentCpuUsage
       });
     }
-    
+
     previousCpuUsage = process.cpuUsage();
   }, 30000); // Check every 30 seconds
 }
@@ -310,16 +310,16 @@ function setupHealthMonitoring() {
 async function initialize() {
   try {
     logger.info('Initializing Context7 optimized OSRS Market Tracker');
-    
+
     // Setup error handling
     setupProcessErrorHandling();
-    
+
     // Setup health monitoring
     setupHealthMonitoring();
-    
+
     // Start the server
     await startServer();
-    
+
     logger.info('OSRS Market Tracker initialized successfully');
   } catch (error) {
     logger.error('Failed to initialize application', error);

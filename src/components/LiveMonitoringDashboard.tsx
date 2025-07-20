@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { 
   LineChart, Line, 
   ResponsiveContainer, XAxis, YAxis, CartesianGrid, 
@@ -45,7 +45,7 @@ type LogEntry = {
   traceId?: string
 }
 
-type WebSocketLogMessage = {
+type _WebSocketLogMessage = {
   type: 'log'
   data: LogEntry
 }
@@ -69,7 +69,7 @@ const LiveMonitoringDashboard: React.FC = () => {
   const [requestInProgress, setRequestInProgress] = useState(false)
   const requestCacheRef = useRef<{ [key: string]: { data: any, timestamp: number } }>({})
   const [isConnectedToMongo, setIsConnectedToMongo] = useState(false)
-  const [aggregatedStats, setAggregatedStats] = useState<{
+  const [_aggregatedStats, setAggregatedStats] = useState<{
     marketData?: Record<string, unknown>;
     monitoring?: Record<string, unknown>;
   } | null>(null)
@@ -99,7 +99,7 @@ const LiveMonitoringDashboard: React.FC = () => {
   const [webSocketError, setWebSocketError] = useState<string | null>(null)
 
   // WebSocket connection with useWebSocket hook - Context7 optimized
-  const { readyState, lastMessage } = useWebSocket(socketUrl, {
+  const { readyState, lastMessage: _lastMessage } = useWebSocket(socketUrl, {
     onOpen: () => {
       setIsWebSocketConnected(true)
       setWebSocketError(null)
@@ -160,7 +160,7 @@ const LiveMonitoringDashboard: React.FC = () => {
   // System actions should come from real backend events only
 
   // Add new system action and manage notifications
-  const addSystemAction = (action: SystemAction) => {
+  const _addSystemAction = (action: SystemAction) => {
     setSystemActions(prev => {
       const safeArray = Array.isArray(prev) ? prev : []
       const updated = [action, ...safeArray].slice(0, 1000) // Keep last 1000 actions

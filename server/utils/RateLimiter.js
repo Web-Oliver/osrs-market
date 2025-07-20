@@ -1,6 +1,6 @@
 /**
  * 🚦 Rate Limiter - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Advanced Rate Limiting System
  * - Token bucket algorithm for smooth rate limiting
  * - Sliding window implementation
@@ -29,7 +29,7 @@ class RateLimiter {
 
     const now = Date.now();
     const windowStart = now - windowMs;
-    
+
     // Get or create window for key
     let window = this.windows.get(key);
     if (!window) {
@@ -47,7 +47,7 @@ class RateLimiter {
 
     // Check if limit exceeded
     const exceeded = window.count >= max;
-    
+
     if (!exceeded) {
       // Add current request
       window.requests.push(now);
@@ -80,7 +80,7 @@ class RateLimiter {
     } = options;
 
     const now = Date.now();
-    
+
     // Get or create bucket for key
     let bucket = this.windows.get(`bucket_${key}`);
     if (!bucket) {
@@ -99,7 +99,7 @@ class RateLimiter {
 
     // Check if enough tokens available
     const exceeded = bucket.tokens < cost;
-    
+
     if (!exceeded) {
       bucket.tokens -= cost;
     }
@@ -126,7 +126,7 @@ class RateLimiter {
     const now = Date.now();
     const subWindowMs = windowMs / precision;
     const currentWindow = Math.floor(now / subWindowMs);
-    
+
     // Get or create sliding window for key
     let window = this.windows.get(`sliding_${key}`);
     if (!window) {
@@ -148,7 +148,7 @@ class RateLimiter {
 
     // Check if limit exceeded
     const exceeded = window.totalCount >= max;
-    
+
     if (!exceeded) {
       // Add to current sub-window
       const currentCount = window.subWindows.get(currentWindow) || 0;
@@ -180,7 +180,7 @@ class RateLimiter {
     } = options;
 
     const now = Date.now();
-    
+
     // Get or create adaptive window for key
     let window = this.windows.get(`adaptive_${key}`);
     if (!window) {
@@ -194,13 +194,13 @@ class RateLimiter {
     }
 
     const windowStart = now - windowMs;
-    
+
     // Remove old data
     window.requests = window.requests.filter(r => r.timestamp > windowStart);
     window.errors = window.errors.filter(e => e.timestamp > windowStart);
 
     // Calculate error rate
-    const errorRate = window.requests.length > 0 ? 
+    const errorRate = window.requests.length > 0 ?
       window.errors.length / window.requests.length : 0;
 
     // Adapt limit based on error rate
@@ -215,7 +215,7 @@ class RateLimiter {
 
     // Check current limit
     const exceeded = window.requests.length >= window.currentLimit;
-    
+
     if (!exceeded) {
       window.requests.push({ timestamp: now });
     }
@@ -304,7 +304,7 @@ class RateLimiter {
     }
 
     keysToDelete.forEach(key => this.windows.delete(key));
-    
+
     return keysToDelete.length;
   }
 
@@ -313,7 +313,7 @@ class RateLimiter {
    */
   getMemoryUsage() {
     let totalSize = 0;
-    
+
     for (const [key, window] of this.windows.entries()) {
       totalSize += key.length * 2; // String overhead
       totalSize += JSON.stringify(window).length * 2; // Rough estimate

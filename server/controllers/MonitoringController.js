@@ -1,6 +1,6 @@
 /**
  * 📊 Monitoring Controller - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Controller Layer
  * - Handles HTTP requests and responses
  * - Thin controllers with business logic in services
@@ -18,7 +18,7 @@ class MonitoringController {
   constructor() {
     this.monitoringService = new MonitoringService();
     this.logger = new Logger('MonitoringController');
-    
+
     // Context7 Pattern: Bind methods to preserve 'this' context
     this.getLiveData = this.getLiveData.bind(this);
     this.saveLiveData = this.saveLiveData.bind(this);
@@ -36,7 +36,7 @@ class MonitoringController {
    */
   async getLiveData(req, res, next) {
     try {
-      this.logger.info('Fetching live monitoring data', { 
+      this.logger.info('Fetching live monitoring data', {
         query: req.query,
         ip: req.ip,
         userAgent: req.get('User-Agent')
@@ -133,7 +133,7 @@ class MonitoringController {
       res.write(`data: ${JSON.stringify({ type: 'connected', timestamp: Date.now() })}\n\n`);
 
       // Set up interval to send real monitoring data
-      const intervalId = setInterval(async () => {
+      const intervalId = setInterval(async() => {
         try {
           const data = await this.monitoringService.getLiveMonitoringData(1);
           if (data && data.length > 0) {
@@ -261,6 +261,7 @@ class MonitoringController {
    * Context7 Pattern: Get health status
    * GET /api/health
    */
+  // eslint-disable-next-line no-unused-vars
   async getHealthStatus(req, res, next) {
     try {
       this.logger.info('Performing health check', {
@@ -270,7 +271,7 @@ class MonitoringController {
       const health = await this.monitoringService.getHealthStatus();
 
       const statusCode = health.status === 'healthy' ? 200 : 503;
-      
+
       this.logger.info('Health check completed', {
         status: health.status,
         mongodb: health.mongodb,
@@ -282,7 +283,7 @@ class MonitoringController {
       this.logger.error('Error performing health check', error, {
         requestId: req.id
       });
-      
+
       // Context7 Pattern: Always return health status even on error
       return ApiResponse.custom(res, 503, {
         status: 'unhealthy',

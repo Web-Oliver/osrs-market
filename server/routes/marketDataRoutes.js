@@ -1,6 +1,6 @@
 /**
  * 📈 Market Data Routes - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Express Router with Modern Patterns
  * - Layered architecture with proper separation
  * - Middleware integration for validation and security
@@ -93,19 +93,19 @@ router.post(
       confidence: { type: 'number', optional: true, min: 0, max: 1 }
     }
   }),
-  async (req, res) => {
+  async(req, res) => {
     try {
       const { MarketDataService } = require('../services/MarketDataService');
       const marketDataService = new MarketDataService();
       const snapshot = await marketDataService.saveMarketSnapshot(req.body);
-      
+
       res.status(201).json({
         success: true,
         data: snapshot,
         timestamp: Date.now()
       });
     } catch (error) {
-      if (error.message.includes('Missing required fields') || 
+      if (error.message.includes('Missing required fields') ||
           error.message.includes('Invalid interval') ||
           error.message.includes('High price cannot be less than low price') ||
           error.message.includes('RSI must be between 0 and 100')) {
@@ -131,11 +131,11 @@ router.post(
  */
 router.get(
   '/health',
-  async (req, res) => {
+  async(req, res) => {
     try {
       const { MarketDataService } = require('../services/MarketDataService');
       const marketDataService = new MarketDataService();
-      
+
       // Basic health check
       const healthStatus = {
         status: 'healthy',
@@ -145,7 +145,7 @@ router.get(
         database: 'connected',
         uptime: process.uptime()
       };
-      
+
       res.status(200).json({
         success: true,
         data: healthStatus,
@@ -192,27 +192,27 @@ router.get(
       endDate: { type: 'string', optional: true, pattern: '^[0-9]+$' }
     }
   }),
-  async (req, res) => {
+  async(req, res) => {
     try {
       const { MarketDataService } = require('../services/MarketDataService');
       const marketDataService = new MarketDataService();
       const itemId = parseInt(req.params.itemId);
       const { interval = '1h', limit = 200, startDate, endDate } = req.query;
-      
+
       // Convert string parameters to appropriate types
       const startDateNum = startDate ? parseInt(startDate) : undefined;
       const endDateNum = endDate ? parseInt(endDate) : undefined;
-      
+
       const snapshots = await marketDataService.getMarketSnapshots(
         itemId,
         interval,
         startDateNum,
         endDateNum
       );
-      
+
       // Limit results if requested
       const limitedSnapshots = limit ? snapshots.slice(0, parseInt(limit)) : snapshots;
-      
+
       res.status(200).json({
         success: true,
         data: limitedSnapshots,
@@ -265,13 +265,13 @@ router.get(
       limit: { type: 'string', optional: true }
     }
   }),
-  async (req, res) => {
+  async(req, res) => {
     try {
       const { MarketDataService } = require('../services/MarketDataService');
       const marketDataService = new MarketDataService();
-      
+
       const { interval = '5m' } = req.query;
-      
+
       let liveData, source;
       if (interval === '1h') {
         liveData = await marketDataService.get1HourMarketData();
@@ -280,7 +280,7 @@ router.get(
         liveData = await marketDataService.get5MinuteMarketData();
         source = 'osrs_wiki_5m';
       }
-      
+
       res.json({
         success: true,
         data: liveData,
@@ -316,24 +316,24 @@ router.get(
       endDate: { type: 'string', optional: true, pattern: '^[0-9]+$' }
     }
   }),
-  async (req, res) => {
+  async(req, res) => {
     try {
       const { MarketDataService } = require('../services/MarketDataService');
       const marketDataService = new MarketDataService();
       const itemId = parseInt(req.params.itemId);
       const { interval, startDate, endDate } = req.query;
-      
+
       // Convert string parameters to appropriate types
       const startDateNum = startDate ? parseInt(startDate) : undefined;
       const endDateNum = endDate ? parseInt(endDate) : undefined;
-      
+
       const snapshots = await marketDataService.getMarketSnapshots(
         itemId,
         interval,
         startDateNum,
         endDateNum
       );
-      
+
       if (snapshots.length === 0) {
         res.status(404).json({
           success: false,
@@ -574,66 +574,18 @@ router.get(
 );
 
 /**
- * Context7 Pattern: GET /api/market-data/live
- * Get live market data from OSRS Wiki API
- * Supports both 5-minute (default) and 1-hour data, and optional itemIds filtering
- */
-router.get(
-  '/live',
-  requestMiddleware.validateRequest({
-    query: {
-      interval: { type: 'string', optional: true, enum: ['5m', '1h'] },
-      itemIds: { type: 'string', optional: true }, // comma-separated list
-      limit: { type: 'string', optional: true }
-    }
-  }),
-  async (req, res) => {
-    try {
-      const { MarketDataService } = require('../services/MarketDataService');
-      const marketDataService = new MarketDataService();
-      
-      const { interval = '5m' } = req.query;
-      
-      let liveData, source;
-      if (interval === '1h') {
-        liveData = await marketDataService.get1HourMarketData();
-        source = 'osrs_wiki_1h';
-      } else {
-        liveData = await marketDataService.get5MinuteMarketData();
-        source = 'osrs_wiki_5m';
-      }
-      
-      res.json({
-        success: true,
-        data: liveData,
-        count: Object.keys(liveData).length,
-        timestamp: Date.now(),
-        source: source,
-        interval: interval
-      });
-    } catch (error) {
-      res.status(500).json({
-        success: false,
-        error: error.message,
-        timestamp: Date.now()
-      });
-    }
-  }
-);
-
-/**
  * Context7 Pattern: POST /api/market-data/sync-5m
  * Manually trigger 5-minute data sync
  */
 router.post(
   '/sync-5m',
-  async (req, res) => {
+  async(req, res) => {
     try {
       const { MarketDataService } = require('../services/MarketDataService');
       const marketDataService = new MarketDataService();
-      
+
       const result = await marketDataService.sync5MinuteData();
-      
+
       res.json({
         success: true,
         message: '5-minute market data synced successfully',
@@ -656,13 +608,13 @@ router.post(
  */
 router.post(
   '/sync-1h',
-  async (req, res) => {
+  async(req, res) => {
     try {
       const { MarketDataService } = require('../services/MarketDataService');
       const marketDataService = new MarketDataService();
-      
+
       const result = await marketDataService.sync1HourData();
-      
+
       res.json({
         success: true,
         message: '1-hour market data synced successfully',
@@ -685,13 +637,13 @@ router.post(
  */
 router.get(
   '/1h',
-  async (req, res) => {
+  async(req, res) => {
     try {
       const { MarketDataService } = require('../services/MarketDataService');
       const marketDataService = new MarketDataService();
-      
+
       const hourlyData = await marketDataService.get1HourMarketData();
-      
+
       res.json({
         success: true,
         data: hourlyData,
@@ -724,21 +676,21 @@ router.get(
       force: { type: 'string', optional: true, enum: ['true', 'false'] }
     }
   }),
-  async (req, res) => {
+  async(req, res) => {
     try {
       const { MarketDataService } = require('../services/MarketDataService');
       const marketDataService = new MarketDataService();
-      
+
       const itemId = parseInt(req.params.itemId);
       const { timestep = '5m', force = 'false' } = req.query;
-      
+
       // Check if we have recent stored data first
       const storedData = await marketDataService.getStoredTimeseriesData(itemId, timestep, 1);
-      const hasRecentData = storedData.length > 0 && 
+      const hasRecentData = storedData.length > 0 &&
         (Date.now() - storedData[0].fetchedAt) < (24 * 60 * 60 * 1000); // Less than 24 hours old
-      
+
       let timeseriesData = null;
-      
+
       if (force === 'true' || !hasRecentData) {
         try {
           // Fetch new timeseries data with rate limiting
@@ -758,7 +710,7 @@ router.get(
         // Use stored data
         timeseriesData = storedData[0];
       }
-      
+
       res.json({
         success: true,
         data: timeseriesData,
@@ -769,7 +721,7 @@ router.get(
         },
         timestamp: Date.now()
       });
-      
+
     } catch (error) {
       res.status(500).json({
         success: false,
@@ -795,27 +747,27 @@ router.get(
       limit: { type: 'string', optional: true }
     }
   }),
-  async (req, res) => {
+  async(req, res) => {
     try {
       const { MarketDataService } = require('../services/MarketDataService');
       const marketDataService = new MarketDataService();
-      
+
       const itemId = parseInt(req.params.itemId);
       const { timestep = '5m', limit = 10 } = req.query;
-      
+
       const storedData = await marketDataService.getStoredTimeseriesData(
-        itemId, 
-        timestep, 
+        itemId,
+        timestep,
         parseInt(limit)
       );
-      
+
       res.json({
         success: true,
         data: storedData,
         count: storedData.length,
         timestamp: Date.now()
       });
-      
+
     } catch (error) {
       res.status(500).json({
         success: false,
@@ -841,16 +793,16 @@ router.post(
       force: { type: 'boolean', optional: true }
     }
   }),
-  async (req, res) => {
+  async(req, res) => {
     try {
       const { MarketDataService } = require('../services/MarketDataService');
       const marketDataService = new MarketDataService();
-      
+
       const itemId = parseInt(req.params.itemId);
       const { timestep = '5m', force = false } = req.body;
-      
+
       const timeseriesData = await marketDataService.getTimeseriesData(itemId, timestep);
-      
+
       if (!timeseriesData) {
         return res.json({
           success: true,
@@ -859,14 +811,14 @@ router.post(
           timestamp: Date.now()
         });
       }
-      
+
       res.json({
         success: true,
         data: timeseriesData,
         message: 'Timeseries analysis completed successfully',
         timestamp: Date.now()
       });
-      
+
     } catch (error) {
       if (error.message.includes('Rate limit exceeded')) {
         return res.status(429).json({
@@ -875,7 +827,7 @@ router.post(
           timestamp: Date.now()
         });
       }
-      
+
       res.status(500).json({
         success: false,
         error: error.message,
@@ -891,7 +843,7 @@ router.post(
  */
 router.get(
   '/scheduler/status',
-  async (req, res) => {
+  async(req, res) => {
     try {
       // Note: In production, you'd get this from a singleton scheduler instance
       res.json({
@@ -926,14 +878,14 @@ router.get(
       itemIds: { type: 'string', optional: true } // comma-separated list
     }
   }),
-  async (req, res) => {
+  async(req, res) => {
     try {
       const { itemIds } = req.query;
-      
+
       const prices = await marketDataController.getLatestPrices(
         itemIds ? itemIds.split(',').map(id => parseInt(id)) : null
       );
-      
+
       res.json({
         success: true,
         data: prices,
@@ -957,13 +909,13 @@ router.get(
  */
 router.post(
   '/collect-latest',
-  async (req, res) => {
+  async(req, res) => {
     try {
       const { DataCollectionService } = require('../services/DataCollectionService');
       const dataCollectionService = new DataCollectionService();
-      
+
       const result = await dataCollectionService.collectLatestMarketData();
-      
+
       res.json({
         success: true,
         message: 'Latest market data collection completed',

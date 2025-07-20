@@ -1,6 +1,6 @@
 /**
  * 📢 Notification Service - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Centralized Notification System
  * - Multiple notification channels
  * - Priority-based routing
@@ -108,13 +108,13 @@ class NotificationService {
   async send(notification) {
     try {
       const processedNotification = this.processNotification(notification);
-      
+
       // Add to queue
       this.queue.push(processedNotification);
-      
+
       // Process queue
       await this.processQueue();
-      
+
       return {
         success: true,
         notificationId: processedNotification.id,
@@ -155,10 +155,10 @@ class NotificationService {
   async processQueue() {
     while (this.queue.length > 0) {
       const notification = this.queue.shift();
-      
+
       try {
         await this.deliver(notification);
-        
+
         // Add to history
         this.addToHistory(notification, 'delivered');
       } catch (error) {
@@ -203,22 +203,22 @@ class NotificationService {
   async deliverToConsole(notification) {
     const message = notification.subject || notification.body || 'Notification';
     const priority = notification.priority || 'medium';
-    
+
     switch (priority) {
-      case 'critical':
-        console.error(`🚨 [CRITICAL] ${message}`);
-        break;
-      case 'high':
-        console.warn(`⚠️ [HIGH] ${message}`);
-        break;
-      case 'medium':
-        console.info(`📊 [MEDIUM] ${message}`);
-        break;
-      case 'low':
-        console.log(`ℹ️ [LOW] ${message}`);
-        break;
-      default:
-        console.log(`📢 [NOTIFICATION] ${message}`);
+    case 'critical':
+      console.error(`🚨 [CRITICAL] ${message}`);
+      break;
+    case 'high':
+      console.warn(`⚠️ [HIGH] ${message}`);
+      break;
+    case 'medium':
+      console.info(`📊 [MEDIUM] ${message}`);
+      break;
+    case 'low':
+      console.log(`ℹ️ [LOW] ${message}`);
+      break;
+    default:
+      console.log(`📢 [NOTIFICATION] ${message}`);
     }
   }
 
@@ -251,12 +251,12 @@ class NotificationService {
    */
   applyTemplate(template, data) {
     let result = template;
-    
+
     Object.entries(data).forEach(([key, value]) => {
       const placeholder = `{{${key}}}`;
       result = result.replace(new RegExp(placeholder, 'g'), value);
     });
-    
+
     return result;
   }
 
@@ -275,7 +275,7 @@ class NotificationService {
     };
 
     this.history.push(historyEntry);
-    
+
     // Keep history within limits
     if (this.history.length > this.maxHistory) {
       this.history.shift();

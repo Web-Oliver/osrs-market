@@ -1,6 +1,6 @@
 /**
  * 🔍 Market Data Validator - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Validation Layer
  * - Centralized validation logic
  * - Reusable validation schemas
@@ -83,7 +83,7 @@ class MarketDataValidator extends BaseValidator {
    */
   saveMarketData(data) {
     const validation = this.validateData(data, this.validationSchemas.saveMarketData);
-    
+
     if (!validation.isValid) {
       return validation;
     }
@@ -132,29 +132,29 @@ class MarketDataValidator extends BaseValidator {
    */
   validateMarketDataItems(items) {
     const errors = [];
-    
+
     items.forEach((item, index) => {
       if (!item.itemId || typeof item.itemId !== 'number') {
         errors.push(`Item ${index}: itemId is required and must be a number`);
       }
-      
+
       if (!item.itemName || typeof item.itemName !== 'string') {
         errors.push(`Item ${index}: itemName is required and must be a string`);
       }
-      
+
       if (!item.priceData || typeof item.priceData !== 'object') {
         errors.push(`Item ${index}: priceData is required and must be an object`);
       } else {
         if (item.priceData.high !== null && typeof item.priceData.high !== 'number') {
           errors.push(`Item ${index}: priceData.high must be a number or null`);
         }
-        
+
         if (item.priceData.low !== null && typeof item.priceData.low !== 'number') {
           errors.push(`Item ${index}: priceData.low must be a number or null`);
         }
       }
     });
-    
+
     return {
       isValid: errors.length === 0,
       errors
@@ -168,12 +168,12 @@ class MarketDataValidator extends BaseValidator {
     if (!itemId) {
       return { isValid: false, error: 'Item ID is required' };
     }
-    
+
     const numericId = parseInt(itemId);
     if (isNaN(numericId) || numericId < 1) {
       return { isValid: false, error: 'Item ID must be a positive number' };
     }
-    
+
     return { isValid: true, itemId: numericId };
   }
 
@@ -182,18 +182,18 @@ class MarketDataValidator extends BaseValidator {
    */
   validateTimeRange(startTime, endTime) {
     const errors = [];
-    
+
     if (startTime && endTime) {
       const start = parseInt(startTime);
       const end = parseInt(endTime);
-      
+
       if (isNaN(start) || isNaN(end)) {
         errors.push('Start time and end time must be valid numbers');
       } else if (start >= end) {
         errors.push('Start time must be before end time');
       }
     }
-    
+
     return {
       isValid: errors.length === 0,
       errors
@@ -207,15 +207,15 @@ class MarketDataValidator extends BaseValidator {
     const errors = [];
     const validSortFields = ['timestamp', 'itemId', 'profit', 'volume', 'price', 'name', 'relevance'];
     const validSortOrders = ['asc', 'desc'];
-    
+
     if (sortBy && !validSortFields.includes(sortBy)) {
       errors.push(`sortBy must be one of: ${validSortFields.join(', ')}`);
     }
-    
+
     if (sortOrder && !validSortOrders.includes(sortOrder)) {
       errors.push(`sortOrder must be one of: ${validSortOrders.join(', ')}`);
     }
-    
+
     return {
       isValid: errors.length === 0,
       errors
@@ -229,15 +229,15 @@ class MarketDataValidator extends BaseValidator {
     if (!query || typeof query !== 'string') {
       return { isValid: false, error: 'Search query is required and must be a string' };
     }
-    
+
     if (query.trim().length < 2) {
       return { isValid: false, error: 'Search query must be at least 2 characters long' };
     }
-    
+
     if (query.length > 100) {
       return { isValid: false, error: 'Search query must not exceed 100 characters' };
     }
-    
+
     return { isValid: true, query: query.trim() };
   }
 }

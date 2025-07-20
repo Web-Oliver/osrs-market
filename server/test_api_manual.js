@@ -55,7 +55,7 @@ async function testApiEndpoints() {
     server.close();
     await mongoose.connection.close();
     console.log('\nTest completed successfully!');
-    
+
   } catch (error) {
     console.error('Test failed:', error);
     process.exit(1);

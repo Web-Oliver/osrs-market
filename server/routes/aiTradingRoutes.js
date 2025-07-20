@@ -1,6 +1,6 @@
 /**
  * 🤖 AI Trading Routes - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Routes Layer for AI Trading Operations
  * - Handles AI trading session management endpoints
  * - Provides neural network training and prediction routes
@@ -27,11 +27,11 @@ const logger = new Logger('AITradingRoutes');
 const validateSessionId = (req, res, next) => {
   const { sessionId } = req.params;
   const validation = validateRequest.validateSessionId(sessionId);
-  
+
   if (!validation.isValid) {
     return ApiResponse.badRequest(res, 'Invalid session ID', validation.errors);
   }
-  
+
   next();
 };
 

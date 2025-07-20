@@ -1,6 +1,6 @@
 /**
  * 🎯 Smart Item Selector Service - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Service Layer for Smart Item Selection
  * - Focuses on high-value trading opportunities
  * - Reduces API calls by targeting profitable items
@@ -40,19 +40,19 @@ class SmartItemSelectorService {
       // Get latest prices from OSRS Wiki API
       const latestPrices = await this.osrsWikiService.getLatestPrices();
       const itemMapping = await this.osrsWikiService.getItemMapping();
-      
+
       const highValueItems = [];
       const priceData = latestPrices.data || {};
-      
+
       // Filter for high-value items
       for (const [itemIdStr, prices] of Object.entries(priceData)) {
         const itemId = parseInt(itemIdStr);
         const itemInfo = itemMapping.find(item => item.id === itemId);
-        
+
         if (itemInfo && prices.high && prices.high >= 100000) { // 100k gp minimum
           const spread = prices.high - prices.low;
           const spreadPercent = prices.low > 0 ? (spread / prices.low) * 100 : 0;
-          
+
           if (spreadPercent >= 2) { // At least 2% spread for profitability
             highValueItems.push({
               itemId: itemId,
@@ -67,14 +67,14 @@ class SmartItemSelectorService {
           }
         }
       }
-      
+
       // Sort by profit potential and take top items
       const sortedItems = highValueItems
         .sort((a, b) => b.profitPotential - a.profitPotential)
         .slice(0, limit);
 
       this.setCachedResult(cacheKey, sortedItems);
-      
+
       this.logger.debug('Successfully retrieved high-value items', {
         count: highValueItems.length
       });
@@ -108,23 +108,23 @@ class SmartItemSelectorService {
         this.osrsWikiService.getLatestPrices(),
         this.osrsWikiService.get5MinutePrices()
       ]);
-      
+
       const itemMapping = await this.osrsWikiService.getItemMapping();
-      
+
       const trendingItems = [];
       const latestData = latestPrices.data || {};
       const fiveMinData = fiveMinPrices.data || {};
-      
+
       // Find items with significant price changes
       for (const [itemIdStr, latestPrice] of Object.entries(latestData)) {
         const itemId = parseInt(itemIdStr);
         const itemInfo = itemMapping.find(item => item.id === itemId);
         const fiveMinPrice = fiveMinData[itemIdStr];
-        
+
         if (itemInfo && latestPrice.high && fiveMinPrice?.avgHighPrice) {
           const priceChange = latestPrice.high - fiveMinPrice.avgHighPrice;
           const priceChangePercent = (priceChange / fiveMinPrice.avgHighPrice) * 100;
-          
+
           // Filter for significant price changes (5% or more)
           if (Math.abs(priceChangePercent) >= 5) {
             trendingItems.push({
@@ -141,14 +141,14 @@ class SmartItemSelectorService {
           }
         }
       }
-      
+
       // Sort by absolute price change percentage
       const sortedItems = trendingItems
         .sort((a, b) => Math.abs(b.priceChangePercent) - Math.abs(a.priceChangePercent))
         .slice(0, limit);
 
       this.setCachedResult(cacheKey, sortedItems);
-      
+
       this.logger.debug('Successfully retrieved trending items', {
         count: trendingItems.length
       });
@@ -180,14 +180,14 @@ class SmartItemSelectorService {
       // Query for stable items with consistent volume and low volatility
       const stableItems = await marketDataService.getMarketData({
         maxVolatility: 10, // Low volatility
-        minVolume: 50,     // Consistent trading volume
+        minVolume: 50, // Consistent trading volume
         sortBy: 'consistency',
         limit: limit,
         timeRange: 7 * 24 * 60 * 60 * 1000 // Last 7 days
       });
 
       this.setCachedResult(cacheKey, stableItems);
-      
+
       this.logger.debug('Successfully retrieved stable items', {
         count: stableItems.length
       });
@@ -225,7 +225,7 @@ class SmartItemSelectorService {
       });
 
       this.setCachedResult(cacheKey, categoryItems);
-      
+
       this.logger.debug('Successfully retrieved category items', {
         category,
         count: categoryItems.length
@@ -269,7 +269,7 @@ class SmartItemSelectorService {
       const recommendations = await marketDataService.getMarketData(query);
 
       this.setCachedResult(cacheKey, recommendations);
-      
+
       this.logger.debug('Successfully retrieved personalized recommendations', {
         count: recommendations.length
       });

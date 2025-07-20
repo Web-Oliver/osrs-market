@@ -1,6 +1,6 @@
 /**
  * 📝 Logger - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Centralized Logging System
  * - Structured logging with context
  * - Multiple log levels and formats
@@ -60,12 +60,12 @@ class Logger {
           format.simple(),
           format.printf(({ timestamp, level, message, module, ...meta }) => {
             let logLine = `${timestamp} [${level}] ${module}: ${message}`;
-            
+
             // Add metadata in development
             if (Object.keys(meta).length > 0) {
               logLine += `\n${JSON.stringify(meta, null, 2)}`;
             }
-            
+
             return logLine;
           })
         )
@@ -119,7 +119,7 @@ class Logger {
    */
   error(message, error = null, meta = {}) {
     const errorMeta = this.enrichMeta(meta);
-    
+
     if (error) {
       errorMeta.error = {
         message: error.message,
@@ -137,7 +137,7 @@ class Logger {
    */
   fatal(message, error = null, meta = {}) {
     const errorMeta = this.enrichMeta(meta);
-    
+
     if (error) {
       errorMeta.error = {
         message: error.message,
@@ -166,7 +166,7 @@ class Logger {
    */
   apiRequest(method, url, statusCode, duration, meta = {}) {
     const level = statusCode >= 400 ? 'warn' : 'info';
-    
+
     this.logger[level](`API Request: ${method} ${url}`, this.enrichMeta({
       ...meta,
       method,
@@ -235,7 +235,7 @@ class Logger {
    */
   external(service, operation, success, duration, meta = {}) {
     const level = success ? 'info' : 'warn';
-    
+
     this.logger[level](`External: ${service} ${operation}`, this.enrichMeta({
       ...meta,
       service,
@@ -276,14 +276,14 @@ class Logger {
   child(additionalContext) {
     const childLogger = new Logger(this.module);
     const originalEnrichMeta = childLogger.enrichMeta.bind(childLogger);
-    
+
     childLogger.enrichMeta = (meta) => {
       return originalEnrichMeta({
         ...additionalContext,
         ...meta
       });
     };
-    
+
     return childLogger;
   }
 
@@ -305,7 +305,7 @@ class Logger {
    */
   requestEnd(requestId, method, url, statusCode, duration, meta = {}) {
     const level = statusCode >= 400 ? 'warn' : 'info';
-    
+
     this.logger[level](`Request completed: ${method} ${url}`, this.enrichMeta({
       ...meta,
       requestId,
@@ -359,11 +359,11 @@ class Logger {
    */
   sanitizeConfigValue(key, value) {
     const sensitiveKeys = ['password', 'secret', 'token', 'key', 'connectionString'];
-    
+
     if (sensitiveKeys.some(sensitive => key.toLowerCase().includes(sensitive))) {
       return '[REDACTED]';
     }
-    
+
     return value;
   }
 

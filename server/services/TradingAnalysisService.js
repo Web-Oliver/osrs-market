@@ -1,13 +1,13 @@
 /**
  * 📊 Trading Analysis Service - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Service Layer for Market Signal Analysis and Interpretation
  * - Interprets technical indicators and generates market signals
  * - Provides comprehensive trading recommendations
  * - Focuses on higher-level market analysis vs raw calculations
  * - DRY principles with reusable interpretation patterns
  * - SOLID architecture with single responsibility for analysis
- * 
+ *
  * REFACTORED: Now uses FinancialMetricsCalculator for raw calculations
  * This service focuses on interpreting those metrics to generate trading signals
  */
@@ -62,7 +62,7 @@ class TradingAnalysisService {
       return { signal: 'HOLD', strength: 0.1, interpretation: 'Error interpreting RSI' };
     }
   }
-  
+
   /**
    * Context7 Pattern: Interpret MACD signals
    */
@@ -104,7 +104,7 @@ class TradingAnalysisService {
       return { signal: 'HOLD', strength: 0.1, interpretation: 'Error interpreting MACD' };
     }
   }
-  
+
   /**
    * Context7 Pattern: Interpret Bollinger Bands signals
    */
@@ -151,7 +151,7 @@ class TradingAnalysisService {
       return { signal: 'HOLD', strength: 0.1, interpretation: 'Error interpreting Bollinger Bands' };
     }
   }
-  
+
   /**
    * Context7 Pattern: Get technical indicators using FinancialMetricsCalculator
    */
@@ -164,7 +164,7 @@ class TradingAnalysisService {
 
       // Use FinancialMetricsCalculator to get all calculated metrics
       const metrics = this.metricsCalculator.calculateAllMetrics(rawData, historicalData);
-      
+
       // Extract technical indicators
       const indicators = {
         rsi: metrics.rsi || 50,
@@ -185,7 +185,7 @@ class TradingAnalysisService {
         volatility: indicators.volatility?.toFixed(2) || 'N/A',
         momentum: indicators.momentum?.toFixed(2) || 'N/A'
       });
-      
+
       return indicators;
     } catch (error) {
       this.logger.error('❌ Error getting technical indicators', error);
@@ -200,7 +200,7 @@ class TradingAnalysisService {
       };
     }
   }
-  
+
   /**
    * Context7 Pattern: Generate comprehensive market signal from technical indicators
    */
@@ -216,9 +216,9 @@ class TradingAnalysisService {
       // Get technical indicators using FinancialMetricsCalculator
       const indicators = this.getTechnicalIndicators(rawData, historicalData);
       const currentPrice = (rawData.highPrice + rawData.lowPrice) / 2;
-      
+
       const signalComponents = [];
-      
+
       // RSI interpretation
       if (indicators.rsi) {
         const rsiSignal = this.interpretRSI(indicators.rsi);
@@ -228,7 +228,7 @@ class TradingAnalysisService {
           weight: 0.3
         });
       }
-      
+
       // MACD interpretation
       if (indicators.macd) {
         const macdSignal = this.interpretMACD(indicators.macd);
@@ -238,7 +238,7 @@ class TradingAnalysisService {
           weight: 0.25
         });
       }
-      
+
       // Bollinger Bands interpretation
       if (indicators.bollinger) {
         const bbSignal = this.interpretBollingerBands(currentPrice, indicators.bollinger);
@@ -248,7 +248,7 @@ class TradingAnalysisService {
           weight: 0.2
         });
       }
-      
+
       // Momentum interpretation
       if (indicators.momentum !== undefined) {
         const momentumSignal = this.interpretMomentum(indicators.momentum);
@@ -258,7 +258,7 @@ class TradingAnalysisService {
           weight: 0.15
         });
       }
-      
+
       // Volatility interpretation
       if (indicators.volatility !== undefined) {
         const volatilitySignal = this.interpretVolatility(indicators.volatility);
@@ -268,7 +268,7 @@ class TradingAnalysisService {
           weight: 0.1
         });
       }
-      
+
       // Calculate weighted signal
       const buyWeight = signalComponents
         .filter(s => s.signal === 'BUY')
@@ -279,9 +279,9 @@ class TradingAnalysisService {
       const holdWeight = signalComponents
         .filter(s => s.signal === 'HOLD')
         .reduce((sum, s) => sum + (s.weight * s.strength), 0);
-      
+
       let dominantSignal, strength;
-      
+
       if (buyWeight > sellWeight && buyWeight > holdWeight) {
         dominantSignal = 'BUY';
         strength = buyWeight;
@@ -292,11 +292,11 @@ class TradingAnalysisService {
         dominantSignal = 'HOLD';
         strength = holdWeight;
       }
-      
+
       // Calculate confidence based on signal consistency
       const totalWeight = buyWeight + sellWeight + holdWeight;
       const confidence = totalWeight > 0 ? Math.max(buyWeight, sellWeight, holdWeight) / totalWeight : 0.5;
-      
+
       const marketSignal = {
         type: dominantSignal,
         strength: Math.min(1, strength),
@@ -320,7 +320,7 @@ class TradingAnalysisService {
         confidence: confidence.toFixed(3),
         componentCount: signalComponents.length
       });
-      
+
       return marketSignal;
     } catch (error) {
       this.logger.error('❌ Error generating market signal', error);
@@ -421,22 +421,22 @@ class TradingAnalysisService {
     try {
       const strengthLevel = strength > 0.7 ? 'Strong' : strength > 0.4 ? 'Moderate' : 'Weak';
       const confidenceLevel = confidence > 0.7 ? 'High' : confidence > 0.4 ? 'Medium' : 'Low';
-      
+
       const supportingComponents = components.filter(c => c.signal === signal);
       const conflictingComponents = components.filter(c => c.signal !== signal && c.signal !== 'HOLD');
-      
+
       let interpretation = `${strengthLevel} ${signal} signal with ${confidenceLevel} confidence. `;
-      
+
       if (supportingComponents.length > 0) {
         const sources = supportingComponents.map(c => c.source).join(', ');
         interpretation += `Supported by: ${sources}. `;
       }
-      
+
       if (conflictingComponents.length > 0) {
         const conflictingSources = conflictingComponents.map(c => c.source).join(', ');
         interpretation += `Conflicting signals from: ${conflictingSources}. `;
       }
-      
+
       // Add risk assessment
       if (strength > 0.6 && confidence > 0.6) {
         interpretation += 'Recommended for execution.';
@@ -445,21 +445,21 @@ class TradingAnalysisService {
       } else {
         interpretation += 'Monitor for stronger signals.';
       }
-      
+
       return interpretation;
     } catch (error) {
       this.logger.error('❌ Error generating signal interpretation', error);
       return 'Unable to generate interpretation';
     }
   }
-  
+
   /**
    * Context7 Pattern: Identify flipping opportunity using FinancialMetricsCalculator
    */
   identifyFlippingOpportunity(rawData, historicalData = [], minProfitMargin = 5) {
     try {
       const { itemId, highPrice, lowPrice, volume = 1000 } = rawData;
-      
+
       if (!highPrice || !lowPrice || highPrice <= lowPrice) {
         this.logger.debug('🚫 No flipping opportunity - invalid price data', {
           itemId,
@@ -468,10 +468,10 @@ class TradingAnalysisService {
         });
         return null;
       }
-      
+
       // Use FinancialMetricsCalculator to get comprehensive metrics
       const metrics = this.metricsCalculator.calculateAllMetrics(rawData, historicalData);
-      
+
       // Check if opportunity meets minimum margin requirement
       if (metrics.marginPercent < minProfitMargin) {
         this.logger.debug('🚫 No flipping opportunity - insufficient margin', {
@@ -481,10 +481,10 @@ class TradingAnalysisService {
         });
         return null;
       }
-      
+
       // Get market signal for additional context
       const marketSignal = this.generateMarketSignal(rawData, historicalData);
-      
+
       // Determine risk level from risk score
       let riskLevel;
       if (metrics.riskScore > 70) {
@@ -494,16 +494,16 @@ class TradingAnalysisService {
       } else {
         riskLevel = 'LOW';
       }
-      
+
       // Calculate time to flip based on velocity and volume
-      const timeToFlip = Math.max(5, Math.min(120, 
+      const timeToFlip = Math.max(5, Math.min(120,
         60 / Math.log((volume * metrics.velocity / 100) + 1)
       ));
-      
+
       const opportunity = {
         itemId,
         itemName: rawData.itemName || `Item ${itemId}`,
-        
+
         // Price and profit data
         buyPrice: lowPrice,
         sellPrice: highPrice,
@@ -511,26 +511,26 @@ class TradingAnalysisService {
         netProfitGp: metrics.marginGp, // After GE tax
         grossProfitPercent: metrics.grossProfitPercent,
         netProfitPercent: metrics.marginPercent, // After GE tax
-        
+
         // GE tax information
         geTaxAmount: metrics.geTaxAmount,
         isTaxFree: metrics.isTaxFree,
-        
+
         // Risk and performance metrics
         riskLevel,
         riskScore: metrics.riskScore,
         volatility: metrics.volatility,
         velocity: metrics.velocity,
         expectedProfitPerHour: metrics.expectedProfitPerHour,
-        
+
         // Market data
         volume,
         volumeScore: metrics.volumeScore,
         liquidityRating: metrics.liquidityRating,
-        
+
         // Timing estimates
         timeToFlip,
-        
+
         // Market signal context
         marketSignal: {
           type: marketSignal.type,
@@ -538,14 +538,14 @@ class TradingAnalysisService {
           confidence: marketSignal.confidence,
           interpretation: marketSignal.analysis.interpretation
         },
-        
+
         // Additional context
         confidence: metrics.confidence,
         dataQuality: metrics.dataQuality,
-        
+
         // Tags for categorization
         tags: this.generateOpportunityTags(metrics, marketSignal),
-        
+
         timestamp: Date.now()
       };
 
@@ -558,7 +558,7 @@ class TradingAnalysisService {
         marketSignal: marketSignal.type,
         expectedProfitPerHour: opportunity.expectedProfitPerHour.toFixed(2)
       });
-      
+
       return opportunity;
     } catch (error) {
       this.logger.error('❌ Error identifying flipping opportunity', error);
@@ -571,97 +571,99 @@ class TradingAnalysisService {
    */
   generateOpportunityTags(metrics, marketSignal) {
     const tags = [];
-    
+
     // Risk-based tags
     if (metrics.riskScore < 30) {
       tags.push('low_risk');
     } else if (metrics.riskScore > 70) {
       tags.push('high_risk');
     }
-    
+
     // Profit-based tags
     if (metrics.marginPercent > 20) {
       tags.push('high_profit');
     } else if (metrics.marginPercent > 10) {
       tags.push('good_profit');
     }
-    
+
     // Volume-based tags
     if (metrics.volumeScore > 70) {
       tags.push('high_volume');
     } else if (metrics.volumeScore < 30) {
       tags.push('low_volume');
     }
-    
+
     // Volatility-based tags
     if (metrics.volatility > 30) {
       tags.push('volatile');
     } else if (metrics.volatility < 10) {
       tags.push('stable');
     }
-    
+
     // Speed-based tags
     if (metrics.velocity > 70) {
       tags.push('fast_flip');
     } else if (metrics.velocity < 30) {
       tags.push('slow_flip');
     }
-    
+
     // Market signal tags
     if (marketSignal.type === 'BUY' && marketSignal.strength > 0.6) {
       tags.push('strong_buy');
     } else if (marketSignal.type === 'SELL' && marketSignal.strength > 0.6) {
       tags.push('strong_sell');
     }
-    
+
     // Tax-related tags
     if (metrics.isTaxFree) {
       tags.push('tax_free');
     }
-    
+
     // Profit per hour tags
     if (metrics.expectedProfitPerHour > 1000000) {
       tags.push('high_gp_per_hour');
     } else if (metrics.expectedProfitPerHour > 500000) {
       tags.push('good_gp_per_hour');
     }
-    
+
     return tags;
   }
-  
+
   /**
    * Context7 Pattern: Calculate spread percentage (deprecated - use FinancialMetricsCalculator)
    */
   calculateSpreadPercentage(high, low) {
     try {
-      if (!high || !low || low === 0) return 0;
+      if (!high || !low || low === 0) {
+        return 0;
+      }
       const spread = ((high - low) / low) * 100;
-      
+
       this.logger.debug('📊 Spread calculated', {
         high,
         low,
         spreadPercentage: spread.toFixed(2)
       });
-      
+
       return spread;
     } catch (error) {
       this.logger.error('❌ Error calculating spread percentage', error);
       return 0;
     }
   }
-  
+
   /**
    * Context7 Pattern: Check if flip is profitable
    */
   isProfitableFlip(spreadPercentage, minMargin = 5) {
     const isProfitable = spreadPercentage >= minMargin;
-    
+
     this.logger.debug('💹 Profitability check', {
       spreadPercentage: spreadPercentage.toFixed(2),
       minMargin,
       isProfitable
     });
-    
+
     return isProfitable;
   }
 
@@ -670,13 +672,15 @@ class TradingAnalysisService {
    */
   calculateVolatility(prices, period = 20) {
     try {
-      if (prices.length < 2) return 0;
-      
+      if (prices.length < 2) {
+        return 0;
+      }
+
       const returns = [];
       for (let i = 1; i < prices.length; i++) {
         returns.push(Math.log(prices[i] / prices[i - 1]));
       }
-      
+
       const mean = returns.reduce((sum, ret) => sum + ret, 0) / returns.length;
       const variance = returns.reduce((sum, ret) => sum + Math.pow(ret - mean, 2), 0) / returns.length;
       const volatility = Math.sqrt(variance) * 100; // Convert to percentage
@@ -686,7 +690,7 @@ class TradingAnalysisService {
         period,
         priceCount: prices.length
       });
-      
+
       return volatility;
     } catch (error) {
       this.logger.error('❌ Error calculating volatility', error);
@@ -704,7 +708,7 @@ class TradingAnalysisService {
         const max = Math.max(...prices);
         return { support: min, resistance: max };
       }
-      
+
       const recentPrices = prices.slice(-period);
       const support = Math.min(...recentPrices);
       const resistance = Math.max(...recentPrices);
@@ -714,7 +718,7 @@ class TradingAnalysisService {
         resistance: resistance.toFixed(2),
         range: (resistance - support).toFixed(2)
       });
-      
+
       return { support, resistance };
     } catch (error) {
       this.logger.error('❌ Error calculating support/resistance', error);
@@ -727,11 +731,13 @@ class TradingAnalysisService {
    */
   calculateTrendStrength(prices, period = 14) {
     try {
-      if (prices.length < period + 1) return 0;
-      
+      if (prices.length < period + 1) {
+        return 0;
+      }
+
       let upMoves = 0;
       let downMoves = 0;
-      
+
       for (let i = 1; i <= period; i++) {
         if (prices[i] > prices[i - 1]) {
           upMoves++;
@@ -739,7 +745,7 @@ class TradingAnalysisService {
           downMoves++;
         }
       }
-      
+
       const trendStrength = (upMoves - downMoves) / period;
 
       this.logger.debug('📊 Trend strength calculated', {
@@ -748,7 +754,7 @@ class TradingAnalysisService {
         downMoves,
         period
       });
-      
+
       return trendStrength;
     } catch (error) {
       this.logger.error('❌ Error calculating trend strength', error);
@@ -768,16 +774,16 @@ class TradingAnalysisService {
 
       // Use FinancialMetricsCalculator for all metrics
       const metrics = this.metricsCalculator.calculateAllMetrics(rawData, historicalData);
-      
+
       // Generate market signal using interpretation methods
       const marketSignal = this.generateMarketSignal(rawData, historicalData);
-      
+
       // Get technical indicators
       const indicators = this.getTechnicalIndicators(rawData, historicalData);
-      
+
       // Identify flipping opportunity if profitable
       const flippingOpportunity = this.identifyFlippingOpportunity(rawData, historicalData);
-      
+
       const analysis = {
         // Core metrics from FinancialMetricsCalculator
         metrics: {
@@ -789,32 +795,32 @@ class TradingAnalysisService {
           velocity: metrics.velocity,
           volumeScore: metrics.volumeScore,
           momentumScore: metrics.momentumScore,
-          
+
           // GE tax information
           geTaxAmount: metrics.geTaxAmount,
           isTaxFree: metrics.isTaxFree,
           netSellPrice: metrics.netSellPrice
         },
-        
+
         // Technical indicators
         indicators,
-        
+
         // Market signal with interpretation
         marketSignal,
-        
+
         // Flipping opportunity (if available)
         flippingOpportunity,
-        
+
         // Analysis summary
         summary: {
           recommendation: marketSignal.type,
           confidence: marketSignal.confidence,
           riskLevel: flippingOpportunity?.riskLevel || 'UNKNOWN',
-          profitability: metrics.marginPercent > 10 ? 'HIGH' : 
-                        metrics.marginPercent > 5 ? 'MEDIUM' : 'LOW',
+          profitability: metrics.marginPercent > 10 ? 'HIGH' :
+            metrics.marginPercent > 5 ? 'MEDIUM' : 'LOW',
           tradingViability: this.assessTradingViability(metrics, marketSignal)
         },
-        
+
         timestamp: Date.now()
       };
 
@@ -842,7 +848,7 @@ class TradingAnalysisService {
     try {
       let viabilityScore = 0;
       const factors = [];
-      
+
       // Profit factor (40% weight)
       if (metrics.marginPercent > 15) {
         viabilityScore += 40;
@@ -854,7 +860,7 @@ class TradingAnalysisService {
         viabilityScore += 10;
         factors.push('Moderate profit margin');
       }
-      
+
       // Risk factor (25% weight)
       if (metrics.riskScore < 30) {
         viabilityScore += 25;
@@ -866,7 +872,7 @@ class TradingAnalysisService {
         viabilityScore += 5;
         factors.push('High risk');
       }
-      
+
       // Volume factor (20% weight)
       if (metrics.volumeScore > 60) {
         viabilityScore += 20;
@@ -878,7 +884,7 @@ class TradingAnalysisService {
         viabilityScore += 5;
         factors.push('Low volume');
       }
-      
+
       // Market signal factor (15% weight)
       if (marketSignal.type === 'BUY' && marketSignal.strength > 0.6) {
         viabilityScore += 15;
@@ -890,7 +896,7 @@ class TradingAnalysisService {
         viabilityScore += 8;
         factors.push('Confident signal');
       }
-      
+
       let rating;
       if (viabilityScore >= 75) {
         rating = 'EXCELLENT';
@@ -903,7 +909,7 @@ class TradingAnalysisService {
       } else {
         rating = 'AVOID';
       }
-      
+
       return {
         score: viabilityScore,
         rating,
@@ -926,20 +932,20 @@ class TradingAnalysisService {
    */
   getViabilityRecommendation(rating, factors) {
     const factorList = factors.join(', ').toLowerCase();
-    
+
     switch (rating) {
-      case 'EXCELLENT':
-        return `Highly recommended for trading. Strong factors: ${factorList}`;
-      case 'GOOD':
-        return `Good trading opportunity. Positive factors: ${factorList}`;
-      case 'FAIR':
-        return `Moderate trading opportunity. Consider factors: ${factorList}`;
-      case 'POOR':
-        return `Risky trading opportunity. Caution advised due to: ${factorList}`;
-      case 'AVOID':
-        return `Avoid trading. Negative factors: ${factorList}`;
-      default:
-        return 'Unable to provide recommendation';
+    case 'EXCELLENT':
+      return `Highly recommended for trading. Strong factors: ${factorList}`;
+    case 'GOOD':
+      return `Good trading opportunity. Positive factors: ${factorList}`;
+    case 'FAIR':
+      return `Moderate trading opportunity. Consider factors: ${factorList}`;
+    case 'POOR':
+      return `Risky trading opportunity. Caution advised due to: ${factorList}`;
+    case 'AVOID':
+      return `Avoid trading. Negative factors: ${factorList}`;
+    default:
+      return 'Unable to provide recommendation';
     }
   }
 }

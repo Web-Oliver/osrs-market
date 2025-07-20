@@ -1,6 +1,6 @@
 /**
  * 🏺 Item Domain Types - Core item modeling type definitions
- * 
+ *
  * Context7 Pattern: Domain-driven type definitions
  * - DRY: Centralized item-related type definitions
  * - SOLID: Single responsibility for item domain types

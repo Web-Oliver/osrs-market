@@ -1,6 +1,6 @@
 /**
  * 📋 Watchlist Routes - Context7 Optimized
- * 
+ *
  * Context7 Pattern: RESTful API Routes for Watchlist Management
  * - Comprehensive watchlist operations
  * - Proper HTTP methods and status codes

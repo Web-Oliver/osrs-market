@@ -1,6 +1,6 @@
 /**
  * 🔄 Data Transformer - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Data Transformation and Normalization System
  * - Consistent data format transformation
  * - Data validation and cleansing
@@ -143,11 +143,11 @@ class DataTransformer {
       const parsed = parseInt(itemId, 10);
       return isNaN(parsed) ? null : parsed;
     }
-    
+
     if (typeof itemId === 'number') {
       return itemId > 0 ? itemId : null;
     }
-    
+
     return null;
   }
 
@@ -158,7 +158,7 @@ class DataTransformer {
     if (typeof itemName !== 'string') {
       return null;
     }
-    
+
     return itemName
       .trim()
       .replace(/\s+/g, ' ')
@@ -173,18 +173,18 @@ class DataTransformer {
     if (!timestamp) {
       return Date.now();
     }
-    
+
     if (typeof timestamp === 'string') {
       const parsed = new Date(timestamp).getTime();
       return isNaN(parsed) ? Date.now() : parsed;
     }
-    
+
     if (typeof timestamp === 'number') {
       // Handle both seconds and milliseconds
       const value = timestamp < 1e12 ? timestamp * 1000 : timestamp;
       return isNaN(value) ? Date.now() : value;
     }
-    
+
     return Date.now();
   }
 
@@ -195,16 +195,16 @@ class DataTransformer {
     if (price === null || price === undefined) {
       return null;
     }
-    
+
     if (typeof price === 'string') {
       const parsed = parseFloat(price);
       return isNaN(parsed) ? null : Math.max(0, parsed);
     }
-    
+
     if (typeof price === 'number') {
       return price >= 0 ? price : null;
     }
-    
+
     return null;
   }
 
@@ -215,12 +215,12 @@ class DataTransformer {
     if (typeof value === 'number' && !isNaN(value)) {
       return value;
     }
-    
+
     if (typeof value === 'string') {
       const parsed = parseFloat(value);
       return isNaN(parsed) ? defaultValue : parsed;
     }
-    
+
     return defaultValue;
   }
 
@@ -237,11 +237,11 @@ class DataTransformer {
    */
   normalizeRateLimitStatus(status) {
     const validStatuses = ['HEALTHY', 'THROTTLED', 'COOLDOWN', 'OVERLOADED'];
-    
+
     if (typeof status === 'string' && validStatuses.includes(status.toUpperCase())) {
       return status.toUpperCase();
     }
-    
+
     return 'UNKNOWN';
   }
 
@@ -252,11 +252,11 @@ class DataTransformer {
     if (!item.priceData || !item.priceData.high || !item.priceData.low) {
       return 0;
     }
-    
+
     const buy = item.priceData.low;
     const sell = item.priceData.high;
     const margin = sell - buy;
-    
+
     return buy > 0 ? (margin / buy) * 100 : 0;
   }
 
@@ -267,7 +267,7 @@ class DataTransformer {
     if (!item.priceData || !item.priceData.high || !item.priceData.low) {
       return 0;
     }
-    
+
     return item.priceData.high - item.priceData.low;
   }
 
@@ -278,7 +278,7 @@ class DataTransformer {
     if (!item.apiRequests || !item.responseTime) {
       return 0;
     }
-    
+
     const responseTimeSeconds = item.responseTime / 1000;
     return responseTimeSeconds > 0 ? item.apiRequests / responseTimeSeconds : 0;
   }
@@ -288,28 +288,28 @@ class DataTransformer {
    */
   calculateEfficiencyScore(item) {
     const scores = [];
-    
+
     // Success rate score
     if (item.successRate) {
       scores.push(item.successRate);
     }
-    
+
     // Item selection efficiency score
     if (item.itemSelectionEfficiency) {
       scores.push(item.itemSelectionEfficiency);
     }
-    
+
     // Data quality score
     if (item.dataQuality) {
       scores.push(item.dataQuality);
     }
-    
+
     // Response time score (inverted - lower is better)
     if (item.responseTime) {
       const responseTimeScore = Math.max(0, 100 - (item.responseTime / 10));
       scores.push(responseTimeScore);
     }
-    
+
     return scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
   }
 
@@ -320,13 +320,21 @@ class DataTransformer {
     if (!item.successRate || !item.dataQuality) {
       return 'UNKNOWN';
     }
-    
+
     const averageHealth = (item.successRate + item.dataQuality) / 2;
-    
-    if (averageHealth >= 95) return 'EXCELLENT';
-    if (averageHealth >= 85) return 'GOOD';
-    if (averageHealth >= 70) return 'FAIR';
-    if (averageHealth >= 50) return 'POOR';
+
+    if (averageHealth >= 95) {
+      return 'EXCELLENT';
+    }
+    if (averageHealth >= 85) {
+      return 'GOOD';
+    }
+    if (averageHealth >= 70) {
+      return 'FAIR';
+    }
+    if (averageHealth >= 50) {
+      return 'POOR';
+    }
     return 'CRITICAL';
   }
 
@@ -336,14 +344,24 @@ class DataTransformer {
   calculateDataQuality(item) {
     let score = 0;
     let factors = 0;
-    
+
     // Required fields presence
-    if (item.itemId) { score += 25; factors++; }
-    if (item.itemName) { score += 20; factors++; }
-    if (item.priceData && item.priceData.high) { score += 25; factors++; }
-    if (item.priceData && item.priceData.low) { score += 25; factors++; }
-    if (item.timestamp) { score += 5; factors++; }
-    
+    if (item.itemId) {
+      score += 25; factors++;
+    }
+    if (item.itemName) {
+      score += 20; factors++;
+    }
+    if (item.priceData && item.priceData.high) {
+      score += 25; factors++;
+    }
+    if (item.priceData && item.priceData.low) {
+      score += 25; factors++;
+    }
+    if (item.timestamp) {
+      score += 5; factors++;
+    }
+
     return factors > 0 ? score : 0;
   }
 
@@ -353,25 +371,25 @@ class DataTransformer {
   calculateCompleteness(item) {
     const requiredFields = ['itemId', 'itemName', 'priceData'];
     const optionalFields = ['timestamp', 'volume', 'members', 'tradeable'];
-    
+
     let required = 0;
     let optional = 0;
-    
+
     requiredFields.forEach(field => {
       if (this.hasValidValue(item, field)) {
         required++;
       }
     });
-    
+
     optionalFields.forEach(field => {
       if (this.hasValidValue(item, field)) {
         optional++;
       }
     });
-    
+
     const requiredScore = (required / requiredFields.length) * 80;
     const optionalScore = (optional / optionalFields.length) * 20;
-    
+
     return requiredScore + optionalScore;
   }
 
@@ -395,19 +413,19 @@ class DataTransformer {
    */
   extractMetadata(item) {
     const metadata = {};
-    
+
     // Extract common metadata fields
     const metadataFields = [
       'source', 'version', 'collectionTime', 'accuracy',
       'confidence', 'provider', 'lastUpdated'
     ];
-    
+
     metadataFields.forEach(field => {
       if (item[field] !== undefined) {
         metadata[field] = item[field];
       }
     });
-    
+
     return metadata;
   }
 
@@ -419,16 +437,16 @@ class DataTransformer {
     if (!rules) {
       return { isValid: false, errors: ['Unknown data type'] };
     }
-    
+
     const errors = [];
-    
+
     // Check required fields
     rules.required.forEach(field => {
       if (!this.hasValidValue(data, field)) {
         errors.push(`Missing required field: ${field}`);
       }
     });
-    
+
     // Check data types
     Object.entries(rules.types).forEach(([field, expectedType]) => {
       const value = this.getNestedValue(data, field);
@@ -439,7 +457,7 @@ class DataTransformer {
         }
       }
     });
-    
+
     // Check ranges
     Object.entries(rules.ranges || {}).forEach(([field, range]) => {
       const value = this.getNestedValue(data, field);
@@ -449,7 +467,7 @@ class DataTransformer {
         }
       }
     });
-    
+
     return {
       isValid: errors.length === 0,
       errors
@@ -463,10 +481,10 @@ class DataTransformer {
     if (!Array.isArray(data)) {
       return [];
     }
-    
+
     const results = [];
     const errors = [];
-    
+
     data.forEach((item, index) => {
       try {
         const validation = this.validateData(item, type);
@@ -474,17 +492,17 @@ class DataTransformer {
           errors.push({ index, errors: validation.errors });
           return;
         }
-        
-        const transformed = type === 'marketData' ? 
-          this.transformMarketData(item)[0] : 
+
+        const transformed = type === 'marketData' ?
+          this.transformMarketData(item)[0] :
           this.transformMonitoringData(item)[0];
-          
+
         results.push(transformed);
       } catch (error) {
         errors.push({ index, errors: [error.message] });
       }
     });
-    
+
     return {
       results,
       errors,

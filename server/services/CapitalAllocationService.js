@@ -1,13 +1,13 @@
 /**
  * 💰 Capital Allocation Service - Context7 Optimized
- * 
+ *
  * Context7 Pattern: Service Layer for Dynamic Capital Allocation
  * - Manages capital allocation between different trading strategies
  * - Implements dual-mode strategy: instant flips vs patient offers
  * - Considers market conditions and user risk tolerance
  * - Optimizes capital utilization for maximum profit
  * - SOLID architecture with single responsibility for capital management
- * 
+ *
  * Dual-Mode Strategy:
  * - High-frequency instant flips: Fast, low-margin, high-volume trades
  * - Patient overnight offers: Slower, high-margin, lower-volume trades
@@ -16,10 +16,10 @@
 const { Logger } = require('../utils/Logger');
 const { FinancialMetricsCalculator } = require('../utils/FinancialMetricsCalculator');
 const { MarketDataService } = require('./MarketDataService');
-const { 
-  calculateProfitAfterTax, 
+const {
+  calculateProfitAfterTax,
   calculateGETax,
-  GE_TAX_THRESHOLD_GP 
+  GE_TAX_THRESHOLD_GP
 } = require('../utils/marketConstants');
 
 class CapitalAllocationService {
@@ -27,36 +27,36 @@ class CapitalAllocationService {
     this.logger = new Logger('CapitalAllocation');
     this.metricsCalculator = new FinancialMetricsCalculator();
     this.marketDataService = new MarketDataService();
-    
+
     // Default configuration
     this.config = {
       // Capital allocation percentages
       instantFlipAllocation: config.instantFlipAllocation || 0.6, // 60% for instant flips
       patientOfferAllocation: config.patientOfferAllocation || 0.4, // 40% for patient offers
-      
+
       // Risk management
       maxRiskPerTrade: config.maxRiskPerTrade || 0.05, // 5% max risk per trade
       maxTotalRisk: config.maxTotalRisk || 0.2, // 20% max total portfolio risk
-      
+
       // Strategy thresholds
       instantFlipMinMargin: config.instantFlipMinMargin || 0.02, // 2% min margin for instant flips
       patientOfferMinMargin: config.patientOfferMinMargin || 0.05, // 5% min margin for patient offers
-      
+
       // Volume requirements
       instantFlipMinVolume: config.instantFlipMinVolume || 1000, // Min volume for instant flips
       patientOfferMinVolume: config.patientOfferMinVolume || 100, // Min volume for patient offers
-      
+
       // Timing constraints
       instantFlipMaxHours: config.instantFlipMaxHours || 2, // Max 2 hours for instant flips
       patientOfferMaxHours: config.patientOfferMaxHours || 24, // Max 24 hours for patient offers
-      
+
       // Market condition thresholds
       volatilityThreshold: config.volatilityThreshold || 0.15, // 15% volatility threshold
       liquidityThreshold: config.liquidityThreshold || 0.5, // 50% liquidity threshold
-      
+
       ...config
     };
-    
+
     this.currentAllocations = {
       instantFlips: [],
       patientOffers: [],
@@ -65,7 +65,7 @@ class CapitalAllocationService {
       totalProfit: 0,
       lastRebalance: Date.now()
     };
-    
+
     this.logger.info('💰 Capital Allocation Service initialized', {
       instantFlipAllocation: this.config.instantFlipAllocation,
       patientOfferAllocation: this.config.patientOfferAllocation,
@@ -75,7 +75,7 @@ class CapitalAllocationService {
 
   /**
    * Context7 Pattern: Allocate capital between instant flips and patient offers
-   * 
+   *
    * @param {number} totalCapital - Total available capital
    * @param {Array} opportunities - Array of trading opportunities
    * @param {Object} marketConditions - Current market conditions
@@ -94,61 +94,61 @@ class CapitalAllocationService {
 
       // Analyze market conditions
       const marketAnalysis = await this.analyzeMarketConditions(marketConditions);
-      
+
       // Adjust allocation based on market conditions
       const adjustedAllocation = this.adjustAllocationForMarketConditions(marketAnalysis);
-      
+
       // Calculate capital for each strategy
       const instantFlipCapital = totalCapital * adjustedAllocation.instantFlipAllocation;
       const patientOfferCapital = totalCapital * adjustedAllocation.patientOfferAllocation;
-      
+
       // Select opportunities for each strategy
       const instantFlipOpportunities = this.selectInstantFlipOpportunities(opportunities, marketAnalysis);
       const patientOfferOpportunities = this.selectPatientOfferOpportunities(opportunities, marketAnalysis);
-      
+
       // Allocate capital to instant flips
       const instantFlipAllocations = this.allocateToInstantFlips(
         instantFlipCapital,
         instantFlipOpportunities,
         marketAnalysis
       );
-      
+
       // Allocate capital to patient offers
       const patientOfferAllocations = this.allocateToPatientOffers(
         patientOfferCapital,
         patientOfferOpportunities,
         marketAnalysis
       );
-      
+
       // Calculate total allocated capital
       const totalAllocated = instantFlipAllocations.totalAllocated + patientOfferAllocations.totalAllocated;
       const remainingCapital = totalCapital - totalAllocated;
-      
+
       const allocation = {
         totalCapital,
         totalAllocated,
         remainingCapital,
         allocationPercentage: (totalAllocated / totalCapital) * 100,
-        
+
         instantFlips: {
           ...instantFlipAllocations,
           targetAllocation: adjustedAllocation.instantFlipAllocation,
           actualAllocation: instantFlipAllocations.totalAllocated / totalCapital
         },
-        
+
         patientOffers: {
           ...patientOfferAllocations,
           targetAllocation: adjustedAllocation.patientOfferAllocation,
           actualAllocation: patientOfferAllocations.totalAllocated / totalCapital
         },
-        
+
         marketAnalysis,
         adjustedAllocation,
         recommendations: this.generateRecommendations(marketAnalysis, totalAllocated, totalCapital),
-        
+
         timestamp: Date.now()
       };
-      
+
       // Update current allocations
       this.currentAllocations = {
         ...this.currentAllocations,
@@ -157,7 +157,7 @@ class CapitalAllocationService {
         totalCapitalUsed: totalAllocated,
         lastRebalance: Date.now()
       };
-      
+
       this.logger.info('✅ Capital allocation completed', {
         totalCapital,
         totalAllocated,
@@ -166,7 +166,7 @@ class CapitalAllocationService {
         patientOfferCount: patientOfferAllocations.trades.length,
         allocationPercentage: allocation.allocationPercentage.toFixed(2)
       });
-      
+
       return allocation;
     } catch (error) {
       this.logger.error('❌ Error allocating capital', error);
@@ -185,27 +185,27 @@ class CapitalAllocationService {
         trend: marketConditions.trend || 'neutral',
         activeTraders: marketConditions.activeTraders || 'medium',
         priceStability: marketConditions.priceStability || 'stable',
-        
+
         // Market sentiment indicators
         marketSentiment: this.calculateMarketSentiment(marketConditions),
         riskLevel: this.calculateMarketRiskLevel(marketConditions),
         opportunityLevel: this.calculateOpportunityLevel(marketConditions),
-        
+
         // Timing factors
         timeOfDay: this.getTimeOfDay(),
         dayOfWeek: this.getDayOfWeek(),
         isWeekend: this.isWeekend(),
-        
+
         timestamp: Date.now()
       };
-      
+
       this.logger.debug('Market conditions analyzed', {
         volatility: analysis.volatility,
         liquidity: analysis.liquidity,
         marketSentiment: analysis.marketSentiment,
         riskLevel: analysis.riskLevel
       });
-      
+
       return analysis;
     } catch (error) {
       this.logger.error('❌ Error analyzing market conditions', error);
@@ -219,7 +219,7 @@ class CapitalAllocationService {
   adjustAllocationForMarketConditions(marketAnalysis) {
     let instantFlipAllocation = this.config.instantFlipAllocation;
     let patientOfferAllocation = this.config.patientOfferAllocation;
-    
+
     // Adjust for volatility
     if (marketAnalysis.volatility > this.config.volatilityThreshold) {
       // High volatility favors instant flips
@@ -230,14 +230,14 @@ class CapitalAllocationService {
       instantFlipAllocation -= 0.1;
       patientOfferAllocation += 0.1;
     }
-    
+
     // Adjust for liquidity
     if (marketAnalysis.liquidity < this.config.liquidityThreshold) {
       // Low liquidity reduces instant flip allocation
       instantFlipAllocation -= 0.05;
       patientOfferAllocation += 0.05;
     }
-    
+
     // Adjust for market sentiment
     if (marketAnalysis.marketSentiment === 'bearish') {
       // Bearish market reduces overall risk
@@ -248,7 +248,7 @@ class CapitalAllocationService {
       instantFlipAllocation += 0.05;
       patientOfferAllocation -= 0.05;
     }
-    
+
     // Adjust for time of day
     if (marketAnalysis.timeOfDay === 'peak') {
       // Peak hours favor instant flips
@@ -259,16 +259,16 @@ class CapitalAllocationService {
       instantFlipAllocation -= 0.05;
       patientOfferAllocation += 0.05;
     }
-    
+
     // Ensure allocations stay within bounds
     instantFlipAllocation = Math.max(0.2, Math.min(0.8, instantFlipAllocation));
     patientOfferAllocation = Math.max(0.2, Math.min(0.8, patientOfferAllocation));
-    
+
     // Normalize to ensure they add up to 1
     const total = instantFlipAllocation + patientOfferAllocation;
     instantFlipAllocation /= total;
     patientOfferAllocation /= total;
-    
+
     return {
       instantFlipAllocation,
       patientOfferAllocation,
@@ -285,27 +285,27 @@ class CapitalAllocationService {
       if (opportunity.marginPercent < this.config.instantFlipMinMargin * 100) {
         return false;
       }
-      
+
       // Filter by volume requirement
       if (opportunity.volume < this.config.instantFlipMinVolume) {
         return false;
       }
-      
+
       // Filter by estimated time to flip
       if (opportunity.timeToFlip > this.config.instantFlipMaxHours * 60) {
         return false;
       }
-      
+
       // Filter by volatility (instant flips can handle higher volatility)
       if (opportunity.volatility > 50) {
         return false;
       }
-      
+
       // Filter by risk level
       if (opportunity.riskLevel === 'HIGH' && marketAnalysis.riskLevel === 'high') {
         return false;
       }
-      
+
       return true;
     }).sort((a, b) => {
       // Sort by expected profit per hour (descending)
@@ -322,27 +322,27 @@ class CapitalAllocationService {
       if (opportunity.marginPercent < this.config.patientOfferMinMargin * 100) {
         return false;
       }
-      
+
       // Filter by volume requirement (lower for patient offers)
       if (opportunity.volume < this.config.patientOfferMinVolume) {
         return false;
       }
-      
+
       // Filter by estimated time to flip (longer acceptable)
       if (opportunity.timeToFlip > this.config.patientOfferMaxHours * 60) {
         return false;
       }
-      
+
       // Filter by volatility (patient offers prefer lower volatility)
       if (opportunity.volatility > 30) {
         return false;
       }
-      
+
       // Prefer medium to low risk
       if (opportunity.riskLevel === 'HIGH') {
         return false;
       }
-      
+
       return true;
     }).sort((a, b) => {
       // Sort by margin percentage (descending)
@@ -357,17 +357,19 @@ class CapitalAllocationService {
     const trades = [];
     let totalAllocated = 0;
     let totalExpectedProfit = 0;
-    
+
     for (const opportunity of opportunities) {
-      if (totalAllocated >= availableCapital) break;
-      
+      if (totalAllocated >= availableCapital) {
+        break;
+      }
+
       // Calculate position size based on risk management
       const positionSize = this.calculatePositionSize(
         opportunity,
         availableCapital - totalAllocated,
         'instant'
       );
-      
+
       if (positionSize > 0) {
         const trade = {
           itemId: opportunity.itemId,
@@ -384,13 +386,13 @@ class CapitalAllocationService {
           confidence: opportunity.confidence || 0.7,
           timestamp: Date.now()
         };
-        
+
         trades.push(trade);
         totalAllocated += trade.capitalAllocated;
         totalExpectedProfit += trade.expectedProfit;
       }
     }
-    
+
     return {
       trades,
       totalAllocated,
@@ -408,17 +410,19 @@ class CapitalAllocationService {
     const trades = [];
     let totalAllocated = 0;
     let totalExpectedProfit = 0;
-    
+
     for (const opportunity of opportunities) {
-      if (totalAllocated >= availableCapital) break;
-      
+      if (totalAllocated >= availableCapital) {
+        break;
+      }
+
       // Calculate position size based on risk management
       const positionSize = this.calculatePositionSize(
         opportunity,
         availableCapital - totalAllocated,
         'patient'
       );
-      
+
       if (positionSize > 0) {
         const trade = {
           itemId: opportunity.itemId,
@@ -435,13 +439,13 @@ class CapitalAllocationService {
           confidence: opportunity.confidence || 0.7,
           timestamp: Date.now()
         };
-        
+
         trades.push(trade);
         totalAllocated += trade.capitalAllocated;
         totalExpectedProfit += trade.expectedProfit;
       }
     }
-    
+
     return {
       trades,
       totalAllocated,
@@ -457,31 +461,31 @@ class CapitalAllocationService {
    */
   calculatePositionSize(opportunity, availableCapital, strategy) {
     // Basic position size based on available capital
-    let basePositionSize = availableCapital * 0.1; // Start with 10% of available capital
-    
+    const basePositionSize = availableCapital * 0.1; // Start with 10% of available capital
+
     // Adjust based on risk level
     const riskMultiplier = {
       'LOW': 1.5,
       'MEDIUM': 1.0,
       'HIGH': 0.5
     }[opportunity.riskLevel] || 1.0;
-    
+
     // Adjust based on strategy
     const strategyMultiplier = strategy === 'instant' ? 1.2 : 0.8;
-    
+
     // Adjust based on confidence
     const confidenceMultiplier = opportunity.confidence || 0.7;
-    
+
     // Calculate final position size
     const positionSize = basePositionSize * riskMultiplier * strategyMultiplier * confidenceMultiplier;
-    
+
     // Ensure position size doesn't exceed risk limits
     const maxRiskAmount = availableCapital * this.config.maxRiskPerTrade;
     const maxPositionSize = Math.min(positionSize, maxRiskAmount);
-    
+
     // Ensure minimum position size
     const minPositionSize = opportunity.buyPrice * 1; // At least 1 item
-    
+
     return Math.max(minPositionSize, maxPositionSize);
   }
 
@@ -492,7 +496,7 @@ class CapitalAllocationService {
     const sentiment = marketConditions.sentiment || 'neutral';
     const volatility = marketConditions.volatility || 0.1;
     const trend = marketConditions.trend || 'neutral';
-    
+
     if (trend === 'bullish' && volatility < 0.15) {
       return 'bullish';
     } else if (trend === 'bearish' || volatility > 0.3) {
@@ -508,7 +512,7 @@ class CapitalAllocationService {
   calculateMarketRiskLevel(marketConditions) {
     const volatility = marketConditions.volatility || 0.1;
     const liquidity = marketConditions.liquidity || 0.7;
-    
+
     if (volatility > 0.3 || liquidity < 0.3) {
       return 'high';
     } else if (volatility > 0.15 || liquidity < 0.5) {
@@ -524,7 +528,7 @@ class CapitalAllocationService {
   calculateOpportunityLevel(marketConditions) {
     const volatility = marketConditions.volatility || 0.1;
     const liquidity = marketConditions.liquidity || 0.7;
-    
+
     if (volatility > 0.1 && liquidity > 0.6) {
       return 'high';
     } else if (volatility > 0.05 && liquidity > 0.4) {
@@ -539,7 +543,7 @@ class CapitalAllocationService {
    */
   getTimeOfDay() {
     const hour = new Date().getHours();
-    
+
     if (hour >= 18 && hour <= 22) {
       return 'peak'; // Evening peak hours
     } else if (hour >= 6 && hour <= 10) {
@@ -572,17 +576,19 @@ class CapitalAllocationService {
    * Context7 Pattern: Calculate average risk
    */
   calculateAverageRisk(trades) {
-    if (trades.length === 0) return 0;
-    
+    if (trades.length === 0) {
+      return 0;
+    }
+
     const riskScores = trades.map(trade => {
       switch (trade.riskLevel) {
-        case 'LOW': return 0.3;
-        case 'MEDIUM': return 0.6;
-        case 'HIGH': return 0.9;
-        default: return 0.6;
+      case 'LOW': return 0.3;
+      case 'MEDIUM': return 0.6;
+      case 'HIGH': return 0.9;
+      default: return 0.6;
       }
     });
-    
+
     return riskScores.reduce((sum, score) => sum + score, 0) / riskScores.length;
   }
 
@@ -591,27 +597,27 @@ class CapitalAllocationService {
    */
   getAdjustmentReason(marketAnalysis) {
     const reasons = [];
-    
+
     if (marketAnalysis.volatility > this.config.volatilityThreshold) {
       reasons.push('High volatility favors instant flips');
     }
-    
+
     if (marketAnalysis.liquidity < this.config.liquidityThreshold) {
       reasons.push('Low liquidity reduces instant flip allocation');
     }
-    
+
     if (marketAnalysis.marketSentiment === 'bearish') {
       reasons.push('Bearish market reduces overall risk');
     } else if (marketAnalysis.marketSentiment === 'bullish') {
       reasons.push('Bullish market increases instant flip allocation');
     }
-    
+
     if (marketAnalysis.timeOfDay === 'peak') {
       reasons.push('Peak hours favor instant flips');
     } else if (marketAnalysis.timeOfDay === 'off-peak') {
       reasons.push('Off-peak hours favor patient offers');
     }
-    
+
     return reasons.join('; ');
   }
 
@@ -620,9 +626,9 @@ class CapitalAllocationService {
    */
   generateRecommendations(marketAnalysis, totalAllocated, totalCapital) {
     const recommendations = [];
-    
+
     const utilizationRate = totalAllocated / totalCapital;
-    
+
     if (utilizationRate < 0.5) {
       recommendations.push({
         type: 'capital_utilization',
@@ -630,7 +636,7 @@ class CapitalAllocationService {
         priority: 'medium'
       });
     }
-    
+
     if (utilizationRate > 0.9) {
       recommendations.push({
         type: 'capital_utilization',
@@ -638,7 +644,7 @@ class CapitalAllocationService {
         priority: 'high'
       });
     }
-    
+
     if (marketAnalysis.volatility > 0.3) {
       recommendations.push({
         type: 'market_condition',
@@ -646,7 +652,7 @@ class CapitalAllocationService {
         priority: 'high'
       });
     }
-    
+
     if (marketAnalysis.liquidity < 0.3) {
       recommendations.push({
         type: 'market_condition',
@@ -654,7 +660,7 @@ class CapitalAllocationService {
         priority: 'medium'
       });
     }
-    
+
     if (marketAnalysis.isWeekend) {
       recommendations.push({
         type: 'timing',
@@ -662,7 +668,7 @@ class CapitalAllocationService {
         priority: 'low'
       });
     }
-    
+
     return recommendations;
   }
 
@@ -693,7 +699,7 @@ class CapitalAllocationService {
    */
   calculatePortfolioMetrics() {
     const allTrades = [...this.currentAllocations.instantFlips, ...this.currentAllocations.patientOffers];
-    
+
     if (allTrades.length === 0) {
       return {
         totalCapital: this.currentAllocations.availableCapital,
@@ -705,14 +711,14 @@ class CapitalAllocationService {
         tradeCount: 0
       };
     }
-    
+
     const totalAllocated = allTrades.reduce((sum, trade) => sum + trade.capitalAllocated, 0);
     const totalExpectedProfit = allTrades.reduce((sum, trade) => sum + trade.expectedProfit, 0);
     const averageMargin = allTrades.reduce((sum, trade) => sum + trade.marginPercent, 0) / allTrades.length;
     const averageRisk = this.calculateAverageRisk(allTrades);
     const uniqueItems = new Set(allTrades.map(trade => trade.itemId)).size;
     const diversification = uniqueItems / allTrades.length;
-    
+
     return {
       totalCapital: this.currentAllocations.availableCapital,
       totalAllocated,

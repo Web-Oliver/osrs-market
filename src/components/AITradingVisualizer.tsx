@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Brain, TrendingUp, TrendingDown, DollarSign, Clock, Target, AlertCircle, Database } from 'lucide-react';
+import { Brain, TrendingUp, Target, AlertCircle, Database } from 'lucide-react';
 
 interface AIDecision {
   id: string;
