@@ -10,7 +10,6 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const http = require('http');
-const mongoose = require('mongoose');
 const MongoDataPersistence = require('./services/mongoDataPersistence');
 const { WebSocketLoggingService } = require('./services/WebSocketLoggingService');
 
@@ -18,9 +17,10 @@ const { WebSocketLoggingService } = require('./services/WebSocketLoggingService'
 const apiRoutes = require('./routes/index');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+// FIXED: Use port 3000 to match AI microservice expectations
+const PORT = process.env.PORT || 3000;
 
-// MongoDB configuration with Context7 optimizations
+// MongoDB configuration with Context7 optimizations - FIXED: Use single driver approach
 const mongoConfig = {
   connectionString: process.env.MONGODB_CONNECTION_STRING || 'mongodb://localhost:27017',
   databaseName: process.env.MONGODB_DATABASE || 'osrs_market_data',
@@ -33,10 +33,20 @@ const mongoConfig = {
 // Initialize MongoDB persistence service
 let mongoService = null;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, '../dist')));
+// FIXED: Performance optimizations
+const compression = require('compression');
+
+// Middleware with performance optimizations
+app.use(compression()); // Enable gzip compression
+app.use(cors({
+  credentials: true,
+  optionsSuccessStatus: 200 // For legacy browser support
+}));
+app.use(express.json({ limit: '10mb' })); // Set reasonable limit
+app.use(express.static(path.join(__dirname, '../dist'), {
+  maxAge: '1d', // Cache static files for 1 day
+  etag: true
+}));
 
 // Use centralized API routes
 app.use('/api', apiRoutes);
@@ -71,45 +81,7 @@ async function connectToMongoDB() {
   }
 }
 
-// Mongoose connection for models
-async function connectToMongoose() {
-  try {
-    console.log('🍃 Connecting to MongoDB via Mongoose...');
-
-    const mongooseConnectionString = `${mongoConfig.connectionString}/${mongoConfig.databaseName}`;
-    console.log('📋 Mongoose Connection String:', mongooseConnectionString.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'));
-
-    await mongoose.connect(mongooseConnectionString, {
-      // Same optimizations as native driver
-      maxPoolSize: 50,
-      minPoolSize: 5,
-      maxConnecting: 5,
-      maxIdleTimeMS: 30000,
-      connectTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
-      serverSelectionTimeoutMS: 10000,
-      retryWrites: true,
-      retryReads: true
-    });
-
-    console.log('✅ Mongoose connected successfully');
-
-    // Test mongoose connection
-    const adminDb = mongoose.connection.db.admin();
-    await adminDb.ping();
-    console.log('🏓 Mongoose ping successful');
-
-    return true;
-  } catch (error) {
-    console.error('❌ Failed to connect to Mongoose:', error);
-    console.error('🔧 Mongoose connection details:', {
-      connectionString: `${mongoConfig.connectionString}/${mongoConfig.databaseName}`.replace(/\/\/[^:]+:[^@]+@/, '//***:***@'),
-      error: error.message,
-      stack: error.stack
-    });
-    return false;
-  }
-}
+// REMOVED: Mongoose connection function - using single MongoDB native driver for better performance
 
 // API Routes with Context7 optimizations
 
@@ -388,24 +360,88 @@ app.use((err, req, res, _next) => {
   });
 });
 
-// Start server with Context7 optimizations
+/**
+ * OSRS Data Scraper API endpoints
+ */
+let scraperService = null;
+
+// Initialize scraper service
+app.get('/api/scraper/status', async (req, res) => {
+  try {
+    if (!scraperService) {
+      const { OSRSDataScraperService } = require('./services/OSRSDataScraperService');
+      scraperService = new OSRSDataScraperService();
+    }
+    
+    const status = scraperService.getStatus();
+    res.json(status);
+  } catch (error) {
+    console.error('Error getting scraper status:', error);
+    res.status(500).json({ error: 'Failed to get scraper status' });
+  }
+});
+
+// Start scraper for all categories
+app.post('/api/scraper/start', async (req, res) => {
+  try {
+    if (!scraperService) {
+      const { OSRSDataScraperService } = require('./services/OSRSDataScraperService');
+      scraperService = new OSRSDataScraperService();
+    }
+    
+    console.log('🕷️ Starting full OSRS data scrape...');
+    const result = await scraperService.performFullScrape();
+    
+    console.log(`✅ Scraper completed: ${result.itemsScraped} items collected`);
+    res.json(result);
+  } catch (error) {
+    console.error('Error starting scraper:', error);
+    res.status(500).json({ error: 'Failed to start scraper', details: error.message });
+  }
+});
+
+// Start scraper for specific category
+app.post('/api/scraper/start/:category', async (req, res) => {
+  try {
+    const { category } = req.params;
+    
+    if (!scraperService) {
+      const { OSRSDataScraperService } = require('./services/OSRSDataScraperService');
+      scraperService = new OSRSDataScraperService();
+    }
+    
+    console.log(`🕷️ Starting scraper for category: ${category}`);
+    
+    // For individual categories, we'll trigger a full scrape
+    // since the scraper is designed to collect all 4 categories
+    const result = await scraperService.performFullScrape();
+    
+    console.log(`✅ Scraper completed: ${result.itemsScraped} items collected`);
+    res.json({ 
+      category, 
+      ...result,
+      message: `Scraper completed for all categories including ${category}`
+    });
+  } catch (error) {
+    console.error(`Error starting scraper for ${req.params.category}:`, error);
+    res.status(500).json({ error: 'Failed to start scraper', details: error.message });
+  }
+});
+
+// Start server with Context7 optimizations - FIXED: Single database connection
 async function startServer() {
-  console.log('🚀 Starting server with dual database connections...');
+  console.log('🚀 Starting server with optimized single database connection...');
 
-  // Connect both database drivers
-  const [mongoConnected, mongooseConnected] = await Promise.all([
-    connectToMongoDB(),
-    connectToMongoose()
-  ]);
+  // Connect only to MongoDB native driver (better performance)
+  const mongoConnected = await connectToMongoDB();
 
-  if (!mongoConnected || !mongooseConnected) {
-    console.error('❌ Failed to connect to one or more databases');
+  if (!mongoConnected) {
+    console.error('❌ Failed to connect to MongoDB');
     console.log('📊 Database Connection Status:', {
-      mongoNative: mongoConnected ? '✅ Connected' : '❌ Failed',
-      mongoose: mongooseConnected ? '✅ Connected' : '❌ Failed'
+      mongoNative: mongoConnected ? '✅ Connected' : '❌ Failed'
     });
   } else {
-    console.log('✅ Both database connections established successfully');
+    console.log('✅ Database connection established successfully');
   }
 
   // Create HTTP server for WebSocket support
@@ -439,44 +475,50 @@ async function startServer() {
   });
 }
 
-// Context7 optimized graceful shutdown
+// Context7 optimized graceful shutdown - FIXED: Single connection cleanup
 process.on('SIGINT', async() => {
   console.log('\n🛑 Shutting down server with Context7 cleanup...');
 
-  // Close both database connections
-  const shutdownPromises = [];
-
+  // Close MongoDB connection
   if (mongoService) {
-    shutdownPromises.push(
-      mongoService.disconnect()
-        .then(() => console.log('📦 MongoDB native connection closed'))
-        .catch(error => console.error('Error closing MongoDB native connection:', error))
-    );
+    try {
+      await mongoService.disconnect();
+      console.log('📦 MongoDB connection closed successfully');
+    } catch (error) {
+      console.error('Error closing MongoDB connection:', error);
+    }
   }
 
-  if (mongoose.connection.readyState !== 0) {
-    shutdownPromises.push(
-      mongoose.connection.close()
-        .then(() => console.log('🍃 Mongoose connection closed'))
-        .catch(error => console.error('Error closing Mongoose connection:', error))
-    );
-  }
-
-  await Promise.all(shutdownPromises);
-  console.log('✅ All database connections closed');
-
+  console.log('✅ Database connection closed');
   process.exit(0);
 });
 
-// Handle uncaught exceptions with Context7 logging
+// Context7 Pattern: Enhanced error handling with operational error detection
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
-  process.exit(1);
+  console.error('❌ Uncaught Exception:', error);
+  
+  // Context7 Pattern: Check if error is operational
+  const isOperational = error.isOperational === true;
+  const logLevel = isOperational ? 'warn' : 'error';
+  
+  console[logLevel](`${isOperational ? '⚠️ Operational' : '💥 Programming'} error detected:`, {
+    message: error.message,
+    stack: error.stack,
+    isOperational
+  });
+
+  // Context7 Pattern: Only exit for non-operational errors
+  if (!isOperational) {
+    console.error('💀 Exiting process due to non-operational error');
+    process.exit(1);
+  }
 });
 
 process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1);
+  console.error('🔄 Unhandled Promise Rejection at:', promise, 'reason:', reason);
+  
+  // Context7 Pattern: Re-throw to be caught by uncaughtException handler
+  throw reason;
 });
 
 startServer().catch(console.error);

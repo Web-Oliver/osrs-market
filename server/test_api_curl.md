@@ -5,7 +5,7 @@
 Create a new market snapshot:
 
 ```bash
-curl -X POST http://localhost:3001/api/market-data/snapshot \
+curl -X POST http://localhost:3000/api/market-data/snapshot \
   -H "Content-Type: application/json" \
   -d '{
     "itemId": 4151,
@@ -43,7 +43,7 @@ Expected response:
 Retrieve market snapshots for item 4151:
 
 ```bash
-curl http://localhost:3001/api/market-data/4151
+curl http://localhost:3000/api/market-data/4151
 ```
 
 Expected response:
@@ -73,19 +73,19 @@ Expected response:
 
 Filter by interval:
 ```bash
-curl "http://localhost:3001/api/market-data/4151?interval=latest"
+curl "http://localhost:3000/api/market-data/4151?interval=latest"
 ```
 
 Filter by date range:
 ```bash
-curl "http://localhost:3001/api/market-data/4151?startDate=1752769000000&endDate=1752769100000"
+curl "http://localhost:3000/api/market-data/4151?startDate=1752769000000&endDate=1752769100000"
 ```
 
 ## Test 4: Error cases
 
 Test invalid data:
 ```bash
-curl -X POST http://localhost:3001/api/market-data/snapshot \
+curl -X POST http://localhost:3000/api/market-data/snapshot \
   -H "Content-Type: application/json" \
   -d '{
     "itemId": 4151,
@@ -98,10 +98,10 @@ curl -X POST http://localhost:3001/api/market-data/snapshot \
 
 Test invalid itemId:
 ```bash
-curl http://localhost:3001/api/market-data/invalid
+curl http://localhost:3000/api/market-data/invalid
 ```
 
 Test non-existent item:
 ```bash
-curl http://localhost:3001/api/market-data/99999
+curl http://localhost:3000/api/market-data/99999
 ```

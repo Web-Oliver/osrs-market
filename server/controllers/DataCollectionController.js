@@ -536,6 +536,135 @@ class DataCollectionController {
       resourceEfficiency: Math.max(0, 100 - stats.memoryUsage)
     };
   }
+
+  // =========================================
+  // DATA PIPELINE ORCHESTRATOR ENDPOINTS
+  // =========================================
+
+  /**
+   * Start the data pipeline orchestrator
+   */
+  async startPipeline(req, res) {
+    try {
+      const result = await this.dataCollectionService.startDataPipeline();
+      
+      res.json({
+        success: true,
+        message: 'Data pipeline started successfully',
+        data: result,
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      console.error('Error starting pipeline:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to start data pipeline',
+        details: error.message
+      });
+    }
+  }
+
+  /**
+   * Stop the data pipeline orchestrator
+   */
+  async stopPipeline(req, res) {
+    try {
+      const result = await this.dataCollectionService.stopDataPipeline();
+      
+      res.json({
+        success: true,
+        message: 'Data pipeline stopped successfully',
+        data: result,
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      console.error('Error stopping pipeline:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to stop data pipeline',
+        details: error.message
+      });
+    }
+  }
+
+  /**
+   * Get pipeline status and health
+   */
+  async getPipelineStatus(req, res) {
+    try {
+      const status = this.dataCollectionService.getPipelineStatus();
+      const health = this.dataCollectionService.getHealth();
+      
+      res.json({
+        success: true,
+        data: {
+          pipeline: status,
+          health: health,
+          components: {
+            dataCollection: this.dataCollectionService.isCollecting,
+            aiDataFlow: !!this.dataCollectionService.aiDataInterval,
+            monitoring: !!this.dataCollectionService.healthMonitorInterval
+          }
+        },
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      console.error('Error getting pipeline status:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to get pipeline status',
+        details: error.message
+      });
+    }
+  }
+
+  /**
+   * Force push data to AI service
+   */
+  async pushToAI(req, res) {
+    try {
+      const result = await this.dataCollectionService.pushDataToAI();
+      
+      res.json({
+        success: true,
+        message: 'Data pushed to AI service',
+        data: result,
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      console.error('Error pushing to AI:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to push data to AI service',
+        details: error.message
+      });
+    }
+  }
+
+  /**
+   * Test AI service connection
+   */
+  async testAIConnection(req, res) {
+    try {
+      const isConnected = await this.dataCollectionService.testAIServiceConnection();
+      
+      res.json({
+        success: true,
+        data: {
+          aiServiceConnected: isConnected,
+          aiServiceUrl: 'http://localhost:8000'
+        },
+        timestamp: Date.now()
+      });
+    } catch (error) {
+      console.error('Error testing AI connection:', error);
+      res.status(500).json({
+        success: false,
+        error: 'Failed to test AI connection',
+        details: error.message
+      });
+    }
+  }
 }
 
 module.exports = { DataCollectionController };

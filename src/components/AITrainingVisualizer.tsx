@@ -66,8 +66,8 @@ export function AITrainingVisualizer() {
         // Fetch Python AI service status and training data
         const [pythonHealthResponse, trainingStatusResponse, aiTradingResponse] = await Promise.all([
           fetch('http://localhost:8000/api/v1/health/'),
-          fetch('http://localhost:3001/api/auto-training/status'),
-          fetch('http://localhost:3001/api/ai-trading/sessions')
+          fetch('http://localhost:3000/api/auto-training/status'),
+          fetch('http://localhost:3000/api/ai-trading/sessions')
         ])
 
         console.log('🔍 [AITrainingVisualizer] Response statuses:', {
@@ -183,7 +183,7 @@ export function AITrainingVisualizer() {
         if (trainingData.length === 0) {
           try {
             console.log('📈 [AITrainingVisualizer] Fetching historical training data...')
-            const historicalResponse = await fetch('http://localhost:3001/api/auto-training/data/historical')
+            const historicalResponse = await fetch('http://localhost:3000/api/auto-training/data/historical')
             console.log('📈 [AITrainingVisualizer] Historical response status:', historicalResponse.status)
             
             if (historicalResponse.ok) {

@@ -601,6 +601,165 @@ class WebSocketLoggingService {
       memoryUsage: process.memoryUsage()
     };
   }
+
+  // =========================================
+  // REAL-TIME MARKET DATA STREAMING
+  // =========================================
+
+  /**
+   * STREAMING: Broadcast market data to all connected clients
+   */
+  broadcastMarketData(marketData) {
+    try {
+      const message = {
+        type: 'market_data',
+        timestamp: Date.now(),
+        data: marketData
+      };
+
+      this.broadcastToClients(message);
+      this.logger.debug(`📊 Broadcasted market data to ${this.clients.size} clients`);
+    } catch (error) {
+      this.logger.error('❌ Error broadcasting market data', error);
+    }
+  }
+
+  /**
+   * STREAMING: Broadcast pipeline status updates
+   */
+  broadcastPipelineStatus(status) {
+    try {
+      const message = {
+        type: 'pipeline_status',
+        timestamp: Date.now(),
+        data: status
+      };
+
+      this.broadcastToClients(message);
+      this.logger.debug(`🔄 Broadcasted pipeline status to ${this.clients.size} clients`);
+    } catch (error) {
+      this.logger.error('❌ Error broadcasting pipeline status', error);
+    }
+  }
+
+  /**
+   * STREAMING: Broadcast AI training updates
+   */
+  broadcastAITrainingUpdate(trainingData) {
+    try {
+      const message = {
+        type: 'ai_training',
+        timestamp: Date.now(),
+        data: trainingData
+      };
+
+      this.broadcastToClients(message);
+      this.logger.debug(`🤖 Broadcasted AI training update to ${this.clients.size} clients`);
+    } catch (error) {
+      this.logger.error('❌ Error broadcasting AI training update', error);
+    }
+  }
+
+  /**
+   * STREAMING: Broadcast memory usage alerts
+   */
+  broadcastMemoryAlert(memoryData) {
+    try {
+      const message = {
+        type: 'memory_alert',
+        timestamp: Date.now(),
+        severity: memoryData.heapUsed > 500 ? 'critical' : 'warning',
+        data: memoryData
+      };
+
+      this.broadcastToClients(message);
+      this.logger.debug(`⚠️ Broadcasted memory alert to ${this.clients.size} clients`);
+    } catch (error) {
+      this.logger.error('❌ Error broadcasting memory alert', error);
+    }
+  }
+
+  /**
+   * STREAMING: Broadcast system health updates
+   */
+  broadcastSystemHealth(healthData) {
+    try {
+      const message = {
+        type: 'system_health',
+        timestamp: Date.now(),
+        data: healthData
+      };
+
+      this.broadcastToClients(message);
+      this.logger.debug(`❤️ Broadcasted system health to ${this.clients.size} clients`);
+    } catch (error) {
+      this.logger.error('❌ Error broadcasting system health', error);
+    }
+  }
+
+  /**
+   * STREAMING: Generic broadcast method for any message type
+   */
+  broadcastToClients(message) {
+    const messageStr = JSON.stringify(message);
+    const activeClients = [];
+
+    for (const [clientId, client] of this.clients) {
+      try {
+        if (client.ws.readyState === WebSocket.OPEN) {
+          client.ws.send(messageStr);
+          activeClients.push(clientId);
+        } else {
+          // Remove inactive clients
+          this.clients.delete(clientId);
+        }
+      } catch (error) {
+        this.logger.warn(`⚠️ Failed to send message to client ${clientId}`, error);
+        this.clients.delete(clientId);
+      }
+    }
+
+    return activeClients.length;
+  }
+
+  /**
+   * STREAMING: Send message to specific client
+   */
+  sendToClient(clientId, message) {
+    try {
+      const client = this.clients.get(clientId);
+      if (client && client.ws.readyState === WebSocket.OPEN) {
+        client.ws.send(JSON.stringify(message));
+        return true;
+      }
+      return false;
+    } catch (error) {
+      this.logger.error(`❌ Error sending message to client ${clientId}`, error);
+      return false;
+    }
+  }
+
+  /**
+   * STREAMING: Get streaming statistics
+   */
+  getStreamingStats() {
+    const connectedClients = Array.from(this.clients.values()).filter(
+      client => client.ws.readyState === WebSocket.OPEN
+    );
+
+    return {
+      totalClients: this.clients.size,
+      activeClients: connectedClients.length,
+      clientTypes: connectedClients.reduce((acc, client) => {
+        const type = client.metadata?.type || 'unknown';
+        acc[type] = (acc[type] || 0) + 1;
+        return acc;
+      }, {}),
+      messagesSent: this.messagesSent || 0,
+      bytesTransferred: this.bytesTransferred || 0,
+      uptime: process.uptime()
+    };
+  }
 }
 
 module.exports = { WebSocketLoggingService };

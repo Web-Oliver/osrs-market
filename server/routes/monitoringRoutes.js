@@ -10,6 +10,7 @@
 
 const express = require('express');
 const { MonitoringController } = require('../controllers/MonitoringController');
+const { DataCollectionController } = require('../controllers/DataCollectionController');
 const { RequestMiddleware } = require('../middleware/RequestMiddleware');
 const { ErrorMiddleware } = require('../middleware/ErrorMiddleware');
 const { validateRequest } = require('../validators/MonitoringValidator');
@@ -18,6 +19,7 @@ const router = express.Router();
 
 // Context7 Pattern: Initialize dependencies
 const monitoringController = new MonitoringController();
+const dataCollectionController = new DataCollectionController();
 const requestMiddleware = new RequestMiddleware();
 const errorMiddleware = new ErrorMiddleware();
 
@@ -221,6 +223,55 @@ router.post(
     }
   }),
   errorMiddleware.handleAsyncError(monitoringController.runTest)
+);
+
+// =========================================
+// DATA PIPELINE ORCHESTRATOR ROUTES
+// =========================================
+
+/**
+ * Context7 Pattern: POST /api/pipeline/start
+ * Start the data pipeline orchestrator
+ */
+router.post(
+  '/pipeline/start',
+  errorMiddleware.handleAsyncError(dataCollectionController.startPipeline)
+);
+
+/**
+ * Context7 Pattern: POST /api/pipeline/stop
+ * Stop the data pipeline orchestrator
+ */
+router.post(
+  '/pipeline/stop',
+  errorMiddleware.handleAsyncError(dataCollectionController.stopPipeline)
+);
+
+/**
+ * Context7 Pattern: GET /api/pipeline/status
+ * Get pipeline status and health
+ */
+router.get(
+  '/pipeline/status',
+  errorMiddleware.handleAsyncError(dataCollectionController.getPipelineStatus)
+);
+
+/**
+ * Context7 Pattern: POST /api/pipeline/push-ai
+ * Force push data to AI service
+ */
+router.post(
+  '/pipeline/push-ai',
+  errorMiddleware.handleAsyncError(dataCollectionController.pushToAI)
+);
+
+/**
+ * Context7 Pattern: GET /api/pipeline/test-ai
+ * Test AI service connection
+ */
+router.get(
+  '/pipeline/test-ai',
+  errorMiddleware.handleAsyncError(dataCollectionController.testAIConnection)
 );
 
 /**

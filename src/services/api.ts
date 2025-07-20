@@ -38,7 +38,7 @@ export class OSRSApi {
   static async searchItems(query?: string): Promise<ApiResponse<OSRSItem[]>> {
     try {
       // Call the Node.js backend to search items
-      const backendUrl = import.meta.env.VITE_NODE_API_URL || 'http://localhost:3001';
+      const backendUrl = import.meta.env.VITE_NODE_API_URL || 'http://localhost:3000';
       const searchUrl = query 
         ? `${backendUrl}/api/items/search?q=${encodeURIComponent(query)}`
         : `${backendUrl}/api/items`;

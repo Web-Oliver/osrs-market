@@ -213,7 +213,7 @@ const LiveMonitoringDashboard: React.FC = () => {
       // Get both system status and auto training status
       const [systemStatus, autoTrainingResponse] = await Promise.all([
         mongoService.getSystemStatus(),
-        fetch('http://localhost:3001/api/auto-training/status').then(r => r.json())
+        fetch('http://localhost:3000/api/auto-training/status').then(r => r.json())
       ])
       
       // Merge the data, prioritizing auto training service data for data collection

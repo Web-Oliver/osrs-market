@@ -37,6 +37,12 @@ class DataCollectionService {
     // CRITICAL: Initialize MongoDB persistence
     this.initializePersistence();
 
+    // Start memory monitoring for all services
+    this.startMemoryMonitoring();
+
+    // Initialize WebSocket streaming (will be set by server)
+    this.webSocketService = null;
+
     // Collection state
     this.isCollecting = false;
     this.collectionInterval = null;
@@ -510,6 +516,22 @@ class DataCollectionService {
       }
 
       this.logger.info(`✅ Latest market data collection completed: ${savedCount} items saved, ${errorCount} errors`);
+
+      // Stream the collected data in real-time
+      if (savedCount > 0) {
+        try {
+          const marketData = Object.entries(latestPrices.data).map(([itemId, priceData]) => ({
+            itemId: parseInt(itemId),
+            priceData,
+            timestamp: Date.now()
+          }));
+          this.streamMarketData(marketData);
+        } catch (streamError) {
+          // Mark as operational error - streaming failure shouldn't crash collection
+          streamError.isOperational = true;
+          this.logger.warn('⚠️ Failed to stream market data (non-critical)', streamError);
+        }
+      }
 
       return {
         success: true,
@@ -1293,6 +1315,567 @@ class DataCollectionService {
       memory: this.getMemoryUsage(),
       selectedItems: this.selectedItems.size,
       errors: this.collectionStats.errors.length
+    };
+  }
+
+  // =========================================
+  // MEMORY MANAGEMENT METHODS
+  // =========================================
+
+  /**
+   * MEMORY MANAGEMENT: Start memory monitoring for the service
+   */
+  startMemoryMonitoring() {
+    try {
+      // Start memory monitoring for scraper service
+      if (this.osrsDataScraperService.startMemoryMonitoring) {
+        this.osrsDataScraperService.startMemoryMonitoring();
+      }
+
+      // Start our own memory monitoring
+      this.memoryMonitorInterval = setInterval(async () => {
+        await this.monitorServiceMemory();
+      }, 300000); // Every 5 minutes
+
+      this.logger.info('📊 Memory monitoring started for DataCollectionService');
+    } catch (error) {
+      this.logger.error('❌ Failed to start memory monitoring', error);
+    }
+  }
+
+  /**
+   * MEMORY MANAGEMENT: Monitor service memory usage
+   */
+  async monitorServiceMemory() {
+    try {
+      const usage = process.memoryUsage();
+      const memoryMB = {
+        rss: Math.round(usage.rss / 1024 / 1024),
+        heapTotal: Math.round(usage.heapTotal / 1024 / 1024),
+        heapUsed: Math.round(usage.heapUsed / 1024 / 1024),
+        external: Math.round(usage.external / 1024 / 1024)
+      };
+
+      // Log warning if memory usage is high
+      if (memoryMB.heapUsed > 400) { // More than 400MB
+        this.logger.warn(`⚠️ High memory usage: ${memoryMB.heapUsed}MB heap used`);
+        
+        // Stream memory alert
+        this.streamMemoryAlert(memoryMB);
+        
+        // Perform cleanup
+        await this.performMemoryCleanup();
+      }
+
+      // Save memory metrics
+      if (this.mongoPersistence) {
+        await this.mongoPersistence.saveLiveMonitoringData({
+          timestamp: Date.now(),
+          memoryUsage: memoryMB.rss,
+          heapUsed: memoryMB.heapUsed,
+          selectedItemsCount: this.selectedItems.size,
+          cacheSize: this.itemMetrics.size,
+          source: 'memory_monitor'
+        });
+      }
+
+      return memoryMB;
+    } catch (error) {
+      this.logger.error('❌ Error monitoring memory', error);
+    }
+  }
+
+  /**
+   * MEMORY MANAGEMENT: Perform memory cleanup
+   */
+  async performMemoryCleanup() {
+    try {
+      this.logger.info('🧹 Performing memory cleanup...');
+
+      // Clear old cache entries
+      const maxAge = 3600000; // 1 hour
+      const currentTime = Date.now();
+      let clearCount = 0;
+
+      for (const [key, value] of this.itemMetrics.entries()) {
+        if (value.timestamp && currentTime - value.timestamp > maxAge) {
+          this.itemMetrics.delete(key);
+          clearCount++;
+        }
+      }
+
+      // Clear cache
+      if (this.cache && this.cache.clear) {
+        this.cache.clear();
+      }
+
+      // Cleanup scraper service
+      if (this.osrsDataScraperService.cleanupCache) {
+        this.osrsDataScraperService.cleanupCache();
+      }
+
+      // Force garbage collection if available
+      if (global.gc) {
+        const beforeGC = process.memoryUsage().heapUsed;
+        global.gc();
+        const afterGC = process.memoryUsage().heapUsed;
+        const freed = Math.round((beforeGC - afterGC) / 1024 / 1024);
+        this.logger.info(`🗑️ Garbage collection freed ${freed}MB`);
+      }
+
+      this.logger.info(`✅ Memory cleanup completed - cleared ${clearCount} old entries`);
+    } catch (error) {
+      this.logger.error('❌ Error during memory cleanup', error);
+    }
+  }
+
+  /**
+   * MEMORY MANAGEMENT: Stop memory monitoring
+   */
+  stopMemoryMonitoring() {
+    try {
+      if (this.memoryMonitorInterval) {
+        clearInterval(this.memoryMonitorInterval);
+        this.memoryMonitorInterval = null;
+      }
+
+      // Stop scraper memory monitoring
+      if (this.osrsDataScraperService.stopMemoryMonitoring) {
+        this.osrsDataScraperService.stopMemoryMonitoring();
+      }
+
+      this.logger.info('🛑 Memory monitoring stopped');
+    } catch (error) {
+      this.logger.error('❌ Error stopping memory monitoring', error);
+    }
+  }
+
+  /**
+   * MEMORY MANAGEMENT: Get comprehensive memory statistics
+   */
+  getMemoryStats() {
+    const usage = process.memoryUsage();
+    const memoryMB = {
+      rss: Math.round(usage.rss / 1024 / 1024),
+      heapTotal: Math.round(usage.heapTotal / 1024 / 1024),
+      heapUsed: Math.round(usage.heapUsed / 1024 / 1024),
+      external: Math.round(usage.external / 1024 / 1024)
+    };
+
+    return {
+      process: memoryMB,
+      service: {
+        selectedItems: this.selectedItems.size,
+        itemMetrics: this.itemMetrics.size,
+        isCollecting: this.isCollecting,
+        uptime: this.collectionStats.startTime ? Date.now() - this.collectionStats.startTime : 0
+      },
+      scraper: this.osrsDataScraperService.getMemoryUsage ? this.osrsDataScraperService.getMemoryUsage() : null
+    };
+  }
+
+  // =========================================
+  // WEBSOCKET INTEGRATION METHODS
+  // =========================================
+
+  /**
+   * WEBSOCKET: Set WebSocket service for real-time streaming
+   */
+  setWebSocketService(webSocketService) {
+    this.webSocketService = webSocketService;
+    this.logger.info('📡 WebSocket service attached for real-time streaming');
+  }
+
+  /**
+   * WEBSOCKET: Stream market data in real-time
+   */
+  streamMarketData(marketData) {
+    try {
+      if (this.webSocketService) {
+        const streamData = {
+          timestamp: Date.now(),
+          itemCount: marketData.length,
+          items: marketData.slice(0, 10), // Send first 10 items to avoid large payloads
+          summary: {
+            totalItems: marketData.length,
+            avgPrice: marketData.reduce((sum, item) => sum + (item.priceData?.high || 0), 0) / marketData.length,
+            topItem: marketData[0]?.itemName || 'N/A'
+          }
+        };
+
+        this.webSocketService.broadcastMarketData(streamData);
+        this.logger.debug(`📊 Streamed market data: ${marketData.length} items`);
+      }
+    } catch (error) {
+      this.logger.error('❌ Error streaming market data', error);
+    }
+  }
+
+  /**
+   * WEBSOCKET: Stream collection statistics
+   */
+  streamCollectionStats() {
+    try {
+      if (this.webSocketService) {
+        const stats = this.getCollectionStats();
+        const memoryStats = this.getMemoryStats();
+
+        const streamData = {
+          stats,
+          memory: memoryStats,
+          pipeline: this.getPipelineStatus(),
+          timestamp: Date.now()
+        };
+
+        this.webSocketService.broadcastSystemHealth(streamData);
+        this.logger.debug('📈 Streamed collection statistics');
+      }
+    } catch (error) {
+      this.logger.error('❌ Error streaming collection stats', error);
+    }
+  }
+
+  /**
+   * WEBSOCKET: Stream memory alerts when usage is high
+   */
+  streamMemoryAlert(memoryData) {
+    try {
+      if (this.webSocketService && memoryData.heapUsed > 300) {
+        this.webSocketService.broadcastMemoryAlert(memoryData);
+        this.logger.warn(`⚠️ Streamed memory alert: ${memoryData.heapUsed}MB`);
+      }
+    } catch (error) {
+      this.logger.error('❌ Error streaming memory alert', error);
+    }
+  }
+
+  /**
+   * WEBSOCKET: Stream pipeline status updates
+   */
+  streamPipelineStatus() {
+    try {
+      if (this.webSocketService) {
+        const status = this.getPipelineStatus();
+        this.webSocketService.broadcastPipelineStatus(status);
+        this.logger.debug('🔄 Streamed pipeline status');
+      }
+    } catch (error) {
+      this.logger.error('❌ Error streaming pipeline status', error);
+    }
+  }
+
+  // =========================================
+  // DATA PIPELINE ORCHESTRATOR METHODS
+  // =========================================
+
+  /**
+   * ORCHESTRATOR: Start complete data pipeline
+   * Coordinates scraper → backend → AI microservice flow
+   */
+  async startDataPipeline() {
+    try {
+      this.logger.info('🚀 Starting Data Pipeline Orchestrator');
+      
+      // Step 1: Initialize all services
+      await this.initializeAllServices();
+      
+      // Step 2: Start data collection
+      await this.startDataCollection();
+      
+      // Step 3: Start AI data pipeline
+      await this.startAIDataFlow();
+      
+      // Step 4: Setup real-time monitoring
+      await this.setupRealTimeMonitoring();
+      
+      this.logger.info('✅ Data Pipeline Orchestrator started successfully');
+      return { success: true, message: 'Pipeline started' };
+    } catch (error) {
+      this.logger.error('❌ Failed to start data pipeline', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ORCHESTRATOR: Initialize all pipeline services
+   */
+  async initializeAllServices() {
+    this.logger.info('🔧 Initializing pipeline services...');
+    
+    // Initialize MongoDB persistence
+    if (!this.mongoPersistence) {
+      await this.initializePersistence();
+    }
+    
+    // Initialize scraper
+    if (!this.osrsDataScraperService.mongoPersistence) {
+      await this.osrsDataScraperService.initialize();
+    }
+    
+    // Test AI microservice connection
+    await this.testAIServiceConnection();
+    
+    this.logger.info('✅ All pipeline services initialized');
+  }
+
+  /**
+   * ORCHESTRATOR: Test AI microservice connection
+   */
+  async testAIServiceConnection() {
+    try {
+      const response = await fetch('http://localhost:8000/health');
+      if (response.ok) {
+        this.logger.info('✅ AI microservice connection verified');
+        return true;
+      } else {
+        throw new Error(`AI service responded with status: ${response.status}`);
+      }
+    } catch (error) {
+      this.logger.warn('⚠️ AI microservice not responding, pipeline will continue without AI features');
+      return false;
+    }
+  }
+
+  /**
+   * ORCHESTRATOR: Start AI data flow pipeline
+   */
+  async startAIDataFlow() {
+    try {
+      this.logger.info('🤖 Starting AI data flow pipeline...');
+      
+      // Set up periodic data push to AI service
+      this.aiDataInterval = setInterval(async () => {
+        try {
+          await this.pushDataToAI();
+        } catch (error) {
+          this.logger.error('❌ Error in AI data push', error);
+        }
+      }, 60000); // Every minute
+      
+      this.logger.info('✅ AI data flow pipeline started');
+    } catch (error) {
+      this.logger.error('❌ Failed to start AI data flow', error);
+    }
+  }
+
+  /**
+   * ORCHESTRATOR: Push latest market data to AI microservice
+   */
+  async pushDataToAI() {
+    try {
+      // Validate prerequisites - fail fast
+      if (!this.mongoPersistence) {
+        const error = new Error('MongoDB persistence not initialized');
+        error.isOperational = true;
+        throw error;
+      }
+
+      // Get latest market data from MongoDB
+      const marketData = await this.mongoPersistence.getMarketData({
+        limit: 100,
+        onlyTradeable: true
+      });
+
+      if (marketData.length === 0) {
+        return { success: false, message: 'No market data available' };
+      }
+
+      // Format data for AI service with validation
+      const aiData = marketData.map(item => {
+        if (!item.itemId || !item.priceData) {
+          const error = new Error(`Invalid market data item: missing itemId or priceData`);
+          error.isOperational = true;
+          throw error;
+        }
+        return {
+          itemId: item.itemId,
+          itemName: item.itemName,
+          priceData: item.priceData,
+          timestamp: item.timestamp,
+          spread: item.spread,
+          volume: item.volume
+        };
+      });
+
+      // Send to AI microservice with timeout
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+      try {
+        const response = await fetch('http://localhost:8000/api/v1/training/market-data', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            data: aiData,
+            timestamp: Date.now(),
+            source: 'pipeline_orchestrator'
+          }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeout);
+
+        if (response.ok) {
+          this.logger.info(`📤 Pushed ${aiData.length} market items to AI service`);
+          return { success: true, itemsPushed: aiData.length };
+        } else {
+          const aiError = new Error(`AI service responded with status: ${response.status}`);
+          aiError.isOperational = true; // AI service issues are operational
+          throw aiError;
+        }
+      } catch (fetchError) {
+        clearTimeout(timeout);
+        if (fetchError.name === 'AbortError') {
+          const timeoutError = new Error('AI service request timeout (10s)');
+          timeoutError.isOperational = true;
+          throw timeoutError;
+        }
+        throw fetchError;
+      }
+    } catch (error) {
+      // Log error with operational flag context
+      const logLevel = error.isOperational ? 'warn' : 'error';
+      this.logger[logLevel](`❌ Failed to push data to AI service`, error);
+      
+      return { 
+        success: false, 
+        error: error.message,
+        isOperational: error.isOperational || false
+      };
+    }
+  }
+
+  /**
+   * ORCHESTRATOR: Setup real-time monitoring
+   */
+  async setupRealTimeMonitoring() {
+    try {
+      this.logger.info('📊 Setting up real-time monitoring...');
+      
+      // Monitor pipeline health every 30 seconds
+      this.healthMonitorInterval = setInterval(async () => {
+        await this.monitorPipelineHealth();
+      }, 30000);
+      
+      // Save monitoring metrics every 5 minutes
+      this.metricsInterval = setInterval(async () => {
+        await this.saveMonitoringMetrics();
+      }, 300000);
+      
+      this.logger.info('✅ Real-time monitoring active');
+    } catch (error) {
+      this.logger.error('❌ Failed to setup monitoring', error);
+    }
+  }
+
+  /**
+   * ORCHESTRATOR: Monitor pipeline health
+   */
+  async monitorPipelineHealth() {
+    try {
+      const health = {
+        timestamp: Date.now(),
+        scraper: this.osrsDataScraperService.browser ? 'healthy' : 'unhealthy',
+        database: this.mongoPersistence ? 'healthy' : 'unhealthy',
+        aiService: await this.testAIServiceConnection() ? 'healthy' : 'unhealthy',
+        dataCollection: this.isCollecting ? 'active' : 'inactive',
+        selectedItems: this.selectedItems.size,
+        memoryUsage: this.getMemoryUsage()
+      };
+
+      // Log health issues
+      if (health.scraper === 'unhealthy') {
+        this.logger.warn('⚠️ Scraper service unhealthy - attempting restart');
+        await this.osrsDataScraperService.launchBrowser();
+      }
+
+      if (health.database === 'unhealthy') {
+        this.logger.warn('⚠️ Database connection unhealthy');
+        await this.initializePersistence();
+      }
+
+      return health;
+    } catch (error) {
+      this.logger.error('❌ Error monitoring pipeline health', error);
+      return { error: error.message };
+    }
+  }
+
+  /**
+   * ORCHESTRATOR: Save monitoring metrics to database
+   */
+  async saveMonitoringMetrics() {
+    try {
+      if (!this.mongoPersistence) return;
+
+      const metrics = {
+        timestamp: Date.now(),
+        pipelineStatus: 'active',
+        itemsProcessed: this.collectionStats.totalItemsProcessed || 0,
+        successRate: this.collectionStats.totalCollections > 0 ?
+          (this.collectionStats.successfulCollections / this.collectionStats.totalCollections) * 100 : 0,
+        responseTime: this.collectionStats.averageResponseTime || 0,
+        memoryUsage: this.getMemoryUsage().rss,
+        selectedItemsCount: this.selectedItems.size,
+        errors: this.collectionStats.errors.length
+      };
+
+      await this.mongoPersistence.saveLiveMonitoringData(metrics);
+      this.logger.debug('📊 Monitoring metrics saved to database');
+    } catch (error) {
+      this.logger.error('❌ Failed to save monitoring metrics', error);
+    }
+  }
+
+  /**
+   * ORCHESTRATOR: Stop data pipeline
+   */
+  async stopDataPipeline() {
+    try {
+      this.logger.info('🛑 Stopping Data Pipeline Orchestrator');
+      
+      // Stop data collection
+      await this.stopDataCollection();
+      
+      // Clear intervals
+      if (this.aiDataInterval) {
+        clearInterval(this.aiDataInterval);
+        this.aiDataInterval = null;
+      }
+      
+      if (this.healthMonitorInterval) {
+        clearInterval(this.healthMonitorInterval);
+        this.healthMonitorInterval = null;
+      }
+      
+      if (this.metricsInterval) {
+        clearInterval(this.metricsInterval);
+        this.metricsInterval = null;
+      }
+      
+      this.logger.info('✅ Data Pipeline Orchestrator stopped');
+      return { success: true, message: 'Pipeline stopped' };
+    } catch (error) {
+      this.logger.error('❌ Failed to stop data pipeline', error);
+      throw error;
+    }
+  }
+
+  /**
+   * ORCHESTRATOR: Get pipeline status
+   */
+  getPipelineStatus() {
+    return {
+      isActive: this.isCollecting,
+      aiDataFlow: !!this.aiDataInterval,
+      healthMonitoring: !!this.healthMonitorInterval,
+      metricsCollection: !!this.metricsInterval,
+      selectedItems: this.selectedItems.size,
+      uptime: this.collectionStats.startTime ? Date.now() - this.collectionStats.startTime : 0,
+      lastDataPush: this.lastAIDataPush || null,
+      stats: this.getCollectionStats()
     };
   }
 }

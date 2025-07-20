@@ -3,7 +3,7 @@ import type { AutoTrainingConfig } from '../types/autoTraining'
 
 // Environment-based configuration
 const API_CONFIG = {
-  nodeBackend: import.meta.env.VITE_NODE_API_URL || 'http://localhost:3001'
+  nodeBackend: import.meta.env.VITE_NODE_API_URL || 'http://localhost:3000'
 }
 
 const BASE_URL = `${API_CONFIG.nodeBackend}/api/auto-training`

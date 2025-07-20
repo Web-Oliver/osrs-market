@@ -41,7 +41,7 @@ export function AutoTrainingDashboard() {
   useEffect(() => {
     const fetchTrainingMetrics = async () => {
       try {
-        const response = await fetch('http://localhost:3001/api/auto-training/status');
+        const response = await fetch('http://localhost:3000/api/auto-training/status');
         if (response.ok) {
           const statusData = await response.json();
           if (statusData.success && statusData.data?.status?.training?.metrics) {

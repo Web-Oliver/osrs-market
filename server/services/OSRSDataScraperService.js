@@ -31,12 +31,21 @@ class OSRSDataScraperService {
     this.itemRepository = new ItemRepository();
     this.itemDomainService = new ItemDomainService();
 
-    // OSRS Grand Exchange URLs for top 100 lists
+    // FIXED: OSRS Grand Exchange URLs for top 100 items per category (400 total)
+    // We'll scrape multiple pages/scales to get more items per category
     this.urls = {
       mostTraded: 'https://secure.runescape.com/m=itemdb_oldschool/top100?list=0&scale=3',
-      greatestRise: 'https://secure.runescape.com/m=itemdb_oldschool/top100?list=1&scale=3',
+      greatestRise: 'https://secure.runescape.com/m=itemdb_oldschool/top100?list=1&scale=3', 
       mostValuable: 'https://secure.runescape.com/m=itemdb_oldschool/top100?list=2&scale=3',
       greatestFall: 'https://secure.runescape.com/m=itemdb_oldschool/top100?list=3&scale=3'
+    };
+    
+    // Additional URL patterns to get more items (different time scales)
+    this.additionalUrls = {
+      mostTraded1h: 'https://secure.runescape.com/m=itemdb_oldschool/top100?list=0&scale=1',
+      mostTraded5m: 'https://secure.runescape.com/m=itemdb_oldschool/top100?list=0&scale=0',
+      greatestRise1h: 'https://secure.runescape.com/m=itemdb_oldschool/top100?list=1&scale=1',
+      greatestRise5m: 'https://secure.runescape.com/m=itemdb_oldschool/top100?list=1&scale=0'
     };
 
     this.searchBaseUrl = 'https://secure.runescape.com/m=itemdb_oldschool/results';
@@ -1506,24 +1515,147 @@ class OSRSDataScraperService {
   }
 
   /**
-   * Context7 Pattern: Cleanup resources
+   * Context7 Pattern: Cleanup resources with memory management
    */
   async cleanup() {
     try {
+      this.logger.info('🧹 Starting comprehensive cleanup...');
+
+      // Close browser and all pages
       if (this.browser) {
+        const pages = await this.browser.pages();
+        for (const page of pages) {
+          if (!page.isClosed()) {
+            await page.close();
+          }
+        }
         await this.browser.close();
         this.browser = null;
+        this.logger.info('✅ Browser cleanup completed');
       }
 
+      // Close MongoDB connection
       if (this.mongoPersistence) {
-        await this.mongoPersistence.close();
+        await this.mongoPersistence.disconnect();
         this.mongoPersistence = null;
+        this.logger.info('✅ MongoDB cleanup completed');
+      }
+
+      // Clear memory caches
+      this.itemHistoryCache.clear();
+      this.scrapedData = {
+        mostTraded: [],
+        greatestRise: [],
+        mostValuable: [],
+        greatestFall: []
+      };
+      this.detectedPatterns = [];
+
+      // Force garbage collection if available
+      if (global.gc) {
+        global.gc();
+        this.logger.info('🗑️ Garbage collection forced');
       }
 
       this.logger.info('✅ OSRS Data Scraper cleanup completed');
     } catch (error) {
       this.logger.error('❌ Error during cleanup', error);
     }
+  }
+
+  /**
+   * MEMORY MANAGEMENT: Get memory usage statistics
+   */
+  getMemoryUsage() {
+    const usage = process.memoryUsage();
+    return {
+      rss: Math.round(usage.rss / 1024 / 1024), // MB
+      heapTotal: Math.round(usage.heapTotal / 1024 / 1024), // MB
+      heapUsed: Math.round(usage.heapUsed / 1024 / 1024), // MB
+      external: Math.round(usage.external / 1024 / 1024), // MB
+      cacheSize: this.itemHistoryCache.size,
+      scrapedDataSize: Object.values(this.scrapedData).reduce((total, arr) => total + arr.length, 0)
+    };
+  }
+
+  /**
+   * MEMORY MANAGEMENT: Clear old cache entries
+   */
+  cleanupCache() {
+    const maxCacheAge = 3600000; // 1 hour
+    const currentTime = Date.now();
+    let clearCount = 0;
+
+    for (const [key, value] of this.itemHistoryCache.entries()) {
+      if (value.timestamp && currentTime - value.timestamp > maxCacheAge) {
+        this.itemHistoryCache.delete(key);
+        clearCount++;
+      }
+    }
+
+    if (clearCount > 0) {
+      this.logger.info(`🧹 Cleared ${clearCount} old cache entries`);
+    }
+
+    return clearCount;
+  }
+
+  /**
+   * MEMORY MANAGEMENT: Monitor and report memory usage
+   */
+  async monitorMemory() {
+    const usage = this.getMemoryUsage();
+    
+    // Log warning if memory usage is high
+    if (usage.heapUsed > 500) { // More than 500MB
+      this.logger.warn(`⚠️ High memory usage detected: ${usage.heapUsed}MB heap used`);
+      
+      // Perform cleanup
+      this.cleanupCache();
+      
+      // Force garbage collection if available
+      if (global.gc) {
+        global.gc();
+        const newUsage = this.getMemoryUsage();
+        this.logger.info(`🗑️ Memory after GC: ${newUsage.heapUsed}MB (freed ${usage.heapUsed - newUsage.heapUsed}MB)`);
+      }
+    }
+
+    return usage;
+  }
+
+  /**
+   * MEMORY MANAGEMENT: Setup periodic memory monitoring
+   */
+  startMemoryMonitoring() {
+    // Monitor memory every 5 minutes
+    this.memoryMonitorInterval = setInterval(async () => {
+      await this.monitorMemory();
+    }, 300000);
+
+    // Cleanup cache every 30 minutes
+    this.cacheCleanupInterval = setInterval(() => {
+      this.cleanupCache();
+    }, 1800000);
+
+    this.logger.info('📊 Memory monitoring started');
+  }
+
+  /**
+   * MEMORY MANAGEMENT: Stop memory monitoring
+   */
+  stopMemoryMonitoring() {
+    if (this.memoryMonitorInterval) {
+      clearInterval(this.memoryMonitorInterval);
+      this.memoryMonitorInterval = null;
+    }
+
+    if (this.cacheCleanupInterval) {
+      clearInterval(this.cacheCleanupInterval);
+      this.cacheCleanupInterval = null;
+    }
+
+    this.logger.info('🛑 Memory monitoring stopped');
   }
 }
 

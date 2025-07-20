@@ -27,18 +27,18 @@ class MongoDataPersistence {
     this.collectionStatsCollection = null;
     this.liveMonitoringCollection = null;
 
-    // Context7 Optimized Connection Configuration
+    // OPTIMIZED: Fixed Connection Configuration (reduced from performance-killing 50 connections)
     this.connectionOptions = {
-      // Connection Pool Optimization (Context7 Best Practices)
-      maxPoolSize: 50, // Maximum connections in pool
-      minPoolSize: 5, // Minimum connections maintained
-      maxConnecting: 5, // Max concurrent connection attempts
-      maxIdleTimeMS: 30000, // 30 seconds idle timeout
+      // Connection Pool Optimization - FIXED for single application
+      maxPoolSize: 10, // REDUCED: Maximum connections in pool (was 50 - too high)
+      minPoolSize: 2,  // REDUCED: Minimum connections maintained (was 5)
+      maxConnecting: 2, // REDUCED: Max concurrent connection attempts (was 5)
+      maxIdleTimeMS: 60000, // INCREASED: 60 seconds idle timeout
 
-      // Timeout Configuration (Context7 Recommended)
-      connectTimeoutMS: 10000, // 10 seconds connection timeout
-      socketTimeoutMS: 45000, // 45 seconds socket timeout
-      serverSelectionTimeoutMS: 10000, // 10 seconds server selection timeout
+      // Timeout Configuration - OPTIMIZED for stability  
+      connectTimeoutMS: 30000, // INCREASED: 30 seconds connection timeout (was 10)
+      socketTimeoutMS: 120000, // INCREASED: 120 seconds socket timeout (was 45)
+      serverSelectionTimeoutMS: 30000, // INCREASED: 30 seconds server selection timeout
 
       // Reliability & Performance (Context7 Optimized)
       retryWrites: true, // Enable retry for write operations
