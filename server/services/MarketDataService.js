@@ -9,10 +9,8 @@
  * - Caching and performance optimization
  */
 
-const MongoDataPersistence = require('./mongoDataPersistence');
-const { Logger } = require('../utils/Logger');
+const { BaseService } = require('./BaseService');
 const fetch = require('node-fetch');
-const { CacheManager } = require('../utils/CacheManager');
 const { DataTransformer } = require('../utils/DataTransformer');
 const { PriceCalculator } = require('../utils/PriceCalculator');
 const { FinancialMetricsCalculator } = require('../utils/FinancialMetricsCalculator');
@@ -30,10 +28,15 @@ const {
 const { AITradingOrchestratorService } = require('./AITradingOrchestratorService');
 const { ItemRepository } = require('../repositories/ItemRepository');
 
-class MarketDataService {
+class MarketDataService extends BaseService {
   constructor() {
-    this.logger = new Logger('MarketDataService');
-    this.cache = new CacheManager('market_data', 600); // 10 minutes cache
+    super('MarketDataService', {
+      enableCache: true,
+      cachePrefix: 'market_data',
+      cacheTTL: 600,
+      enableMongoDB: true
+    });
+    
     this.dataTransformer = new DataTransformer();
     this.priceCalculator = new PriceCalculator();
     this.metricsCalculator = new FinancialMetricsCalculator();
@@ -42,126 +45,119 @@ class MarketDataService {
     // TRADING INTEGRATION
     this.itemRepository = new ItemRepository();
     this.aiTrading = new AITradingOrchestratorService();
-
-    // Context7 Pattern: Initialize MongoDB persistence
-    this.initializeMongoDB();
   }
 
   /**
-   * Context7 Pattern: Get live market data from OSRS Wiki API
+   * Context7 Pattern: Get live market data from OSRS Wiki API with caching
    */
   async getLiveMarketData() {
-    try {
-      this.logger.info('Fetching live market data from OSRS Wiki API');
+    return await this.withCache('live_market_data', async () => {
+      return await this.withRetry(async () => {
+        this.logger.info('Fetching live market data from OSRS Wiki API');
 
-      const response = await fetch('https://prices.runescape.wiki/api/v1/osrs/latest', {
-        headers: {
-          'User-Agent': 'OSRS-Market-Backend - Market Analysis Tool'
+        const response = await fetch('https://prices.runescape.wiki/api/v1/osrs/latest', {
+          headers: {
+            'User-Agent': 'OSRS-Market-Backend - Market Analysis Tool'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`OSRS Wiki API returned ${response.status}`);
         }
-      });
 
-      if (!response.ok) {
-        throw new Error(`OSRS Wiki API returned ${response.status}`);
-      }
+        const wikiData = await response.json();
+        const processedData = {};
 
-      const wikiData = await response.json();
-      const processedData = {};
+        // Convert wiki format to our market data format
+        Object.entries(wikiData.data).forEach(([itemId, priceData]) => {
+          if (priceData.high && priceData.low) {
+            const marginGp = priceData.high - priceData.low;
+            const marginPercent = (marginGp / priceData.low) * 100;
 
-      // Convert wiki format to our market data format
-      Object.entries(wikiData.data).forEach(([itemId, priceData]) => {
-        if (priceData.high && priceData.low) {
-          const marginGp = priceData.high - priceData.low;
-          const marginPercent = (marginGp / priceData.low) * 100;
+            processedData[itemId] = {
+              itemId: parseInt(itemId),
+              highPrice: priceData.high,
+              lowPrice: priceData.low,
+              volume: 100, // Wiki doesn't provide volume in latest endpoint
+              marginGp: marginGp,
+              marginPercent: marginPercent,
+              rsi: 50, // Default neutral RSI
+              volatility: Math.min(marginPercent * 2, 100), // Estimated volatility
+              riskScore: Math.min(25 + (marginPercent * 0.5), 100), // Estimated risk
+              expectedProfitPerHour: marginGp * 20, // Estimated profit per hour
+              timestamp: priceData.highTime || Date.now()
+            };
+          }
+        });
 
-          processedData[itemId] = {
-            itemId: parseInt(itemId),
-            highPrice: priceData.high,
-            lowPrice: priceData.low,
-            volume: 100, // Wiki doesn't provide volume in latest endpoint
-            marginGp: marginGp,
-            marginPercent: marginPercent,
-            rsi: 50, // Default neutral RSI
-            volatility: Math.min(marginPercent * 2, 100), // Estimated volatility
-            riskScore: Math.min(25 + (marginPercent * 0.5), 100), // Estimated risk
-            expectedProfitPerHour: marginGp * 20, // Estimated profit per hour
-            timestamp: priceData.highTime || Date.now()
-          };
-        }
-      });
-
-      this.logger.info(`Processed ${Object.keys(processedData).length} items from OSRS Wiki API`);
-      return processedData;
-
-    } catch (error) {
-      this.logger.error('Failed to fetch live market data from OSRS Wiki', error);
-      throw error;
-    }
+        this.logger.info(`Processed ${Object.keys(processedData).length} items from OSRS Wiki API`);
+        return processedData;
+      }, 'fetch live market data');
+    }, 300); // Cache for 5 minutes
   }
 
   /**
-   * Context7 Pattern: Get 5-minute market data from OSRS Wiki API with volume
+   * Context7 Pattern: Get 5-minute market data from OSRS Wiki API with volume and caching
    */
   async get5MinuteMarketData() {
-    try {
-      this.logger.info('Fetching 5-minute market data from OSRS Wiki API');
+    return await this.withCache('5min_market_data', async () => {
+      return await this.withRetry(async () => {
+        this.logger.info('Fetching 5-minute market data from OSRS Wiki API');
 
-      const response = await fetch('https://prices.runescape.wiki/api/v1/osrs/5m', {
-        headers: {
-          'User-Agent': 'OSRS-Market-Backend - Market Analysis Tool'
+        const response = await fetch('https://prices.runescape.wiki/api/v1/osrs/5m', {
+          headers: {
+            'User-Agent': 'OSRS-Market-Backend - Market Analysis Tool'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`OSRS Wiki 5m API returned ${response.status}`);
         }
-      });
 
-      if (!response.ok) {
-        throw new Error(`OSRS Wiki 5m API returned ${response.status}`);
-      }
+        const wikiData = await response.json();
+        const processedData = {};
 
-      const wikiData = await response.json();
-      const processedData = {};
+        // Convert wiki 5m format to our market data format
+        Object.entries(wikiData.data).forEach(([itemId, priceData]) => {
+          if (priceData.avgHighPrice && priceData.avgLowPrice && priceData.highPriceVolume) {
+            const marginGp = priceData.avgHighPrice - priceData.avgLowPrice;
+            const marginPercent = (marginGp / priceData.avgLowPrice) * 100;
+            const volume = priceData.highPriceVolume + priceData.lowPriceVolume;
 
-      // Convert wiki 5m format to our market data format
-      Object.entries(wikiData.data).forEach(([itemId, priceData]) => {
-        if (priceData.avgHighPrice && priceData.avgLowPrice && priceData.highPriceVolume) {
-          const marginGp = priceData.avgHighPrice - priceData.avgLowPrice;
-          const marginPercent = (marginGp / priceData.avgLowPrice) * 100;
-          const volume = priceData.highPriceVolume + priceData.lowPriceVolume;
+            // Calculate volatility based on price range and volume
+            const priceRange = (marginGp / priceData.avgLowPrice) * 100;
+            const volatility = Math.min(priceRange * 1.5, 100);
 
-          // Calculate volatility based on price range and volume
-          const priceRange = (marginGp / priceData.avgLowPrice) * 100;
-          const volatility = Math.min(priceRange * 1.5, 100);
+            // Calculate risk score based on volatility and volume
+            const volumeScore = Math.min(volume / 100, 50); // Higher volume = lower risk
+            const riskScore = Math.max(5, Math.min(95, volatility - volumeScore + 25));
 
-          // Calculate risk score based on volatility and volume
-          const volumeScore = Math.min(volume / 100, 50); // Higher volume = lower risk
-          const riskScore = Math.max(5, Math.min(95, volatility - volumeScore + 25));
+            // Calculate expected profit per hour based on volume and margin
+            const turnoverRate = Math.min(volume / 10, 50); // How often we can flip
+            const expectedProfitPerHour = marginGp * turnoverRate;
 
-          // Calculate expected profit per hour based on volume and margin
-          const turnoverRate = Math.min(volume / 10, 50); // How often we can flip
-          const expectedProfitPerHour = marginGp * turnoverRate;
+            processedData[itemId] = {
+              itemId: parseInt(itemId),
+              highPrice: priceData.avgHighPrice,
+              lowPrice: priceData.avgLowPrice,
+              volume: volume,
+              marginGp: marginGp,
+              marginPercent: marginPercent,
+              rsi: volume > 50 ? (volume > 200 ? 45 : 50) : 55, // Estimate RSI based on volume
+              volatility: volatility,
+              riskScore: riskScore,
+              expectedProfitPerHour: expectedProfitPerHour,
+              timestamp: wikiData.timestamp || Date.now(),
+              interval: '5m',
+              source: 'osrs_wiki_5m'
+            };
+          }
+        });
 
-          processedData[itemId] = {
-            itemId: parseInt(itemId),
-            highPrice: priceData.avgHighPrice,
-            lowPrice: priceData.avgLowPrice,
-            volume: volume,
-            marginGp: marginGp,
-            marginPercent: marginPercent,
-            rsi: volume > 50 ? (volume > 200 ? 45 : 50) : 55, // Estimate RSI based on volume
-            volatility: volatility,
-            riskScore: riskScore,
-            expectedProfitPerHour: expectedProfitPerHour,
-            timestamp: wikiData.timestamp || Date.now(),
-            interval: '5m',
-            source: 'osrs_wiki_5m'
-          };
-        }
-      });
-
-      this.logger.info(`Processed ${Object.keys(processedData).length} items from OSRS Wiki 5m API`);
-      return processedData;
-
-    } catch (error) {
-      this.logger.error('Failed to fetch 5-minute market data from OSRS Wiki', error);
-      throw error;
-    }
+        this.logger.info(`Processed ${Object.keys(processedData).length} items from OSRS Wiki 5m API`);
+        return processedData;
+      }, 'fetch 5-minute market data');
+    }, 300); // Cache for 5 minutes
   }
 
   /**
@@ -449,9 +445,6 @@ class MarketDataService {
    */
   async saveTimeseriesData(timeseriesData) {
     try {
-      if (!this.mongoService) {
-        await this.initializeMongoDB();
-      }
 
       const collection = 'market_timeseries';
       const document = {
@@ -486,9 +479,6 @@ class MarketDataService {
    */
   async getStoredTimeseriesData(itemId, timestep = '5m', limit = 1) {
     try {
-      if (!this.mongoService) {
-        await this.initializeMongoDB();
-      }
 
       const collection = 'market_timeseries';
       const filter = { itemId: parseInt(itemId), timestep: timestep };
@@ -508,40 +498,13 @@ class MarketDataService {
     }
   }
 
-  /**
-   * Context7 Pattern: Initialize MongoDB with proper error handling
-   */
-  async initializeMongoDB() {
-    try {
-      const mongoConfig = {
-        connectionString: process.env.MONGODB_CONNECTION_STRING || 'mongodb://localhost:27017',
-        databaseName: process.env.MONGODB_DATABASE || 'osrs_market_data'
-      };
-
-      this.mongoService = new MongoDataPersistence(mongoConfig);
-      await this.mongoService.connect();
-
-      this.logger.info('MongoDB persistence initialized successfully');
-    } catch (error) {
-      this.logger.error('Failed to initialize MongoDB persistence', error);
-      this.mongoService = null;
-    }
-  }
 
   /**
    * Context7 Pattern: Get market data with advanced filtering
    */
   async getMarketData(options = {}) {
-    try {
+    return await this.withCache(`market_data_${JSON.stringify(options)}`, async () => {
       this.logger.debug('Fetching market data', { options });
-
-      const cacheKey = this.generateCacheKey('market_data', options);
-      const cachedData = this.cache.get(cacheKey);
-
-      if (cachedData) {
-        this.logger.debug('Returning cached market data');
-        return cachedData;
-      }
 
       let data;
       if (this.mongoService) {
@@ -558,18 +521,13 @@ class MarketDataService {
       // Context7 Pattern: Apply additional business logic
       const enrichedData = this.enrichMarketData(transformedData, options);
 
-      this.cache.set(cacheKey, enrichedData);
-
       this.logger.debug('Successfully fetched market data', {
         recordCount: enrichedData.length,
         source: this.mongoService ? 'mongodb' : 'fallback'
       });
 
       return enrichedData;
-    } catch (error) {
-      this.logger.error('Error fetching market data', error, { options });
-      throw error;
-    }
+    }, 300); // Cache for 5 minutes
   }
 
   /**
@@ -591,7 +549,7 @@ class MarketDataService {
         await this.mongoService.saveMarketData(enrichedItems, data.collectionSource);
 
         // Context7 Pattern: Invalidate cache on data change
-        this.cache.deletePattern('market_data_*');
+        await this.cache.deletePattern('market_data_*');
 
         const processingTime = Date.now() - startTime;
 

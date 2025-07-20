@@ -9,11 +9,17 @@
  * - SOLID architecture with single responsibility
  */
 
-const { Logger } = require('../utils/Logger');
+const { BaseService } = require('./BaseService');
 
-class TradeOutcomeTrackerService {
+class TradeOutcomeTrackerService extends BaseService {
   constructor() {
-    this.logger = new Logger('TradeOutcomeTracker');
+    super('TradeOutcomeTrackerService', {
+      enableCache: true,
+      cachePrefix: 'trade_outcome',
+      cacheTTL: 300, // 5 minutes for trade outcomes
+      enableMongoDB: true // Store trade outcomes
+    });
+    
     this.activeTrades = new Map();
     this.completedTrades = [];
     this.performanceMetrics = {

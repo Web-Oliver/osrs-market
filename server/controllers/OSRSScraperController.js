@@ -1,20 +1,19 @@
 /**
- * 🏺 OSRS Scraper Controller - Context7 Optimized
+ * 🏺 OSRS Scraper Controller - Context7 Optimized with BaseController
  *
- * Context7 Pattern: RESTful API Controller for OSRS Data Scraping
- * - Orchestrates data scraping operations
- * - Provides real-time scraping status and results
- * - Manages pattern detection and analysis
- * - Ensures proper error handling and logging
+ * Context7 Pattern: Controller Layer for OSRS Data Scraping Operations
+ * - Extends BaseController for DRY principles
+ * - Eliminates repetitive error handling and method binding
+ * - SOLID principles with single responsibility
+ * - Standardized endpoint creation and validation
  */
 
+const { BaseController } = require('./BaseController');
 const { OSRSDataScraperService } = require('../services/OSRSDataScraperService');
-const { Logger } = require('../utils/Logger');
-const { ApiResponse } = require('../utils/ApiResponse');
 
-class OSRSScraperController {
+class OSRSScraperController extends BaseController {
   constructor() {
-    this.logger = new Logger('OSRSScraperController');
+    super('OSRSScraperController');
     this.scraperService = null;
     this.currentScrapeStatus = {
       isRunning: false,
@@ -38,13 +37,13 @@ class OSRSScraperController {
   /**
    * Context7 Pattern: Start full OSRS data import
    */
-  async startFullImport(req, res) {
-    try {
+  startFullImport = this.createPostEndpoint(
+    async () => {
       if (this.currentScrapeStatus.isRunning) {
-        return ApiResponse.error(res, 'SCRAPE_IN_PROGRESS', 'A scraping operation is already in progress', 409);
+        const error = new Error('A scraping operation is already in progress');
+        error.statusCode = 409;
+        throw error;
       }
-
-      this.logger.info('🏺 Starting full OSRS data import request');
 
       // Initialize service if needed
       await this.initializeService();
@@ -64,7 +63,7 @@ class OSRSScraperController {
         this.currentScrapeStatus.error = error.message;
       });
 
-      return ApiResponse.success(res, {
+      return {
         message: 'OSRS data import started',
         scrapeId: `scrape_${Date.now()}`,
         status: this.currentScrapeStatus,
@@ -75,16 +74,10 @@ class OSRSScraperController {
           'Greatest Fall Items',
           'Most Valuable Items'
         ]
-      }, 'Full OSRS data import initiated successfully');
-
-    } catch (error) {
-      this.logger.error('❌ Failed to start full import', error);
-      this.currentScrapeStatus.isRunning = false;
-      this.currentScrapeStatus.error = error.message;
-
-      return ApiResponse.error(res, 'IMPORT_START_FAILED', 'Failed to start data import', error.message, 500);
-    }
-  }
+      };
+    },
+    { operationName: 'start full OSRS data import' }
+  );
 
   /**
    * Context7 Pattern: Perform asynchronous scraping operation
@@ -126,8 +119,8 @@ class OSRSScraperController {
   /**
    * Context7 Pattern: Get current scraping status
    */
-  async getScrapingStatus(req, res) {
-    try {
+  getScrapingStatus = this.createGetEndpoint(
+    async () => {
       await this.initializeService();
 
       const serviceStatus = this.scraperService.getStatus();
@@ -139,25 +132,24 @@ class OSRSScraperController {
         timestamp: Date.now()
       };
 
-      return ApiResponse.success(res, status, 'Scraping status retrieved successfully');
-
-    } catch (error) {
-      this.logger.error('❌ Failed to get scraping status', error);
-      return ApiResponse.error(res, 'STATUS_FAILED', 'Failed to get scraping status', error.message, 500);
-    }
-  }
+      return status;
+    },
+    { operationName: 'get scraping status' }
+  );
 
   /**
    * Context7 Pattern: Get latest scraped data
    */
-  async getLatestScrapedData(req, res) {
-    try {
+  getLatestScrapedData = this.endpointFactory.createCustomEndpoint(
+    async (req, res) => {
       await this.initializeService();
 
       const { category, limit = 50, format = 'json' } = req.query;
 
       if (!this.scraperService.mongoPersistence) {
-        return ApiResponse.error(res, 'DATABASE_NOT_CONNECTED', 'Database connection not available', 503);
+        const error = new Error('Database connection not available');
+        error.statusCode = 503;
+        throw error;
       }
 
       // Get latest scrape data from MongoDB
@@ -168,7 +160,9 @@ class OSRSScraperController {
       );
 
       if (!latestScrape) {
-        return ApiResponse.error(res, 'NO_DATA', 'No scraped data available. Please run a scrape operation first.', 404);
+        const error = new Error('No scraped data available. Please run a scrape operation first.');
+        error.statusCode = 404;
+        throw error;
       }
 
       let responseData = latestScrape;
@@ -182,7 +176,9 @@ class OSRSScraperController {
           }
         };
       } else if (category) {
-        return ApiResponse.error(res, 'INVALID_CATEGORY', `Category '${category}' not found. Valid categories: ${Object.keys(latestScrape.categories).join(', ')}`, 400);
+        const error = new Error(`Category '${category}' not found. Valid categories: ${Object.keys(latestScrape.categories).join(', ')}`);
+        error.statusCode = 400;
+        throw error;
       }
 
       // Handle different response formats
@@ -192,25 +188,24 @@ class OSRSScraperController {
         return this.respondWithSummary(res, responseData);
       }
 
-      return ApiResponse.success(res, responseData, 'Latest scraped data retrieved successfully');
-
-    } catch (error) {
-      this.logger.error('❌ Failed to get latest scraped data', error);
-      return ApiResponse.error(res, 'DATA_RETRIEVAL_FAILED', 'Failed to retrieve scraped data', error.message, 500);
-    }
-  }
+      return this.sendSuccess(res, responseData, 'Latest scraped data retrieved successfully');
+    },
+    { operationName: 'get latest scraped data' }
+  );
 
   /**
    * Context7 Pattern: Get detected market patterns
    */
-  async getMarketPatterns(req, res) {
-    try {
+  getMarketPatterns = this.createGetEndpoint(
+    async (params) => {
       await this.initializeService();
 
-      const { type, significance, limit = 100 } = req.query;
+      const { type, significance, limit } = params;
 
       if (!this.scraperService.mongoPersistence) {
-        return ApiResponse.error(res, 'DATABASE_NOT_CONNECTED', 'Database connection not available', 503);
+        const error = new Error('Database connection not available');
+        error.statusCode = 503;
+        throw error;
       }
 
       // Build query filter
@@ -243,7 +238,7 @@ class OSRSScraperController {
         { $sort: { count: -1 } }
       ]).toArray();
 
-      return ApiResponse.success(res, {
+      return {
         patterns,
         statistics: {
           total: patterns.length,
@@ -251,29 +246,37 @@ class OSRSScraperController {
           availableTypes: [...new Set(patterns.map(p => p.type))],
           availableSignificances: [...new Set(patterns.map(p => p.significance))]
         }
-      }, 'Market patterns retrieved successfully');
-
-    } catch (error) {
-      this.logger.error('❌ Failed to get market patterns', error);
-      return ApiResponse.error(res, 'PATTERNS_RETRIEVAL_FAILED', 'Failed to retrieve market patterns', error.message, 500);
+      };
+    },
+    {
+      operationName: 'get market patterns',
+      parseParams: (req) => ({
+        type: req.query.type,
+        significance: req.query.significance,
+        limit: parseInt(req.query.limit || 100)
+      })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Search for specific item data
    */
-  async searchItemData(req, res) {
-    try {
+  searchItemData = this.createGetEndpoint(
+    async (params) => {
       await this.initializeService();
 
-      const { query, includeHistorical = false } = req.query;
+      const { query, includeHistorical } = params;
 
       if (!query) {
-        return ApiResponse.error(res, 'MISSING_QUERY', 'Search query parameter is required', 400);
+        const error = new Error('Search query parameter is required');
+        error.statusCode = 400;
+        throw error;
       }
 
       if (!this.scraperService.mongoPersistence) {
-        return ApiResponse.error(res, 'DATABASE_NOT_CONNECTED', 'Database connection not available', 503);
+        const error = new Error('Database connection not available');
+        error.statusCode = 503;
+        throw error;
       }
 
       // Search in latest scrape data
@@ -316,24 +319,27 @@ class OSRSScraperController {
           .toArray();
       }
 
-      return ApiResponse.success(res, {
+      return {
         searchQuery: query,
         results: searchResults,
         historicalData: historicalData,
         totalFound: searchResults.length
-      }, `Found ${searchResults.length} items matching '${query}'`);
-
-    } catch (error) {
-      this.logger.error('❌ Failed to search item data', error);
-      return ApiResponse.error(res, 'SEARCH_FAILED', 'Failed to search item data', error.message, 500);
+      };
+    },
+    {
+      operationName: 'search item data',
+      parseParams: (req) => ({
+        query: req.query.query,
+        includeHistorical: req.query.includeHistorical || false
+      })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Get scraper health status
    */
-  async getHealthStatus(req, res) {
-    try {
+  getHealthStatus = this.createGetEndpoint(
+    async () => {
       const health = {
         status: 'healthy',
         timestamp: Date.now(),
@@ -360,15 +366,10 @@ class OSRSScraperController {
         health.status = 'unhealthy';
       }
 
-      const statusCode = health.status === 'healthy' ? 200 : health.status === 'degraded' ? 202 : 503;
-
-      return ApiResponse.success(res, health, 'Health status retrieved', statusCode);
-
-    } catch (error) {
-      this.logger.error('❌ Failed to get health status', error);
-      return ApiResponse.error(res, 'HEALTH_CHECK_FAILED', 'Health check failed', error.message, 503);
-    }
-  }
+      return health;
+    },
+    { operationName: 'get scraper health status' }
+  );
 
   /**
    * Context7 Pattern: Helper method to respond with CSV format
@@ -390,7 +391,7 @@ class OSRSScraperController {
 
     } catch (error) {
       this.logger.error('❌ Failed to generate CSV response', error);
-      return ApiResponse.error(res, 'CSV_GENERATION_FAILED', 'Failed to generate CSV', error.message, 500);
+      return this.sendError(res, 'Failed to generate CSV', error.message, 500);
     }
   }
 
@@ -423,11 +424,11 @@ class OSRSScraperController {
         };
       }
 
-      return ApiResponse.success(res, summary, 'Data summary retrieved successfully');
+      return this.sendSuccess(res, summary, 'Data summary retrieved successfully');
 
     } catch (error) {
       this.logger.error('❌ Failed to generate summary response', error);
-      return ApiResponse.error(res, 'SUMMARY_GENERATION_FAILED', 'Failed to generate summary', error.message, 500);
+      return this.sendError(res, 'Failed to generate summary', error.message, 500);
     }
   }
 

@@ -9,22 +9,25 @@
  * - Background job scheduling
  */
 
+const { BaseService } = require('./BaseService');
 const { OSRSWikiService } = require('./OSRSWikiService');
 const { OSRSDataScraperService } = require('./OSRSDataScraperService');
 const { MonitoringService } = require('./MonitoringService');
 const { MarketDataService } = require('./MarketDataService');
-const { MongoDataPersistence } = require('../mongoDataPersistence');
-const { Logger } = require('../utils/Logger');
-const { CacheManager } = require('../utils/CacheManager');
 const { MetricsCalculator } = require('../utils/MetricsCalculator');
 const { PerformanceMonitor } = require('../utils/PerformanceMonitor');
 const { ItemModel } = require('../models/ItemModel');
 const { ScrapeQueueModel } = require('../models/ScrapeQueueModel');
 
-class DataCollectionService {
+class DataCollectionService extends BaseService {
   constructor() {
-    this.logger = new Logger('DataCollectionService');
-    this.cache = new CacheManager('data_collection', 300000); // 5 minutes cache
+    super('DataCollectionService', {
+      enableCache: true,
+      cachePrefix: 'data_collection',
+      cacheTTL: 300, // 5 minutes cache
+      enableMongoDB: true // Store collection data
+    });
+    
     this.metricsCalculator = new MetricsCalculator();
     this.performanceMonitor = new PerformanceMonitor();
 
@@ -33,9 +36,6 @@ class DataCollectionService {
     this.osrsDataScraperService = new OSRSDataScraperService();
     this.monitoringService = new MonitoringService();
     this.marketDataService = new MarketDataService();
-
-    // CRITICAL: Initialize MongoDB persistence
-    this.initializePersistence();
 
     // Start memory monitoring for all services
     this.startMemoryMonitoring();
@@ -64,20 +64,6 @@ class DataCollectionService {
     };
   }
 
-  /**
-   * CRITICAL: Initialize MongoDB persistence
-   */
-  async initializePersistence() {
-    try {
-      const mongoConfig = {
-        connectionString: process.env.MONGODB_CONNECTION_STRING || 'mongodb://localhost:27017',
-        databaseName: process.env.MONGODB_DATABASE || 'osrs_market_data'
-      };
-
-      this.mongoPersistence = new MongoDataPersistence(mongoConfig);
-      await this.mongoPersistence.initialize();
-
-      this.logger.info('✅ MongoDB persistence initialized for data collection');
     } catch (error) {
       this.logger.error('❌ Failed to initialize MongoDB persistence', error);
       this.mongoPersistence = null;

@@ -9,14 +9,18 @@
  */
 
 const axios = require('axios');
-const { Logger } = require('../utils/Logger');
-const { CacheManager } = require('../utils/CacheManager');
+const { BaseService } = require('./BaseService');
 const { RateLimiter } = require('../utils/RateLimiter');
 
-class OSRSWikiService {
+class OSRSWikiService extends BaseService {
   constructor() {
-    this.logger = new Logger('OSRSWikiService');
-    this.cache = new CacheManager('osrs_wiki', 300000); // 5 minutes cache default
+    super('OSRSWikiService', {
+      enableCache: true,
+      cachePrefix: 'osrs_wiki',
+      cacheTTL: 300, // 5 minutes default
+      enableMongoDB: false // No MongoDB needed for external API service
+    });
+    
     this.rateLimiter = new RateLimiter();
 
     // Enhanced caching configuration
@@ -152,376 +156,265 @@ class OSRSWikiService {
   }
 
   /**
-   * Context7 Pattern: Get latest item prices
+   * Context7 Pattern: Get latest item prices with BaseService optimization
    */
   async getLatestPrices() {
-    try {
-      this.logger.debug('Fetching latest prices from OSRS Wiki API');
+    return await this.withCache('latest_prices', async () => {
+      return await this.withRetry(async () => {
+        this.logger.debug('Fetching latest prices from OSRS Wiki API');
 
-      // Check circuit breaker first
-      if (!this.checkCircuitBreaker()) {
-        // Return stale data if API is down
-        const staleData = this.getStaleData('latest_prices');
-        if (staleData) {
-          return staleData;
+        // Check circuit breaker first
+        if (!this.checkCircuitBreaker()) {
+          const staleData = this.getStaleData('latest_prices');
+          if (staleData) {
+            return staleData;
+          }
+          throw new Error('API is unavailable and no cached data available');
         }
-        throw new Error('API is unavailable and no cached data available');
-      }
 
-      // Check rate limit
-      const rateLimitResult = await this.rateLimiter.checkLimit(
-        this.rateLimitConfig.key,
-        this.rateLimitConfig
-      );
+        // Check rate limit
+        const rateLimitResult = await this.rateLimiter.checkLimit(
+          this.rateLimitConfig.key,
+          this.rateLimitConfig
+        );
 
-      if (rateLimitResult.exceeded) {
-        this.logger.warn('Rate limit exceeded for OSRS Wiki API', {
-          retryAfter: rateLimitResult.retryAfter,
-          remaining: rateLimitResult.remaining
+        if (rateLimitResult.exceeded) {
+          this.logger.warn('Rate limit exceeded for OSRS Wiki API', {
+            retryAfter: rateLimitResult.retryAfter,
+            remaining: rateLimitResult.remaining
+          });
+          throw new Error(`Rate limit exceeded. Retry after ${rateLimitResult.retryAfter} seconds`);
+        }
+
+        // Fetch from API
+        const response = await axios.get(`${this.baseURL}/latest`, this.axiosConfig);
+
+        if (response.status !== 200) {
+          throw new Error(`API returned status ${response.status}`);
+        }
+
+        const data = this.transformLatestPrices(response.data);
+
+        // Record success for circuit breaker
+        this.recordSuccess();
+
+        this.logger.debug('Successfully fetched latest prices', {
+          itemCount: Object.keys(data.data || {}).length,
+          timestamp: data.timestamp
         });
-        throw new Error(`Rate limit exceeded. Retry after ${rateLimitResult.retryAfter} seconds`);
-      }
 
-      // Check cache first
-      const cacheKey = 'latest_prices';
-      const cachedData = this.cache.get(cacheKey);
-
-      if (cachedData) {
-        this.logger.debug('Returning cached latest prices');
-        return cachedData;
-      }
-
-      // Fetch from API
-      const response = await axios.get(`${this.baseURL}/latest`, this.axiosConfig);
-
-      if (response.status !== 200) {
-        throw new Error(`API returned status ${response.status}`);
-      }
-
-      const data = this.transformLatestPrices(response.data);
-
-      // Cache the response with enhanced timeout
-      this.cache.set(cacheKey, data, this.cacheConfig.latest_prices);
-
-      // Record success for circuit breaker
-      this.recordSuccess();
-
-      this.logger.debug('Successfully fetched latest prices', {
-        itemCount: Object.keys(data.data || {}).length,
-        timestamp: data.timestamp
-      });
-
-      return data;
-    } catch (error) {
-      this.logger.error('Failed to fetch latest prices', error);
-
-      // Record failure for circuit breaker
-      this.recordFailure(error);
-
-      // Try to return stale cached data if available
-      const staleData = this.getStaleData('latest_prices');
-      if (staleData) {
-        return staleData;
-      }
-
-      throw error;
-    }
+        return data;
+      }, 'fetch latest prices from OSRS Wiki');
+    }, this.cacheConfig.latest_prices / 1000); // Convert to seconds
   }
 
   /**
-   * Context7 Pattern: Get 5-minute average prices
+   * Context7 Pattern: Get 5-minute average prices with BaseService optimization
    */
   async get5MinutePrices() {
-    try {
-      this.logger.debug('Fetching 5-minute average prices from OSRS Wiki API');
+    return await this.withCache('5m_prices', async () => {
+      return await this.withRetry(async () => {
+        this.logger.debug('Fetching 5-minute average prices from OSRS Wiki API');
 
-      // Check circuit breaker first
-      if (!this.checkCircuitBreaker()) {
-        const staleData = this.getStaleData('5m_prices');
-        if (staleData) {
-          return staleData;
+        // Check circuit breaker first
+        if (!this.checkCircuitBreaker()) {
+          const staleData = this.getStaleData('5m_prices');
+          if (staleData) {
+            return staleData;
+          }
+          throw new Error('API is unavailable and no cached data available');
         }
-        throw new Error('API is unavailable and no cached data available');
-      }
 
-      // Check rate limit
-      const rateLimitResult = await this.rateLimiter.checkLimit(
-        this.rateLimitConfig.key,
-        this.rateLimitConfig
-      );
+        // Check rate limit
+        const rateLimitResult = await this.rateLimiter.checkLimit(
+          this.rateLimitConfig.key,
+          this.rateLimitConfig
+        );
 
-      if (rateLimitResult.exceeded) {
-        this.logger.warn('Rate limit exceeded for OSRS Wiki API', {
-          retryAfter: rateLimitResult.retryAfter,
-          remaining: rateLimitResult.remaining
+        if (rateLimitResult.exceeded) {
+          this.logger.warn('Rate limit exceeded for OSRS Wiki API', {
+            retryAfter: rateLimitResult.retryAfter,
+            remaining: rateLimitResult.remaining
+          });
+          throw new Error(`Rate limit exceeded. Retry after ${rateLimitResult.retryAfter} seconds`);
+        }
+
+        // Fetch from API
+        const response = await axios.get(`${this.baseURL}/5m`, this.axiosConfig);
+
+        if (response.status !== 200) {
+          throw new Error(`API returned status ${response.status}`);
+        }
+
+        const data = this.transform5MinutePrices(response.data);
+
+        // Record success for circuit breaker
+        this.recordSuccess();
+
+        this.logger.debug('Successfully fetched 5-minute prices', {
+          itemCount: Object.keys(data.data || {}).length,
+          timestamp: data.timestamp
         });
-        throw new Error(`Rate limit exceeded. Retry after ${rateLimitResult.retryAfter} seconds`);
-      }
 
-      // Check cache first
-      const cacheKey = '5m_prices';
-      const cachedData = this.cache.get(cacheKey);
-
-      if (cachedData) {
-        this.logger.debug('Returning cached 5-minute prices');
-        return cachedData;
-      }
-
-      // Fetch from API
-      const response = await axios.get(`${this.baseURL}/5m`, this.axiosConfig);
-
-      if (response.status !== 200) {
-        throw new Error(`API returned status ${response.status}`);
-      }
-
-      const data = this.transform5MinutePrices(response.data);
-
-      // Cache the response with enhanced timeout
-      this.cache.set(cacheKey, data, this.cacheConfig['5m_prices']);
-
-      // Record success for circuit breaker
-      this.recordSuccess();
-
-      this.logger.debug('Successfully fetched 5-minute prices', {
-        itemCount: Object.keys(data.data || {}).length,
-        timestamp: data.timestamp
-      });
-
-      return data;
-    } catch (error) {
-      this.logger.error('Failed to fetch 5-minute prices', error);
-
-      // Record failure for circuit breaker
-      this.recordFailure(error);
-
-      // Try to return stale cached data if available
-      const staleData = this.getStaleData('5m_prices');
-      if (staleData) {
-        return staleData;
-      }
-
-      throw error;
-    }
+        return data;
+      }, 'fetch 5-minute prices from OSRS Wiki');
+    }, this.cacheConfig['5m_prices'] / 1000); // Convert to seconds
   }
 
   /**
-   * Context7 Pattern: Get 1-hour average prices
+   * Context7 Pattern: Get 1-hour average prices with BaseService optimization
    */
   async get1HourPrices() {
-    try {
-      this.logger.debug('Fetching 1-hour average prices from OSRS Wiki API');
+    return await this.withCache('1h_prices', async () => {
+      return await this.withRetry(async () => {
+        this.logger.debug('Fetching 1-hour average prices from OSRS Wiki API');
 
-      // Check circuit breaker first
-      if (!this.checkCircuitBreaker()) {
-        const staleData = this.getStaleData('1h_prices');
-        if (staleData) {
-          return staleData;
+        // Check circuit breaker first
+        if (!this.checkCircuitBreaker()) {
+          const staleData = this.getStaleData('1h_prices');
+          if (staleData) {
+            return staleData;
+          }
+          throw new Error('API is unavailable and no cached data available');
         }
-        throw new Error('API is unavailable and no cached data available');
-      }
 
-      // Check rate limit
-      const rateLimitResult = await this.rateLimiter.checkLimit(
-        this.rateLimitConfig.key,
-        this.rateLimitConfig
-      );
+        // Check rate limit
+        const rateLimitResult = await this.rateLimiter.checkLimit(
+          this.rateLimitConfig.key,
+          this.rateLimitConfig
+        );
 
-      if (rateLimitResult.exceeded) {
-        this.logger.warn('Rate limit exceeded for OSRS Wiki API', {
-          retryAfter: rateLimitResult.retryAfter,
-          remaining: rateLimitResult.remaining
+        if (rateLimitResult.exceeded) {
+          this.logger.warn('Rate limit exceeded for OSRS Wiki API', {
+            retryAfter: rateLimitResult.retryAfter,
+            remaining: rateLimitResult.remaining
+          });
+          throw new Error(`Rate limit exceeded. Retry after ${rateLimitResult.retryAfter} seconds`);
+        }
+
+        // Fetch from API
+        const response = await axios.get(`${this.baseURL}/1h`, this.axiosConfig);
+
+        if (response.status !== 200) {
+          throw new Error(`API returned status ${response.status}`);
+        }
+
+        const data = this.transform1HourPrices(response.data);
+
+        // Record success for circuit breaker
+        this.recordSuccess();
+
+        this.logger.debug('Successfully fetched 1-hour prices', {
+          itemCount: Object.keys(data.data || {}).length,
+          timestamp: data.timestamp
         });
-        throw new Error(`Rate limit exceeded. Retry after ${rateLimitResult.retryAfter} seconds`);
-      }
 
-      // Check cache first
-      const cacheKey = '1h_prices';
-      const cachedData = this.cache.get(cacheKey);
-
-      if (cachedData) {
-        this.logger.debug('Returning cached 1-hour prices');
-        return cachedData;
-      }
-
-      // Fetch from API
-      const response = await axios.get(`${this.baseURL}/1h`, this.axiosConfig);
-
-      if (response.status !== 200) {
-        throw new Error(`API returned status ${response.status}`);
-      }
-
-      const data = this.transform1HourPrices(response.data);
-
-      // Cache the response with enhanced timeout
-      this.cache.set(cacheKey, data, this.cacheConfig['1h_prices']);
-
-      // Record success for circuit breaker
-      this.recordSuccess();
-
-      this.logger.debug('Successfully fetched 1-hour prices', {
-        itemCount: Object.keys(data.data || {}).length,
-        timestamp: data.timestamp
-      });
-
-      return data;
-    } catch (error) {
-      this.logger.error('Failed to fetch 1-hour prices', error);
-
-      // Record failure for circuit breaker
-      this.recordFailure(error);
-
-      // Try to return stale cached data if available
-      const staleData = this.getStaleData('1h_prices');
-      if (staleData) {
-        return staleData;
-      }
-
-      throw error;
-    }
+        return data;
+      }, 'fetch 1-hour prices from OSRS Wiki');
+    }, this.cacheConfig['1h_prices'] / 1000); // Convert to seconds
   }
 
   /**
-   * Context7 Pattern: Get item mapping
+   * Context7 Pattern: Get item mapping with BaseService optimization
    */
   async getItemMapping() {
-    try {
-      this.logger.debug('Fetching item mapping from OSRS Wiki API');
+    return await this.withCache('item_mapping', async () => {
+      return await this.withRetry(async () => {
+        this.logger.debug('Fetching item mapping from OSRS Wiki API');
 
-      // Check rate limit
-      const rateLimitResult = await this.rateLimiter.checkLimit(
-        this.rateLimitConfig.key,
-        this.rateLimitConfig
-      );
+        // Check rate limit
+        const rateLimitResult = await this.rateLimiter.checkLimit(
+          this.rateLimitConfig.key,
+          this.rateLimitConfig
+        );
 
-      if (rateLimitResult.exceeded) {
-        throw new Error(`Rate limit exceeded. Retry after ${rateLimitResult.retryAfter} seconds`);
-      }
+        if (rateLimitResult.exceeded) {
+          throw new Error(`Rate limit exceeded. Retry after ${rateLimitResult.retryAfter} seconds`);
+        }
 
-      // Check cache first (longer cache for mapping as it changes less frequently)
-      const cacheKey = 'item_mapping';
-      const cachedData = this.cache.get(cacheKey);
+        // Fetch from API
+        const response = await axios.get(`${this.baseURL}/mapping`, this.axiosConfig);
 
-      if (cachedData) {
-        this.logger.debug('Returning cached item mapping');
-        return cachedData;
-      }
+        if (response.status !== 200) {
+          throw new Error(`API returned status ${response.status}`);
+        }
 
-      // Fetch from API
-      const response = await axios.get(`${this.baseURL}/mapping`, this.axiosConfig);
+        const data = this.transformItemMapping(response.data);
 
-      if (response.status !== 200) {
-        throw new Error(`API returned status ${response.status}`);
-      }
+        this.logger.debug('Successfully fetched item mapping', {
+          itemCount: data.length
+        });
 
-      const data = this.transformItemMapping(response.data);
-
-      // Cache for longer period (mapping changes less frequently)
-      this.cache.set(cacheKey, data, this.cacheConfig.item_mapping);
-
-      this.logger.debug('Successfully fetched item mapping', {
-        itemCount: data.length
-      });
-
-      return data;
-    } catch (error) {
-      this.logger.error('Failed to fetch item mapping', error);
-
-      // Try to return cached data if available
-      const fallbackData = this.cache.get('item_mapping');
-      if (fallbackData) {
-        this.logger.info('Returning stale cached mapping due to API error');
-        return fallbackData;
-      }
-
-      throw error;
-    }
+        return data;
+      }, 'fetch item mapping from OSRS Wiki');
+    }, this.cacheConfig.item_mapping / 1000); // Convert to seconds
   }
 
   /**
-   * Context7 Pattern: Get timeseries data for item with per-item rate limiting
+   * Context7 Pattern: Get timeseries data for item with per-item rate limiting and BaseService optimization
    */
   async getTimeseries(itemId, timestep = '5m') {
-    try {
-      this.logger.debug('Fetching timeseries data', { itemId, timestep });
+    // Validate parameters
+    this.validateRequiredParams({ itemId, timestep }, ['itemId', 'timestep']);
+    
+    if (typeof itemId !== 'number') {
+      throw new Error('Invalid item ID provided');
+    }
 
-      // Validate parameters
-      if (!itemId || typeof itemId !== 'number') {
-        throw new Error('Invalid item ID provided');
-      }
+    const validTimesteps = ['5m', '1h', '6h', '24h'];
+    if (!validTimesteps.includes(timestep)) {
+      throw new Error(`Invalid timestep. Must be one of: ${validTimesteps.join(', ')}`);
+    }
 
-      const validTimesteps = ['5m', '1h', '6h', '24h'];
-      if (!validTimesteps.includes(timestep)) {
-        throw new Error(`Invalid timestep. Must be one of: ${validTimesteps.join(', ')}`);
-      }
+    return await this.withCache(`timeseries_${itemId}_${timestep}`, async () => {
+      return await this.withRetry(async () => {
+        this.logger.debug('Fetching timeseries data', { itemId, timestep });
 
-      // Check per-item rate limit first
-      if (!this.canFetchItem(itemId)) {
-        const cooldownTime = this.getItemCooldownTime(itemId);
-        this.logger.debug('Item rate limited for timeseries', {
-          itemId,
-          timestep,
-          cooldownRemaining: Math.ceil(cooldownTime / 1000) + 's'
-        });
-
-        // Return cached data if available
-        const cacheKey = `timeseries_${itemId}_${timestep}`;
-        const cachedData = this.cache.get(cacheKey);
-        if (cachedData) {
-          this.logger.debug('Returning cached timeseries data due to rate limit', { itemId, timestep });
-          return cachedData;
+        // Check per-item rate limit first
+        if (!this.canFetchItem(itemId)) {
+          const cooldownTime = this.getItemCooldownTime(itemId);
+          this.logger.debug('Item rate limited for timeseries', {
+            itemId,
+            timestep,
+            cooldownRemaining: Math.ceil(cooldownTime / 1000) + 's'
+          });
+          throw new Error(`Item ${itemId} is rate limited for timeseries. Try again in ${Math.ceil(cooldownTime / 1000)} seconds.`);
         }
 
-        throw new Error(`Item ${itemId} is rate limited for timeseries. Try again in ${Math.ceil(cooldownTime / 1000)} seconds.`);
-      }
+        // Check global rate limit
+        const rateLimitResult = await this.rateLimiter.checkLimit(
+          this.rateLimitConfig.key,
+          this.rateLimitConfig
+        );
 
-      // Check global rate limit
-      const rateLimitResult = await this.rateLimiter.checkLimit(
-        this.rateLimitConfig.key,
-        this.rateLimitConfig
-      );
+        if (rateLimitResult.exceeded) {
+          throw new Error(`Rate limit exceeded. Retry after ${rateLimitResult.retryAfter} seconds`);
+        }
 
-      if (rateLimitResult.exceeded) {
-        throw new Error(`Rate limit exceeded. Retry after ${rateLimitResult.retryAfter} seconds`);
-      }
+        // Fetch from API
+        const response = await axios.get(
+          `${this.baseURL}/timeseries?timestep=${timestep}&id=${itemId}`,
+          this.axiosConfig
+        );
 
-      // Check cache first
-      const cacheKey = `timeseries_${itemId}_${timestep}`;
-      const cachedData = this.cache.get(cacheKey);
+        if (response.status !== 200) {
+          throw new Error(`API returned status ${response.status}`);
+        }
 
-      if (cachedData) {
-        this.logger.debug('Returning cached timeseries data');
-        return cachedData;
-      }
+        const data = this.transformTimeseriesData(response.data, itemId, timestep);
 
-      // Fetch from API
-      const response = await axios.get(
-        `${this.baseURL}/timeseries?timestep=${timestep}&id=${itemId}`,
-        this.axiosConfig
-      );
+        // Mark item as fetched for rate limiting
+        this.markItemFetched(itemId);
 
-      if (response.status !== 200) {
-        throw new Error(`API returned status ${response.status}`);
-      }
+        this.logger.debug('Successfully fetched timeseries data', {
+          itemId,
+          timestep,
+          dataPoints: data.data ? data.data.length : 0
+        });
 
-      const data = this.transformTimeseriesData(response.data, itemId, timestep);
-
-      // Cache the response with enhanced timeout
-      this.cache.set(cacheKey, data, this.cacheConfig.timeseries);
-
-      // Mark item as fetched for rate limiting
-      this.markItemFetched(itemId);
-
-      this.logger.debug('Successfully fetched timeseries data', {
-        itemId,
-        timestep,
-        dataPoints: data.data ? data.data.length : 0
-      });
-
-      return data;
-    } catch (error) {
-      this.logger.error('Failed to fetch timeseries data', error, { itemId, timestep });
-      throw error;
-    }
+        return data;
+      }, `fetch timeseries data for item ${itemId}`);
+    }, this.cacheConfig.timeseries / 1000); // Convert to seconds
   }
 
   /**

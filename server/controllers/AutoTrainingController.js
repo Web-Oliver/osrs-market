@@ -1,21 +1,20 @@
 /**
- * 🔄 Auto Training Controller - Context7 Optimized
+ * 🔄 Auto Training Controller - Context7 Optimized with BaseController
  *
  * Context7 Pattern: Controller Layer for Auto Training Management
- * - Handles HTTP requests for automated training operations
- * - Manages training service lifecycle and configuration
- * - Implements comprehensive validation and error handling
- * - DRY principles with reusable response patterns
- * - SOLID architecture with single responsibility
+ * - Extends BaseController for DRY principles
+ * - Eliminates repetitive error handling and method binding
+ * - SOLID principles with single responsibility
+ * - Standardized endpoint creation and validation
  */
 
-const { Logger } = require('../utils/Logger');
+const { BaseController } = require('./BaseController');
 const { AutoTrainingService } = require('../services/AutoTrainingService');
 const { AutoTrainingValidator } = require('../validators/AutoTrainingValidator');
 
-class AutoTrainingController {
+class AutoTrainingController extends BaseController {
   constructor() {
-    this.logger = new Logger('AutoTrainingController');
+    super('AutoTrainingController');
     this.trainingServices = new Map(); // userId -> AutoTrainingService
     this.logger.info('🔄 Auto Training Controller initialized');
   }
@@ -23,29 +22,17 @@ class AutoTrainingController {
   /**
    * Context7 Pattern: Start auto training service
    */
-  async startAutoTraining(req, res) {
-    try {
-      const { userId = 'default' } = req.user || {};
-      const { config } = req.body;
-
-      // Validate configuration
-      const validationResult = AutoTrainingValidator.validateConfig(config);
-      if (!validationResult.isValid) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid configuration',
-          details: validationResult.errors
-        });
-      }
-
+  startAutoTraining = this.createPostEndpoint(
+    async (trainingData) => {
+      const { userId, config } = trainingData;
+      
       // Check if service already running for user
       if (this.trainingServices.has(userId)) {
         const existingService = this.trainingServices.get(userId);
         if (existingService.isRunning) {
-          return res.status(409).json({
-            success: false,
-            error: 'Auto training service already running for this user'
-          });
+          const error = new Error('Auto training service already running for this user');
+          error.statusCode = 409;
+          throw error;
         }
       }
 
@@ -54,369 +41,267 @@ class AutoTrainingController {
       await service.start();
 
       this.trainingServices.set(userId, service);
-
       const status = service.getStatus();
 
-      this.logger.info('✅ Auto training service started', {
+      return {
         userId,
-        sessionId: status.sessionId
-      });
-
-      res.json({
-        success: true,
-        data: {
-          userId,
-          sessionId: status.sessionId,
-          status: status,
-          message: 'Auto training service started successfully'
-        }
-      });
-
-    } catch (error) {
-      this.logger.error('❌ Error starting auto training service', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to start auto training service',
-        details: error.message
-      });
+        sessionId: status.sessionId,
+        status: status
+      };
+    },
+    {
+      operationName: 'start auto training service',
+      validator: (req) => AutoTrainingValidator.validateConfig(req.body.config),
+      parseBody: (req) => ({
+        userId: req.user?.userId || 'default',
+        config: req.body.config
+      })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Stop auto training service
    */
-  async stopAutoTraining(req, res) {
-    try {
-      const { userId = 'default' } = req.user || {};
-
+  stopAutoTraining = this.createGetEndpoint(
+    async (params) => {
+      const { userId } = params;
+      
       const service = this.trainingServices.get(userId);
       if (!service) {
-        return res.status(404).json({
-          success: false,
-          error: 'No auto training service found for this user'
-        });
+        const error = new Error('No auto training service found for this user');
+        error.statusCode = 404;
+        throw error;
       }
 
       const finalStatus = service.getStatus();
       service.stop();
       this.trainingServices.delete(userId);
 
-      this.logger.info('✅ Auto training service stopped', {
+      return {
         userId,
-        sessionId: finalStatus.sessionId
-      });
-
-      res.json({
-        success: true,
-        data: {
-          userId,
-          sessionId: finalStatus.sessionId,
-          finalStatus: finalStatus,
-          message: 'Auto training service stopped successfully'
-        }
-      });
-
-    } catch (error) {
-      this.logger.error('❌ Error stopping auto training service', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to stop auto training service',
-        details: error.message
-      });
+        sessionId: finalStatus.sessionId,
+        finalStatus
+      };
+    },
+    {
+      operationName: 'stop auto training service',
+      parseParams: (req) => ({
+        userId: req.user?.userId || 'default'
+      })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Get auto training status
    */
-  async getAutoTrainingStatus(req, res) {
-    try {
-      const { userId = 'default' } = req.user || {};
-
+  getAutoTrainingStatus = this.createGetEndpoint(
+    async (params) => {
+      const { userId } = params;
+      
       const service = this.trainingServices.get(userId);
       if (!service) {
-        return res.json({
-          success: true,
-          data: {
-            userId,
-            isRunning: false,
-            message: 'No auto training service found for this user'
-          }
-        });
+        return {
+          userId,
+          isRunning: false,
+          message: 'No auto training service found for this user'
+        };
       }
 
-      const status = service.getStatus();
-      const healthStatus = service.getHealthStatus();
-
-      res.json({
-        success: true,
-        data: {
-          userId,
-          status,
-          healthStatus,
-          config: service.getConfig()
-        }
-      });
-
-    } catch (error) {
-      this.logger.error('❌ Error getting auto training status', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to get auto training status',
-        details: error.message
-      });
+      return {
+        userId,
+        status: service.getStatus(),
+        healthStatus: service.getHealthStatus(),
+        config: service.getConfig()
+      };
+    },
+    {
+      operationName: 'get auto training status',
+      parseParams: (req) => ({
+        userId: req.user?.userId || 'default'
+      })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Update auto training configuration
    */
-  async updateAutoTrainingConfig(req, res) {
-    try {
-      const { userId = 'default' } = req.user || {};
-      const { config } = req.body;
-
-      // Validate configuration
-      const validationResult = AutoTrainingValidator.validateConfig(config);
-      if (!validationResult.isValid) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid configuration',
-          details: validationResult.errors
-        });
-      }
-
+  updateAutoTrainingConfig = this.createPostEndpoint(
+    async (configData) => {
+      const { userId, config } = configData;
+      
       const service = this.trainingServices.get(userId);
       if (!service) {
-        return res.status(404).json({
-          success: false,
-          error: 'No auto training service found for this user'
-        });
+        const error = new Error('No auto training service found for this user');
+        error.statusCode = 404;
+        throw error;
       }
 
       service.updateConfig(config);
       const updatedConfig = service.getConfig();
 
-      this.logger.info('✅ Auto training configuration updated', {
+      return {
         userId,
-        updatedFields: Object.keys(config)
-      });
-
-      res.json({
-        success: true,
-        data: {
-          userId,
-          updatedConfig,
-          message: 'Configuration updated successfully'
-        }
-      });
-
-    } catch (error) {
-      this.logger.error('❌ Error updating auto training config', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to update auto training configuration',
-        details: error.message
-      });
+        updatedConfig
+      };
+    },
+    {
+      operationName: 'update auto training configuration',
+      validator: (req) => AutoTrainingValidator.validateConfig(req.body.config),
+      parseBody: (req) => ({
+        userId: req.user?.userId || 'default',
+        config: req.body.config
+      })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Manually trigger training cycle
    */
-  async triggerTrainingCycle(req, res) {
-    try {
-      const { userId = 'default' } = req.user || {};
-
+  triggerTrainingCycle = this.createGetEndpoint(
+    async (params) => {
+      const { userId } = params;
+      
       const service = this.trainingServices.get(userId);
       if (!service) {
-        return res.status(404).json({
-          success: false,
-          error: 'No auto training service found for this user'
-        });
+        const error = new Error('No auto training service found for this user');
+        error.statusCode = 404;
+        throw error;
       }
 
       await service.manualTriggerTraining();
       const status = service.getStatus();
 
-      this.logger.info('✅ Training cycle triggered manually', {
+      return {
         userId,
-        sessionId: status.sessionId
-      });
-
-      res.json({
-        success: true,
-        data: {
-          userId,
-          sessionId: status.sessionId,
-          status,
-          message: 'Training cycle triggered successfully'
-        }
-      });
-
-    } catch (error) {
-      this.logger.error('❌ Error triggering training cycle', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to trigger training cycle',
-        details: error.message
-      });
+        sessionId: status.sessionId,
+        status
+      };
+    },
+    {
+      operationName: 'trigger training cycle',
+      parseParams: (req) => ({
+        userId: req.user?.userId || 'default'
+      })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Export full training report
    */
-  async exportTrainingReport(req, res) {
-    try {
-      const { userId = 'default' } = req.user || {};
-
+  exportTrainingReport = this.createGetEndpoint(
+    async (params) => {
+      const { userId } = params;
+      
       const service = this.trainingServices.get(userId);
       if (!service) {
-        return res.status(404).json({
-          success: false,
-          error: 'No auto training service found for this user'
-        });
+        const error = new Error('No auto training service found for this user');
+        error.statusCode = 404;
+        throw error;
       }
 
       const report = await service.exportFullReport();
 
-      this.logger.info('✅ Training report exported', {
+      return {
         userId,
-        reportSize: report.length
-      });
-
-      res.json({
-        success: true,
-        data: {
-          userId,
-          report: JSON.parse(report),
-          exportedAt: new Date().toISOString()
-        }
-      });
-
-    } catch (error) {
-      this.logger.error('❌ Error exporting training report', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to export training report',
-        details: error.message
-      });
+        report: JSON.parse(report),
+        exportedAt: new Date().toISOString()
+      };
+    },
+    {
+      operationName: 'export training report',
+      parseParams: (req) => ({
+        userId: req.user?.userId || 'default'
+      })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Save AI model
    */
-  async saveModel(req, res) {
-    try {
-      const { userId = 'default' } = req.user || {};
-
+  saveModel = this.createGetEndpoint(
+    async (params) => {
+      const { userId } = params;
+      
       const service = this.trainingServices.get(userId);
       if (!service) {
-        return res.status(404).json({
-          success: false,
-          error: 'No auto training service found for this user'
-        });
+        const error = new Error('No auto training service found for this user');
+        error.statusCode = 404;
+        throw error;
       }
 
       const modelData = service.saveModel();
       if (!modelData) {
-        return res.status(500).json({
-          success: false,
-          error: 'Failed to save model - no model data returned'
-        });
+        const error = new Error('Failed to save model - no model data returned');
+        error.statusCode = 500;
+        throw error;
       }
 
-      this.logger.info('✅ AI model saved', {
+      return {
         userId,
-        modelSize: modelData.length
-      });
-
-      res.json({
-        success: true,
-        data: {
-          userId,
-          modelData,
-          modelSize: modelData.length,
-          savedAt: new Date().toISOString()
-        }
-      });
-
-    } catch (error) {
-      this.logger.error('❌ Error saving AI model', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to save AI model',
-        details: error.message
-      });
+        modelData,
+        modelSize: modelData.length,
+        savedAt: new Date().toISOString()
+      };
+    },
+    {
+      operationName: 'save AI model',
+      parseParams: (req) => ({
+        userId: req.user?.userId || 'default'
+      })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Load AI model
    */
-  async loadModel(req, res) {
-    try {
-      const { userId = 'default' } = req.user || {};
-      const { modelData } = req.body;
-
-      if (!modelData) {
-        return res.status(400).json({
-          success: false,
-          error: 'Model data is required'
-        });
-      }
-
+  loadModel = this.createPostEndpoint(
+    async (loadData) => {
+      const { userId, modelData } = loadData;
+      
       const service = this.trainingServices.get(userId);
       if (!service) {
-        return res.status(404).json({
-          success: false,
-          error: 'No auto training service found for this user'
-        });
+        const error = new Error('No auto training service found for this user');
+        error.statusCode = 404;
+        throw error;
       }
 
       service.loadModel(modelData);
 
-      this.logger.info('✅ AI model loaded', {
+      return {
         userId,
-        modelSize: modelData.length
-      });
-
-      res.json({
-        success: true,
-        data: {
-          userId,
-          modelSize: modelData.length,
-          loadedAt: new Date().toISOString(),
-          message: 'AI model loaded successfully'
+        modelSize: modelData.length,
+        loadedAt: new Date().toISOString()
+      };
+    },
+    {
+      operationName: 'load AI model',
+      parseBody: (req) => {
+        const { modelData } = req.body;
+        
+        if (!modelData) {
+          throw new Error('Model data is required');
         }
-      });
-
-    } catch (error) {
-      this.logger.error('❌ Error loading AI model', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to load AI model',
-        details: error.message
-      });
+        
+        return {
+          userId: req.user?.userId || 'default',
+          modelData
+        };
+      }
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Get historical data
    */
-  async getHistoricalData(req, res) {
-    try {
-      const { userId = 'default' } = req.user || {};
-      const { itemId, timeRange } = req.query;
-
+  getHistoricalData = this.createTimeBasedEndpoint(
+    async (params) => {
+      const { userId, itemId, timeRange } = params;
+      
       const service = this.trainingServices.get(userId);
       if (!service) {
-        return res.status(404).json({
-          success: false,
-          error: 'No auto training service found for this user'
-        });
+        const error = new Error('No auto training service found for this user');
+        error.statusCode = 404;
+        throw error;
       }
 
       const historicalData = service.getHistoricalData(
@@ -424,70 +309,62 @@ class AutoTrainingController {
         timeRange ? parseInt(timeRange) : undefined
       );
 
-      res.json({
-        success: true,
-        data: historicalData.historicalData // Frontend expects data to be the array directly
-      });
-
-    } catch (error) {
-      this.logger.error('❌ Error getting historical data', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to get historical data',
-        details: error.message
-      });
+      return historicalData.historicalData; // Frontend expects data to be the array directly
+    },
+    {
+      operationName: 'get historical data',
+      parseParams: (req) => ({
+        userId: req.user?.userId || 'default',
+        itemId: req.query.itemId,
+        timeRange: req.query.timeRange
+      })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Get item timeseries
    */
-  async getItemTimeseries(req, res) {
-    try {
-      const { userId = 'default' } = req.user || {};
-      const { itemId } = req.params;
-
-      if (!itemId) {
-        return res.status(400).json({
-          success: false,
-          error: 'Item ID is required'
-        });
-      }
-
+  getItemTimeseries = this.createGetEndpoint(
+    async (params) => {
+      const { userId, itemId } = params;
+      
       const service = this.trainingServices.get(userId);
       if (!service) {
-        return res.status(404).json({
-          success: false,
-          error: 'No auto training service found for this user'
-        });
+        const error = new Error('No auto training service found for this user');
+        error.statusCode = 404;
+        throw error;
       }
 
       const timeseries = service.getItemTimeseries(parseInt(itemId));
 
-      res.json({
-        success: true,
-        data: {
-          userId,
-          itemId: parseInt(itemId),
-          timeseries
+      return {
+        userId,
+        itemId: parseInt(itemId),
+        timeseries
+      };
+    },
+    {
+      operationName: 'get item timeseries',
+      parseParams: (req) => {
+        const { itemId } = req.params;
+        
+        if (!itemId) {
+          throw new Error('Item ID is required');
         }
-      });
-
-    } catch (error) {
-      this.logger.error('❌ Error getting item timeseries', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to get item timeseries',
-        details: error.message
-      });
+        
+        return {
+          userId: req.user?.userId || 'default',
+          itemId
+        };
+      }
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Get all active training services
    */
-  async getActiveServices(req, res) {
-    try {
+  getActiveServices = this.createGetEndpoint(
+    async () => {
       const activeServices = [];
 
       for (const [userId, service] of this.trainingServices.entries()) {
@@ -502,55 +379,33 @@ class AutoTrainingController {
         });
       }
 
-      res.json({
-        success: true,
-        data: {
-          totalActive: activeServices.length,
-          services: activeServices
-        }
-      });
-
-    } catch (error) {
-      this.logger.error('❌ Error getting active services', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to get active services',
-        details: error.message
-      });
-    }
-  }
+      return {
+        totalActive: activeServices.length,
+        services: activeServices
+      };
+    },
+    { operationName: 'get active services' }
+  );
 
   /**
    * Context7 Pattern: Get system health
    */
-  async getSystemHealth(req, res) {
-    try {
+  getSystemHealth = this.createGetEndpoint(
+    async () => {
       const totalServices = this.trainingServices.size;
       const runningServices = Array.from(this.trainingServices.values())
         .filter(service => service.isRunning).length;
 
-      const systemHealth = {
+      return {
         totalServices,
         runningServices,
         uptime: process.uptime(),
         memory: process.memoryUsage(),
         timestamp: new Date().toISOString()
       };
-
-      res.json({
-        success: true,
-        data: systemHealth
-      });
-
-    } catch (error) {
-      this.logger.error('❌ Error getting system health', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to get system health',
-        details: error.message
-      });
-    }
-  }
+    },
+    { operationName: 'get system health' }
+  );
 }
 
 module.exports = { AutoTrainingController };

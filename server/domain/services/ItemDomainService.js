@@ -7,10 +7,10 @@
  * - Domain-driven design: Keeps business logic in domain layer
  */
 
+const { BaseService } = require('../../services/BaseService');
 const { ItemId } = require('../value-objects/ItemId');
 const { AlchemyInfo } = require('../value-objects/AlchemyInfo');
 const { ItemSpecifications } = require('../specifications/ItemSpecifications');
-const { Logger } = require('../../utils/Logger');
 
 /**
  * @typedef {import('../../types/domain/Item.js').ItemCreationData} ItemCreationData
@@ -18,13 +18,7 @@ const { Logger } = require('../../utils/Logger');
  * @typedef {import('../../types/domain/Item.js').ItemBusinessRules} ItemBusinessRules
  */
 
-class ItemDomainService {
-  /**
-   * @private
-   * @type {Logger}
-   */
-  #logger;
-
+class ItemDomainService extends BaseService {
   /**
    * @private
    * @type {ItemBusinessRules}
@@ -32,7 +26,13 @@ class ItemDomainService {
   #businessRules;
 
   constructor() {
-    this.#logger = new Logger('ItemDomainService');
+    super('ItemDomainService', {
+      enableCache: true,
+      cachePrefix: 'item_domain',
+      cacheTTL: 3600, // 1 hour for domain operations
+      enableMongoDB: false // Domain service doesn't need direct MongoDB access
+    });
+    
     this.#businessRules = {
       MIN_ALCHEMY_PROFIT: 50,
       HIGH_VALUE_THRESHOLD: 100000,
@@ -55,7 +55,7 @@ class ItemDomainService {
    */
   updateBusinessRules(newRules) {
     Object.assign(this.#businessRules, newRules);
-    this.#logger.info('Business rules updated', { newRules });
+    this.logger.info('Business rules updated', { newRules });
   }
 
   /**

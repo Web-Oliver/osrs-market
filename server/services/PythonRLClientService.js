@@ -13,16 +13,22 @@
  */
 
 const axios = require('axios');
-const { Logger } = require('../utils/Logger');
+const { BaseService } = require('./BaseService');
 
-class PythonRLClientService {
+class PythonRLClientService extends BaseService {
   constructor(config) {
-    this.logger = new Logger('PythonRLClient');
+    super('PythonRLClientService', {
+      enableCache: true,
+      cachePrefix: 'python_rl_client',
+      cacheTTL: 30, // 30 seconds for RL responses
+      enableMongoDB: false, // No MongoDB needed for HTTP client
+      retryAttempts: config?.retryAttempts || 3,
+      retryDelay: config?.retryDelay || 1000
+    });
+    
     this.config = {
       baseUrl: config?.baseUrl || process.env.PYTHON_RL_SERVICE_URL || 'http://localhost:8000',
       timeout: config?.timeout || 30000, // 30 seconds
-      retryAttempts: config?.retryAttempts || 3,
-      retryDelay: config?.retryDelay || 1000, // 1 second
       circuitBreakerThreshold: config?.circuitBreakerThreshold || 5,
       circuitBreakerTimeout: config?.circuitBreakerTimeout || 60000, // 1 minute
       ...config

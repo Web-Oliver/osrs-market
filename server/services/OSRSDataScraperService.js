@@ -11,8 +11,7 @@
  */
 
 const { chromium } = require('playwright');
-const { Logger } = require('../utils/Logger');
-const { MongoDataPersistence } = require('../mongoDataPersistence');
+const { BaseService } = require('./BaseService');
 const { OSRSWikiService } = require('./OSRSWikiService');
 
 // DOMAIN INTEGRATION - Use existing domain models
@@ -21,10 +20,15 @@ const { Item } = require('../domain/entities/Item');
 const { ItemId } = require('../domain/value-objects/ItemId');
 const { ItemDomainService } = require('../domain/services/ItemDomainService');
 
-class OSRSDataScraperService {
+class OSRSDataScraperService extends BaseService {
   constructor(config = {}) {
-    this.logger = new Logger('OSRSDataScraper');
-    this.mongoPersistence = null;
+    super('OSRSDataScraperService', {
+      enableCache: true,
+      cachePrefix: 'osrs_scraper',
+      cacheTTL: 1800, // 30 minutes for scraper data
+      enableMongoDB: true // Store scraped data
+    });
+    
     this.osrsWikiService = new OSRSWikiService();
 
     // DOMAIN INTEGRATION - Initialize domain services

@@ -9,10 +9,9 @@
  * - Performance optimization through caching and bulk operations
  */
 
+const { BaseService } = require('./BaseService');
 const { ItemRepository } = require('../repositories/ItemRepository');
 const { OSRSWikiService } = require('./OSRSWikiService');
-const { Logger } = require('../utils/Logger');
-const { CacheManager } = require('../utils/CacheManager');
 const { DataTransformer } = require('../utils/DataTransformer');
 
 // Enhanced Domain Components
@@ -22,12 +21,17 @@ const { ItemDomainService } = require('../domain/services/ItemDomainService');
 const { ItemSpecifications } = require('../domain/specifications/ItemSpecifications');
 const { ItemModelAdapter } = require('../domain/adapters/ItemModelAdapter');
 
-class ItemMappingService {
+class ItemMappingService extends BaseService {
   constructor() {
-    this.logger = new Logger('ItemMappingService');
+    super('ItemMappingService', {
+      enableCache: true,
+      cachePrefix: 'item_mapping',
+      cacheTTL: 900, // 15 minutes cache
+      enableMongoDB: true
+    });
+    
     this.itemRepository = new ItemRepository();
     this.osrsWikiService = new OSRSWikiService();
-    this.cache = new CacheManager('item_mapping', 900000); // 15 minutes cache
     this.dataTransformer = new DataTransformer();
 
     // Enhanced Domain Components
@@ -103,7 +107,7 @@ class ItemMappingService {
       });
 
       // Clear related caches
-      this.clearItemCaches();
+      await this.cache.deletePattern('item_*');
 
       return {
         success: true,
@@ -284,7 +288,7 @@ class ItemMappingService {
 
         // Add small delay between batches to avoid overwhelming the database
         if (i + this.SYNC_BATCH_SIZE < items.length) {
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await this.delay(100);
         }
       }
 
@@ -307,29 +311,13 @@ class ItemMappingService {
   }
 
   /**
-   * Context7 Pattern: Get item by ID with caching
+   * Context7 Pattern: Get item by ID with BaseService caching
    */
   async getItemById(itemId) {
-    try {
-      const cacheKey = `item_${itemId}`;
-      const cached = this.cache.get(cacheKey);
-
-      if (cached) {
-        this.logger.debug('Returning cached item', { itemId });
-        return cached;
-      }
-
-      const item = await this.itemRepository.findById(itemId);
-
-      if (item) {
-        this.cache.set(cacheKey, item);
-      }
-
-      return item;
-    } catch (error) {
-      this.logger.error('Error getting item by ID', error, { itemId });
-      throw error;
-    }
+    return await this.withCache(`item_${itemId}`, async () => {
+      this.logger.debug('Fetching item by ID', { itemId });
+      return await this.itemRepository.findById(itemId);
+    });
   }
 
   /**

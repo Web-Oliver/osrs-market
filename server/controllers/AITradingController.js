@@ -1,25 +1,21 @@
 /**
- * 🤖 AI Trading Controller - Context7 Optimized
+ * 🤖 AI Trading Controller - Context7 Optimized with BaseController
  *
  * Context7 Pattern: Controller Layer for AI Trading Operations
- * - Handles AI trading session management
- * - Manages neural network training and prediction
- * - Provides trading analytics and performance metrics
- * - Thin controllers with business logic in services
- * - Proper validation and error handling
- * - DRY principles with reusable patterns
- * - SOLID architecture with single responsibility
+ * - Extends BaseController for DRY principles
+ * - Eliminates repetitive error handling and method binding
+ * - SOLID principles with single responsibility
+ * - Standardized endpoint creation and parameter parsing
  */
 
+const { BaseController } = require('./BaseController');
 const { AITradingOrchestratorService } = require('../services/AITradingOrchestratorService');
 const { TradingAnalysisService } = require('../services/TradingAnalysisService');
 const { validateRequest } = require('../validators/AITradingValidator');
-const { ApiResponse } = require('../utils/ApiResponse');
-const { Logger } = require('../utils/Logger');
 
-class AITradingController {
+class AITradingController extends BaseController {
   constructor() {
-    this.logger = new Logger('AITradingController');
+    super('AITradingController');
     this.tradingAnalysis = new TradingAnalysisService();
     this.orchestratorInstances = new Map(); // Multiple orchestrator instances
 
@@ -46,22 +42,6 @@ class AITradingController {
       explorationBoost: true
     };
 
-    // Context7 Pattern: Bind methods to preserve 'this' context
-    this.startTradingSession = this.startTradingSession.bind(this);
-    this.stopTradingSession = this.stopTradingSession.bind(this);
-    this.pauseTradingSession = this.pauseTradingSession.bind(this);
-    this.resumeTradingSession = this.resumeTradingSession.bind(this);
-    this.processMarketData = this.processMarketData.bind(this);
-    this.getTrainingProgress = this.getTrainingProgress.bind(this);
-    this.getPerformanceAnalytics = this.getPerformanceAnalytics.bind(this);
-    this.updateAdaptiveConfig = this.updateAdaptiveConfig.bind(this);
-    this.saveModel = this.saveModel.bind(this);
-    this.loadModel = this.loadModel.bind(this);
-    this.exportTrainingData = this.exportTrainingData.bind(this);
-    this.generateTradingSignals = this.generateTradingSignals.bind(this);
-    this.getSystemStatus = this.getSystemStatus.bind(this);
-    this.getActiveSessions = this.getActiveSessions.bind(this);
-
     this.logger.info('🤖 AI Trading Controller initialized');
   }
 
@@ -69,78 +49,67 @@ class AITradingController {
    * Context7 Pattern: Start AI trading session
    * POST /api/ai-trading/sessions
    */
-  async startTradingSession(req, res, next) {
-    try {
-      this.logger.info('🚀 Starting AI trading session', {
-        body: req.body,
-        ip: req.ip,
-        requestId: req.id
-      });
-
-      // Context7 Pattern: Validate request body
-      const validation = validateRequest.startTradingSession(req.body);
-      if (!validation.isValid) {
-        return ApiResponse.badRequest(res, 'Invalid request parameters', validation.errors);
-      }
-
-      const {
-        networkConfig = this.defaultNetworkConfig,
-        adaptiveConfig = this.defaultAdaptiveConfig,
-        sessionName = 'Default Session'
-      } = req.body;
-
+  startTradingSession = this.createPostEndpoint(
+    async (sessionData) => {
       // Create new orchestrator instance
-      const orchestrator = new AITradingOrchestratorService(networkConfig, adaptiveConfig);
+      const orchestrator = new AITradingOrchestratorService(
+        sessionData.networkConfig, 
+        sessionData.adaptiveConfig
+      );
       const sessionId = orchestrator.startLearningSession();
 
       // Store orchestrator instance
       this.orchestratorInstances.set(sessionId, {
         orchestrator,
-        sessionName,
+        sessionName: sessionData.sessionName,
         createdAt: Date.now(),
-        createdBy: req.ip
+        createdBy: sessionData.metadata.clientIp
       });
 
-      this.logger.info('✅ AI trading session started successfully', {
+      return {
         sessionId,
-        sessionName,
-        networkConfig,
-        adaptiveConfig,
-        requestId: req.id
-      });
-
-      return ApiResponse.created(res, {
-        sessionId,
-        sessionName,
-        networkConfig,
-        adaptiveConfig,
+        sessionName: sessionData.sessionName,
+        networkConfig: sessionData.networkConfig,
+        adaptiveConfig: sessionData.adaptiveConfig,
         status: 'TRAINING'
-      }, 'AI trading session started successfully');
-    } catch (error) {
-      this.logger.error('❌ Error starting AI trading session', error, {
-        body: req.body,
-        requestId: req.id
-      });
-      next(error);
+      };
+    },
+    {
+      operationName: 'start AI trading session',
+      validator: () => validateRequest.startTradingSession(req.body),
+      parseBody: (req) => {
+        const {
+          networkConfig = this.defaultNetworkConfig,
+          adaptiveConfig = this.defaultAdaptiveConfig,
+          sessionName = 'Default Session'
+        } = req.body;
+
+        return {
+          networkConfig,
+          adaptiveConfig,
+          sessionName,
+          metadata: {
+            clientIp: req.ip,
+            userAgent: req.get('User-Agent'),
+            requestId: req.id,
+            timestamp: Date.now()
+          }
+        };
+      }
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Stop AI trading session
    * DELETE /api/ai-trading/sessions/:sessionId
    */
-  async stopTradingSession(req, res, next) {
-    try {
-      const { sessionId } = req.params;
-
-      this.logger.info('🛑 Stopping AI trading session', {
-        sessionId,
-        requestId: req.id
-      });
-
+  stopTradingSession = this.createDeleteEndpoint(
+    async (sessionId) => {
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
-        return ApiResponse.notFound(res, 'Trading session not found');
+        const error = new Error('Trading session not found');
+        error.statusCode = 404;
+        throw error;
       }
 
       // Stop the session
@@ -152,558 +121,307 @@ class AITradingController {
       // Remove from active sessions
       this.orchestratorInstances.delete(sessionId);
 
-      this.logger.info('✅ AI trading session stopped successfully', {
-        sessionId,
-        finalPerformance: {
-          totalTrades: finalPerformance.overall.totalTrades,
-          netProfit: finalPerformance.overall.netProfit,
-          successRate: finalPerformance.overall.successRate
-        },
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, {
+      return {
         sessionId,
         status: 'STOPPED',
         finalPerformance
-      }, 'AI trading session stopped successfully');
-    } catch (error) {
-      this.logger.error('❌ Error stopping AI trading session', error, {
-        sessionId: req.params.sessionId,
-        requestId: req.id
-      });
-      next(error);
+      };
+    },
+    {
+      operationName: 'stop AI trading session',
+      resourceIdParam: 'sessionId'
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Pause AI trading session
    * POST /api/ai-trading/sessions/:sessionId/pause
    */
-  async pauseTradingSession(req, res, next) {
-    try {
-      const { sessionId } = req.params;
-
-      this.logger.info('⏸️ Pausing AI trading session', {
-        sessionId,
-        requestId: req.id
-      });
-
+  pauseTradingSession = this.createPostEndpoint(
+    async (sessionData) => {
+      const { sessionId } = sessionData;
+      
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
-        return ApiResponse.notFound(res, 'Trading session not found');
+        const error = new Error('Trading session not found');
+        error.statusCode = 404;
+        throw error;
       }
 
       sessionInstance.orchestrator.pauseLearningSession();
 
-      this.logger.info('✅ AI trading session paused successfully', {
-        sessionId,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, {
+      return {
         sessionId,
         status: 'PAUSED'
-      }, 'AI trading session paused successfully');
-    } catch (error) {
-      this.logger.error('❌ Error pausing AI trading session', error, {
-        sessionId: req.params.sessionId,
-        requestId: req.id
-      });
-      next(error);
+      };
+    },
+    {
+      operationName: 'pause AI trading session',
+      resourceIdParam: 'sessionId',
+      parseParams: (req) => ({ sessionId: req.params.sessionId })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Resume AI trading session
    * POST /api/ai-trading/sessions/:sessionId/resume
    */
-  async resumeTradingSession(req, res, next) {
-    try {
-      const { sessionId } = req.params;
-
-      this.logger.info('▶️ Resuming AI trading session', {
-        sessionId,
-        requestId: req.id
-      });
-
+  resumeTradingSession = this.createPostEndpoint(
+    async (sessionData) => {
+      const { sessionId } = sessionData;
+      
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
-        return ApiResponse.notFound(res, 'Trading session not found');
+        const error = new Error('Trading session not found');
+        error.statusCode = 404;
+        throw error;
       }
 
       sessionInstance.orchestrator.resumeLearningSession();
 
-      this.logger.info('✅ AI trading session resumed successfully', {
-        sessionId,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, {
+      return {
         sessionId,
         status: 'TRAINING'
-      }, 'AI trading session resumed successfully');
-    } catch (error) {
-      this.logger.error('❌ Error resuming AI trading session', error, {
-        sessionId: req.params.sessionId,
-        requestId: req.id
-      });
-      next(error);
+      };
+    },
+    {
+      operationName: 'resume AI trading session',
+      resourceIdParam: 'sessionId',
+      parseParams: (req) => ({ sessionId: req.params.sessionId })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Process market data for trading decisions
    * POST /api/ai-trading/sessions/:sessionId/process-market-data
    */
-  async processMarketData(req, res, next) {
-    try {
-      const { sessionId } = req.params;
-      const { items } = req.body;
-
-      // EXTENSIVE DEBUGGING: Log everything we can about the request
-      this.logger.info('🔍 [DETAILED DEBUG] processMarketData called', {
-        sessionId,
-        requestMethod: req.method,
-        requestUrl: req.originalUrl,
-        requestHeaders: req.headers,
-        requestBody: req.body,
-        requestParams: req.params,
-        requestQuery: req.query,
-        hasBody: !!req.body,
-        bodyType: typeof req.body,
-        bodyKeys: req.body ? Object.keys(req.body) : null,
-        itemsProperty: req.body?.items,
-        itemsType: typeof req.body?.items,
-        itemsIsArray: Array.isArray(req.body?.items),
-        itemsLength: req.body?.items?.length,
-        firstItem: req.body?.items?.[0],
-        requestId: req.id
-      });
-
-      this.logger.info('📊 Processing market data for trading decisions', {
-        sessionId,
-        itemCount: items?.length,
-        requestId: req.id,
-        requestBody: JSON.stringify(req.body, null, 2),
-        hasItems: !!items,
-        itemsIsArray: Array.isArray(items),
-        firstItem: items?.[0] ? JSON.stringify(items[0], null, 2) : null
-      });
-
-      // Context7 Pattern: Validate request
-      this.logger.info('🔍 [DEBUG] About to validate request', {
-        sessionId,
-        validateFunction: typeof validateRequest.processMarketData,
-        requestBody: req.body,
-        requestId: req.id
-      });
-
-      let validation;
-      try {
-        validation = validateRequest.processMarketData(req.body);
-        this.logger.info('🔍 [DEBUG] Validation completed', {
-          sessionId,
-          validationResult: validation,
-          requestId: req.id
-        });
-      } catch (validationError) {
-        this.logger.error('💥 [CRITICAL] Validation function threw error', {
-          sessionId,
-          validationError: validationError.message,
-          validationStack: validationError.stack,
-          requestBody: req.body,
-          requestId: req.id
-        });
-        return ApiResponse.error(res, 'Validation error occurred', validationError.message, 500);
-      }
-
-      if (!validation.isValid) {
-        this.logger.error('❌ Market data validation failed', {
-          sessionId,
-          validationErrors: validation.errors,
-          requestBody: JSON.stringify(req.body, null, 2),
-          requestId: req.id
-        });
-        return ApiResponse.badRequest(res, 'Invalid market data', validation.errors);
-      }
-
-      this.logger.info('🔍 [DEBUG] Checking session instance', {
-        sessionId,
-        hasSessionInstance: this.orchestratorInstances.has(sessionId),
-        totalSessions: this.orchestratorInstances.size,
-        allSessionIds: Array.from(this.orchestratorInstances.keys()),
-        requestId: req.id
-      });
-
+  processMarketData = this.createPostEndpoint(
+    async (marketData) => {
+      const { sessionId, items } = marketData;
+      
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
-        this.logger.error('❌ Trading session not found', {
-          sessionId,
-          availableSessions: Array.from(this.orchestratorInstances.keys()),
-          requestId: req.id
-        });
-        return ApiResponse.notFound(res, 'Trading session not found');
+        const error = new Error('Trading session not found');
+        error.statusCode = 404;
+        throw error;
       }
-
-      this.logger.info('🔍 [DEBUG] Session instance found', {
-        sessionId,
-        sessionInstanceType: typeof sessionInstance,
-        hasOrchestrator: !!sessionInstance.orchestrator,
-        orchestratorType: typeof sessionInstance.orchestrator,
-        sessionCreatedAt: sessionInstance.createdAt,
-        requestId: req.id
-      });
 
       if (!items || !Array.isArray(items) || items.length === 0) {
-        this.logger.error('❌ Invalid items array', {
-          sessionId,
-          hasItems: !!items,
-          itemsType: typeof items,
-          itemsIsArray: Array.isArray(items),
-          itemsLength: items?.length,
-          requestId: req.id
-        });
-        return ApiResponse.badRequest(res, 'Items array is required and cannot be empty');
+        const error = new Error('Items array is required and cannot be empty');
+        error.statusCode = 400;
+        throw error;
       }
 
-      this.logger.info('🔍 [DEBUG] About to call orchestrator.processMarketData', {
-        sessionId,
-        itemsCount: items.length,
-        orchestratorExists: !!sessionInstance.orchestrator,
-        orchestratorMethods: sessionInstance.orchestrator ? Object.getOwnPropertyNames(Object.getPrototypeOf(sessionInstance.orchestrator)) : null,
-        requestId: req.id
-      });
+      const actions = await sessionInstance.orchestrator.processMarketData(items);
 
-      // Process market data through orchestrator
-      let actions;
-      try {
-        actions = await sessionInstance.orchestrator.processMarketData(items);
-        this.logger.info('🔍 [DEBUG] Orchestrator processMarketData completed', {
-          sessionId,
-          actionsType: typeof actions,
-          actionsIsArray: Array.isArray(actions),
-          actionsLength: actions?.length,
-          requestId: req.id
-        });
-      } catch (orchestratorError) {
-        this.logger.error('💥 [CRITICAL] Orchestrator processMarketData threw error', {
-          sessionId,
-          orchestratorError: orchestratorError.message,
-          orchestratorStack: orchestratorError.stack,
-          requestId: req.id
-        });
-        throw orchestratorError;
-      }
-
-      this.logger.info('✅ Market data processed successfully', {
-        sessionId,
-        itemCount: items.length,
-        actionsGenerated: actions.length,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, {
+      return {
         sessionId,
         processedItems: items.length,
         actionsGenerated: actions.length,
         actions
-      }, 'Market data processed successfully');
-    } catch (error) {
-      this.logger.error('❌ Error processing market data', error, {
+      };
+    },
+    {
+      operationName: 'process market data',
+      validator: (req) => validateRequest.processMarketData(req.body),
+      parseBody: (req) => ({
         sessionId: req.params.sessionId,
-        requestId: req.id
-      });
-      next(error);
+        items: req.body.items
+      })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Get training progress
    * GET /api/ai-trading/sessions/:sessionId/progress
    */
-  async getTrainingProgress(req, res, next) {
-    try {
-      const { sessionId } = req.params;
-
-      this.logger.info('📈 Getting training progress', {
-        sessionId,
-        requestId: req.id
-      });
-
+  getTrainingProgress = this.createGetEndpoint(
+    async (params) => {
+      const { sessionId } = params;
+      
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
-        return ApiResponse.notFound(res, 'Trading session not found');
+        const error = new Error('Trading session not found');
+        error.statusCode = 404;
+        throw error;
       }
 
-      const progress = sessionInstance.orchestrator.getTrainingProgress();
-
-      this.logger.info('✅ Training progress retrieved successfully', {
-        sessionId,
-        episodeCount: progress.session?.episodeCount,
-        totalTrades: progress.session?.totalTrades,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, progress, 'Training progress retrieved successfully');
-    } catch (error) {
-      this.logger.error('❌ Error getting training progress', error, {
-        sessionId: req.params.sessionId,
-        requestId: req.id
-      });
-      next(error);
+      return sessionInstance.orchestrator.getTrainingProgress();
+    },
+    {
+      operationName: 'get training progress',
+      parseParams: (req) => ({ sessionId: req.params.sessionId })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Get performance analytics
    * GET /api/ai-trading/sessions/:sessionId/analytics
    */
-  async getPerformanceAnalytics(req, res, next) {
-    try {
-      const { sessionId } = req.params;
-
-      this.logger.info('📊 Getting performance analytics', {
-        sessionId,
-        requestId: req.id
-      });
-
+  getPerformanceAnalytics = this.createGetEndpoint(
+    async (params) => {
+      const { sessionId } = params;
+      
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
-        return ApiResponse.notFound(res, 'Trading session not found');
+        const error = new Error('Trading session not found');
+        error.statusCode = 404;
+        throw error;
       }
 
-      const analytics = sessionInstance.orchestrator.getPerformanceAnalytics();
-
-      this.logger.info('✅ Performance analytics retrieved successfully', {
-        sessionId,
-        totalTrades: analytics.overall.totalTrades,
-        successRate: analytics.overall.successRate,
-        netProfit: analytics.overall.netProfit,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, analytics, 'Performance analytics retrieved successfully');
-    } catch (error) {
-      this.logger.error('❌ Error getting performance analytics', error, {
-        sessionId: req.params.sessionId,
-        requestId: req.id
-      });
-      next(error);
+      return sessionInstance.orchestrator.getPerformanceAnalytics();
+    },
+    {
+      operationName: 'get performance analytics',
+      parseParams: (req) => ({ sessionId: req.params.sessionId })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Update adaptive configuration
    * PUT /api/ai-trading/sessions/:sessionId/adaptive-config
    */
-  async updateAdaptiveConfig(req, res, next) {
-    try {
-      const { sessionId } = req.params;
-      const { config } = req.body;
-
-      this.logger.info('⚙️ Updating adaptive configuration', {
-        sessionId,
-        config,
-        requestId: req.id
-      });
-
+  updateAdaptiveConfig = this.createPostEndpoint(
+    async (configData) => {
+      const { sessionId, config } = configData;
+      
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
-        return ApiResponse.notFound(res, 'Trading session not found');
+        const error = new Error('Trading session not found');
+        error.statusCode = 404;
+        throw error;
       }
 
       sessionInstance.orchestrator.setAdaptiveConfig(config);
       const updatedConfig = sessionInstance.orchestrator.getAdaptiveConfig();
 
-      this.logger.info('✅ Adaptive configuration updated successfully', {
-        sessionId,
-        updatedConfig,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, {
+      return {
         sessionId,
         adaptiveConfig: updatedConfig
-      }, 'Adaptive configuration updated successfully');
-    } catch (error) {
-      this.logger.error('❌ Error updating adaptive configuration', error, {
+      };
+    },
+    {
+      operationName: 'update adaptive configuration',
+      parseBody: (req) => ({
         sessionId: req.params.sessionId,
-        requestId: req.id
-      });
-      next(error);
+        config: req.body.config
+      })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Save model
    * POST /api/ai-trading/sessions/:sessionId/save-model
    */
-  async saveModel(req, res, next) {
-    try {
-      const { sessionId } = req.params;
-
-      this.logger.info('💾 Saving AI model', {
-        sessionId,
-        requestId: req.id
-      });
-
+  saveModel = this.createGetEndpoint(
+    async (params) => {
+      const { sessionId } = params;
+      
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
-        return ApiResponse.notFound(res, 'Trading session not found');
+        const error = new Error('Trading session not found');
+        error.statusCode = 404;
+        throw error;
       }
 
       const modelData = sessionInstance.orchestrator.saveModel();
 
-      this.logger.info('✅ AI model saved successfully', {
-        sessionId,
-        modelSize: modelData.length,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, {
+      return {
         sessionId,
         modelData,
         modelSize: modelData.length,
         savedAt: Date.now()
-      }, 'AI model saved successfully');
-    } catch (error) {
-      this.logger.error('❌ Error saving AI model', error, {
-        sessionId: req.params.sessionId,
-        requestId: req.id
-      });
-      next(error);
+      };
+    },
+    {
+      operationName: 'save AI model',
+      parseParams: (req) => ({ sessionId: req.params.sessionId })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Load model
    * POST /api/ai-trading/sessions/:sessionId/load-model
    */
-  async loadModel(req, res, next) {
-    try {
-      const { sessionId } = req.params;
-      const { modelData } = req.body;
-
-      this.logger.info('📁 Loading AI model', {
-        sessionId,
-        modelSize: modelData?.length,
-        requestId: req.id
-      });
-
+  loadModel = this.createPostEndpoint(
+    async (loadData) => {
+      const { sessionId, modelData } = loadData;
+      
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
-        return ApiResponse.notFound(res, 'Trading session not found');
+        const error = new Error('Trading session not found');
+        error.statusCode = 404;
+        throw error;
       }
 
       if (!modelData) {
-        return ApiResponse.badRequest(res, 'Model data is required');
+        const error = new Error('Model data is required');
+        error.statusCode = 400;
+        throw error;
       }
 
       sessionInstance.orchestrator.loadModel(modelData);
 
-      this.logger.info('✅ AI model loaded successfully', {
-        sessionId,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, {
+      return {
         sessionId,
         loadedAt: Date.now()
-      }, 'AI model loaded successfully');
-    } catch (error) {
-      this.logger.error('❌ Error loading AI model', error, {
+      };
+    },
+    {
+      operationName: 'load AI model',
+      parseBody: (req) => ({
         sessionId: req.params.sessionId,
-        requestId: req.id
-      });
-      next(error);
+        modelData: req.body.modelData
+      })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Export training data
    * GET /api/ai-trading/sessions/:sessionId/export
    */
-  async exportTrainingData(req, res, next) {
-    try {
-      const { sessionId } = req.params;
-
-      this.logger.info('📤 Exporting training data', {
-        sessionId,
-        requestId: req.id
-      });
-
+  exportTrainingData = this.createGetEndpoint(
+    async (params) => {
+      const { sessionId } = params;
+      
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
-        return ApiResponse.notFound(res, 'Trading session not found');
+        const error = new Error('Trading session not found');
+        error.statusCode = 404;
+        throw error;
       }
 
       const exportData = sessionInstance.orchestrator.exportTrainingData();
 
-      this.logger.info('✅ Training data exported successfully', {
-        sessionId,
-        outcomesCount: exportData.outcomes.length,
-        metricsCount: exportData.metrics.length,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, {
+      return {
         sessionId,
         exportData,
         exportedAt: Date.now()
-      }, 'Training data exported successfully');
-    } catch (error) {
-      this.logger.error('❌ Error exporting training data', error, {
-        sessionId: req.params.sessionId,
-        requestId: req.id
-      });
-      next(error);
+      };
+    },
+    {
+      operationName: 'export training data',
+      parseParams: (req) => ({ sessionId: req.params.sessionId })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Generate trading signals
    * POST /api/ai-trading/signals
    */
-  async generateTradingSignals(req, res, next) {
-    try {
-      const { items } = req.body;
-
-      this.logger.info('🎯 Generating trading signals', {
-        requestBody: req.body,
-        hasItems: !!items,
-        itemCount: items?.length,
-        itemsIsArray: Array.isArray(items),
-        requestId: req.id
-      });
-
-      // Context7 Pattern: Validate request
-      const validation = validateRequest.generateTradingSignals(req.body);
-      if (!validation.isValid) {
-        this.logger.error('❌ Trading signals validation failed', {
-          validationErrors: validation.errors,
-          requestBody: JSON.stringify(req.body, null, 2),
-          hasItems: !!items,
-          itemCount: items?.length,
-          itemsIsArray: Array.isArray(items),
-          firstItem: items?.[0] ? JSON.stringify(items[0], null, 2) : null,
-          requestId: req.id
-        });
-        return ApiResponse.badRequest(res, 'Invalid request data', validation.errors);
-      }
+  generateTradingSignals = this.createPostEndpoint(
+    async (signalData) => {
+      const { items } = signalData;
 
       if (!items || !Array.isArray(items) || items.length === 0) {
-        return ApiResponse.badRequest(res, 'Items array is required and cannot be empty');
+        const error = new Error('Items array is required and cannot be empty');
+        error.statusCode = 400;
+        throw error;
       }
 
       const signals = [];
       for (const item of items) {
-        // Use actual price history for analysis
         if (!item.priceHistory || item.priceHistory.length < 3) {
-          this.logger.warn(`Insufficient price history for item ${item.id}`, {
-            itemId: item.id,
-            historyLength: item.priceHistory ? item.priceHistory.length : 0
-          });
           continue;
         }
 
@@ -732,35 +450,25 @@ class AITradingController {
         }
       }
 
-      this.logger.info('✅ Trading signals generated successfully', {
-        itemCount: items.length,
-        signalsGenerated: signals.length,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, {
+      return {
         signals,
         generatedAt: Date.now(),
         itemsProcessed: items.length
-      }, 'Trading signals generated successfully');
-    } catch (error) {
-      this.logger.error('❌ Error generating trading signals', error, {
-        requestId: req.id
-      });
-      next(error);
+      };
+    },
+    {
+      operationName: 'generate trading signals',
+      validator: (req) => validateRequest.generateTradingSignals(req.body),
+      parseBody: (req) => ({ items: req.body.items })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Get system status
    * GET /api/ai-trading/system-status
    */
-  async getSystemStatus(req, res, next) {
-    try {
-      this.logger.info('📊 Getting AI trading system status', {
-        requestId: req.id
-      });
-
+  getSystemStatus = this.createGetEndpoint(
+    async () => {
       const systemStatus = {
         activeSessions: this.orchestratorInstances.size,
         sessions: Array.from(this.orchestratorInstances.entries()).map(([sessionId, instance]) => ({
@@ -782,30 +490,17 @@ class AITradingController {
         }
       };
 
-      this.logger.info('✅ System status retrieved successfully', {
-        activeSessions: systemStatus.activeSessions,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, systemStatus, 'System status retrieved successfully');
-    } catch (error) {
-      this.logger.error('❌ Error getting system status', error, {
-        requestId: req.id
-      });
-      next(error);
-    }
-  }
+      return systemStatus;
+    },
+    { operationName: 'get system status' }
+  );
 
   /**
    * Context7 Pattern: Get active sessions
    * GET /api/ai-trading/sessions
    */
-  async getActiveSessions(req, res, next) {
-    try {
-      this.logger.info('📋 Getting active trading sessions', {
-        requestId: req.id
-      });
-
+  getActiveSessions = this.createGetEndpoint(
+    async () => {
       const sessions = Array.from(this.orchestratorInstances.entries()).map(([sessionId, instance]) => ({
         sessionId,
         sessionName: instance.sessionName,
@@ -815,22 +510,13 @@ class AITradingController {
         systemStatus: instance.orchestrator.getSystemStatus()
       }));
 
-      this.logger.info('✅ Active sessions retrieved successfully', {
-        sessionCount: sessions.length,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, {
+      return {
         sessions,
         totalSessions: sessions.length
-      }, 'Active sessions retrieved successfully');
-    } catch (error) {
-      this.logger.error('❌ Error getting active sessions', error, {
-        requestId: req.id
-      });
-      next(error);
-    }
-  }
+      };
+    },
+    { operationName: 'get active sessions' }
+  );
 }
 
 module.exports = { AITradingController };

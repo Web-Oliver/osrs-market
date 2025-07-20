@@ -9,14 +9,19 @@
  * - SOLID architecture with single responsibility
  */
 
-const { Logger } = require('../utils/Logger');
+const { BaseService } = require('./BaseService');
 const { DataCollectionService } = require('./DataCollectionService');
 const { AITradingOrchestratorService } = require('./AITradingOrchestratorService');
-const { MongoDataPersistence } = require('../mongoDataPersistence');
 
-class AutoTrainingService {
+class AutoTrainingService extends BaseService {
   constructor(config = {}) {
-    this.logger = new Logger('AutoTrainingService');
+    super('AutoTrainingService', {
+      enableCache: true,
+      cachePrefix: 'auto_training',
+      cacheTTL: 600, // 10 minutes for training status
+      enableMongoDB: true // Store training metrics and progress
+    });
+    
     this.config = {
       dataCollection: {
         enableAutoCollection: true,

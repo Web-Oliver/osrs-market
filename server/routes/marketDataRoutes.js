@@ -10,20 +10,20 @@
 
 const express = require('express');
 const { MarketDataController } = require('../controllers/MarketDataController');
-const { RequestMiddleware } = require('../middleware/RequestMiddleware');
-const { ErrorMiddleware } = require('../middleware/ErrorMiddleware');
+const { ValidationMiddleware } = require('../middleware/ValidationMiddleware');
+const { ErrorHandler } = require('../middleware/ErrorHandler');
 const { validateRequest } = require('../validators/MarketDataValidator');
 
 const router = express.Router();
 
-// Context7 Pattern: Initialize dependencies
+// Context7 Pattern: Initialize dependencies with optimized middleware
 const marketDataController = new MarketDataController();
-const requestMiddleware = new RequestMiddleware();
-const errorMiddleware = new ErrorMiddleware();
+const validationMiddleware = new ValidationMiddleware();
+const errorHandler = new ErrorHandler();
 
-// Context7 Pattern: Apply middleware to all routes
-router.use(requestMiddleware.performanceMonitoring());
-router.use(requestMiddleware.requestTracking());
+// Context7 Pattern: Apply optimized middleware to all routes
+router.use(validationMiddleware.requestTracking());
+router.use(validationMiddleware.performanceMonitoring());
 
 /**
  * Context7 Pattern: GET /api/market-data
@@ -31,7 +31,7 @@ router.use(requestMiddleware.requestTracking());
  */
 router.get(
   '/',
-  requestMiddleware.validateRequest({
+  validationMiddleware.validate({
     query: {
       itemId: { type: 'string', optional: true },
       startTime: { type: 'string', optional: true },
@@ -42,7 +42,7 @@ router.get(
       sortOrder: { type: 'string', enum: ['asc', 'desc'], optional: true }
     }
   }),
-  errorMiddleware.handleAsyncError(marketDataController.getMarketData)
+  errorHandler.asyncHandler(marketDataController.getMarketData)
 );
 
 /**
@@ -51,14 +51,14 @@ router.get(
  */
 router.post(
   '/',
-  requestMiddleware.requestSizeLimit({ limit: '10mb' }),
-  requestMiddleware.validateRequest({
+  validationMiddleware.requestSizeLimit({ limit: '10mb' }),
+  validationMiddleware.validate({
     body: {
       items: { type: 'array', required: true, minItems: 1 },
       collectionSource: { type: 'string', optional: true }
     }
   }),
-  errorMiddleware.handleAsyncError(marketDataController.saveMarketData)
+  errorHandler.asyncHandler(marketDataController.saveMarketData)
 );
 
 /**
@@ -68,8 +68,8 @@ router.post(
  */
 router.post(
   '/snapshot',
-  requestMiddleware.requestSizeLimit({ limit: '1mb' }),
-  requestMiddleware.validateRequest({
+  validationMiddleware.requestSizeLimit({ limit: '1mb' }),
+  validationMiddleware.validate({
     body: {
       itemId: { type: 'number', required: true, min: 1 },
       timestamp: { type: 'number', required: true, min: 0 },

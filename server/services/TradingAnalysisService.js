@@ -12,12 +12,18 @@
  * This service focuses on interpreting those metrics to generate trading signals
  */
 
-const { Logger } = require('../utils/Logger');
+const { BaseService } = require('./BaseService');
 const { FinancialMetricsCalculator } = require('../utils/FinancialMetricsCalculator');
 
-class TradingAnalysisService {
+class TradingAnalysisService extends BaseService {
   constructor() {
-    this.logger = new Logger('TradingAnalysis');
+    super('TradingAnalysisService', {
+      enableCache: true,
+      cachePrefix: 'trading_analysis',
+      cacheTTL: 120, // 2 minutes for trading signals
+      enableMongoDB: false // No MongoDB needed for analysis service
+    });
+    
     this.metricsCalculator = new FinancialMetricsCalculator();
     this.logger.info('📊 Trading Analysis Service initialized with FinancialMetricsCalculator');
   }

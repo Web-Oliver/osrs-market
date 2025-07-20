@@ -7,12 +7,18 @@
  * - Provides health monitoring and statistics
  */
 
+const { BaseService } = require('./BaseService');
 const { MarketDataService } = require('./MarketDataService');
-const { Logger } = require('../utils/Logger');
 
-class MarketDataScheduler {
+class MarketDataScheduler extends BaseService {
   constructor() {
-    this.logger = new Logger('MarketDataScheduler');
+    super('MarketDataScheduler', {
+      enableCache: true,
+      cachePrefix: 'scheduler',
+      cacheTTL: 300, // 5 minutes for schedule status
+      enableMongoDB: false // No MongoDB needed for scheduler
+    });
+    
     this.marketDataService = new MarketDataService();
     this.intervalId = null;
     this.isRunning = false;

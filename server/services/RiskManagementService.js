@@ -16,7 +16,7 @@
  * - Market condition risk adjustments
  */
 
-const { Logger } = require('../utils/Logger');
+const { BaseService } = require('./BaseService');
 const { FinancialMetricsCalculator } = require('../utils/FinancialMetricsCalculator');
 const { MarketDataService } = require('./MarketDataService');
 const {
@@ -24,9 +24,15 @@ const {
   calculateGETax
 } = require('../utils/marketConstants');
 
-class RiskManagementService {
+class RiskManagementService extends BaseService {
   constructor(config = {}) {
-    this.logger = new Logger('RiskManagement');
+    super('RiskManagementService', {
+      enableCache: true,
+      cachePrefix: 'risk_management',
+      cacheTTL: 60, // 1 minute for risk calculations
+      enableMongoDB: true // Store risk metrics
+    });
+    
     this.metricsCalculator = new FinancialMetricsCalculator();
     this.marketDataService = new MarketDataService();
 

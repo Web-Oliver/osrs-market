@@ -13,7 +13,7 @@
  * - Patient overnight offers: Slower, high-margin, lower-volume trades
  */
 
-const { Logger } = require('../utils/Logger');
+const { BaseService } = require('./BaseService');
 const { FinancialMetricsCalculator } = require('../utils/FinancialMetricsCalculator');
 const { MarketDataService } = require('./MarketDataService');
 const {
@@ -22,9 +22,15 @@ const {
   GE_TAX_THRESHOLD_GP
 } = require('../utils/marketConstants');
 
-class CapitalAllocationService {
+class CapitalAllocationService extends BaseService {
   constructor(config = {}) {
-    this.logger = new Logger('CapitalAllocation');
+    super('CapitalAllocationService', {
+      enableCache: true,
+      cachePrefix: 'capital_allocation',
+      cacheTTL: 180, // 3 minutes for allocation decisions
+      enableMongoDB: true // Store allocation history
+    });
+    
     this.metricsCalculator = new FinancialMetricsCalculator();
     this.marketDataService = new MarketDataService();
 

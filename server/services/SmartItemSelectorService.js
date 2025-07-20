@@ -9,14 +9,18 @@
  * - SOLID architecture with single responsibility
  */
 
-const { Logger } = require('../utils/Logger');
+const { BaseService } = require('./BaseService');
 const { OSRSWikiService } = require('./OSRSWikiService');
 
-class SmartItemSelectorService {
+class SmartItemSelectorService extends BaseService {
   constructor() {
-    this.logger = new Logger('SmartItemSelectorService');
-    this.cache = new Map();
-    this.cacheTimeout = 5 * 60 * 1000; // 5 minutes
+    super('SmartItemSelectorService', {
+      enableCache: true,
+      cachePrefix: 'smart_item_selector',
+      cacheTTL: 300, // 5 minutes for item selection
+      enableMongoDB: false // No MongoDB needed for selection logic
+    });
+    
     this.osrsWikiService = new OSRSWikiService();
   }
 

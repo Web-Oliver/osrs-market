@@ -9,11 +9,17 @@
  * - SOLID architecture with single responsibility
  */
 
-const { Logger } = require('../utils/Logger');
+const { BaseService } = require('./BaseService');
 
-class NeuralTradingAgentService {
+class NeuralTradingAgentService extends BaseService {
   constructor(config) {
-    this.logger = new Logger('NeuralTradingAgent');
+    super('NeuralTradingAgentService', {
+      enableCache: true,
+      cachePrefix: 'neural_trading_agent',
+      cacheTTL: 300, // 5 minutes for neural predictions
+      enableMongoDB: true // Store training data and model states
+    });
+    
     this.config = config || {
       inputSize: 8,
       hiddenLayers: [64, 32],

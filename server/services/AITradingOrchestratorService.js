@@ -9,12 +9,11 @@
  * - SOLID architecture with single responsibility
  */
 
-const { Logger } = require('../utils/Logger');
+const { BaseService } = require('./BaseService');
 const { PythonRLClientService } = require('./PythonRLClientService');
 const { NeuralTradingAgentService } = require('./NeuralTradingAgentService');
 const { TradeOutcomeTrackerService } = require('./TradeOutcomeTrackerService');
 const { TradingAnalysisService } = require('./TradingAnalysisService');
-const { MongoDataPersistence } = require('../mongoDataPersistence');
 const { AIModelMetadata } = require('../models/AIModelMetadata');
 
 // DOMAIN INTEGRATION FOR TRADING
@@ -22,9 +21,14 @@ const { ItemRepository } = require('../repositories/ItemRepository');
 const { ItemSpecifications } = require('../domain/specifications/ItemSpecifications');
 const { ItemDomainService } = require('../domain/services/ItemDomainService');
 
-class AITradingOrchestratorService {
+class AITradingOrchestratorService extends BaseService {
   constructor(networkConfig, adaptiveConfig) {
-    this.logger = new Logger('AITradingOrchestrator');
+    super('AITradingOrchestrator', {
+      enableCache: true,
+      cachePrefix: 'ai_trading',
+      cacheTTL: 180, // 3 minutes for AI decisions
+      enableMongoDB: true
+    });
 
     // REFACTORED: Use PythonRLClientService for AI operations
     this.pythonRLClient = new PythonRLClientService(networkConfig);
@@ -33,7 +37,6 @@ class AITradingOrchestratorService {
     this.agent = new NeuralTradingAgentService(networkConfig);
     this.outcomeTracker = new TradeOutcomeTrackerService();
     this.tradingAnalysis = new TradingAnalysisService();
-    this.persistence = null; // Will be initialized properly
 
     // ENHANCED: Domain services for trading intelligence
     this.itemRepository = new ItemRepository();
@@ -53,34 +56,12 @@ class AITradingOrchestratorService {
     };
     this.lastModelUpdate = Date.now();
 
-    // Initialize MongoDB persistence for decision tracking
-    this.initializePersistence();
-
     this.logger.info('🤖 AI Trading Orchestrator initialized', {
       networkConfig,
       adaptiveConfig: this.adaptiveConfig
     });
   }
 
-  /**
-   * Context7 Pattern: Initialize MongoDB persistence for decision tracking
-   */
-  async initializePersistence() {
-    try {
-      const mongoConfig = {
-        connectionString: process.env.MONGODB_CONNECTION_STRING || 'mongodb://localhost:27017',
-        databaseName: process.env.MONGODB_DATABASE || 'osrs_market_data'
-      };
-
-      this.persistence = new MongoDataPersistence(mongoConfig);
-      await this.persistence.initialize();
-
-      this.logger.info('✅ MongoDB persistence initialized for AI decision tracking');
-    } catch (error) {
-      this.logger.error('❌ Failed to initialize MongoDB persistence', error);
-      this.persistence = null;
-    }
-  }
 
   /**
    * Context7 Pattern: Start learning session
@@ -136,7 +117,7 @@ class AITradingOrchestratorService {
           const prediction = await this.predictWithPythonRL(marketState);
 
           // CRITICAL: Save AI decision to MongoDB for tracking and learning
-          if (this.persistence && this.currentSession) {
+          if (this.mongoService && this.currentSession) {
             const decision = {
               sessionId: this.currentSession.id,
               itemId: item.id || item.itemId,
@@ -148,7 +129,7 @@ class AITradingOrchestratorService {
             };
 
             try {
-              const decisionId = await this.persistence.saveAIDecision(decision);
+              const decisionId = await this.mongoService.saveAIDecision(decision);
               prediction.decisionId = decisionId; // Track for outcome updates
 
               this.logger.debug('💾 AI decision saved to database', {
@@ -770,7 +751,7 @@ class AITradingOrchestratorService {
       this.checkAdaptiveLearning();
 
       // CRITICAL: Update AI decision with outcome and save trade outcome
-      if (this.persistence && this.currentSession) {
+      if (this.mongoService && this.currentSession) {
         // Update the original AI decision with the outcome
         if (prediction.decisionId) {
           const outcome = {
@@ -783,7 +764,7 @@ class AITradingOrchestratorService {
           };
 
           try {
-            await this.persistence.updateAIDecisionOutcome(prediction.decisionId, outcome);
+            await this.mongoService.updateAIDecisionOutcome(prediction.decisionId, outcome);
 
             this.logger.debug('✅ AI decision outcome updated', {
               decisionId: prediction.decisionId,
@@ -808,7 +789,7 @@ class AITradingOrchestratorService {
         };
 
         try {
-          await this.persistence.saveTradeOutcome(enhancedTradeOutcome);
+          await this.mongoService.saveTradeOutcome(enhancedTradeOutcome);
 
           this.logger.debug('✅ Trade outcome saved to database', {
             tradeId: tradeOutcome.tradeId,
@@ -924,8 +905,8 @@ class AITradingOrchestratorService {
       }
 
       // Persist training metrics to database
-      if (this.persistence && this.currentSession) {
-        await this.persistence.saveTrainingMetrics(metrics, this.currentSession.id);
+      if (this.mongoService && this.currentSession) {
+        await this.mongoService.saveTrainingMetrics(metrics, this.currentSession.id);
       }
     } catch (error) {
       this.logger.error('❌ Error updating training metrics', error);
@@ -980,7 +961,7 @@ class AITradingOrchestratorService {
       });
 
       // Save learning session data for optimization tracking
-      if (this.persistence && this.currentSession) {
+      if (this.mongoService && this.currentSession) {
         const learningSession = {
           sessionId: this.currentSession.id,
           timestamp: Date.now(),
@@ -999,7 +980,7 @@ class AITradingOrchestratorService {
         }
 
         // Save the learning session
-        await this.persistence.saveLearningSession(learningSession);
+        await this.mongoService.saveLearningSession(learningSession);
 
         this.logger.info('✅ Learning session saved with adaptive optimizations', {
           sessionId: this.currentSession.id,
@@ -1018,12 +999,12 @@ class AITradingOrchestratorService {
    */
   async analyzePerformanceFromDatabase() {
     try {
-      if (!this.persistence || !this.currentSession) {
+      if (!this.mongoService || !this.currentSession) {
         return null;
       }
 
       // Get recent decisions and outcomes for this session
-      const recentDecisions = await this.persistence.getAIDecisions(
+      const recentDecisions = await this.mongoService.getAIDecisions(
         {
           sessionId: this.currentSession.id,
           startTime: Date.now() - (24 * 60 * 60 * 1000) // Last 24 hours
@@ -1462,9 +1443,9 @@ class AITradingOrchestratorService {
       });
 
       // Persist final session state
-      if (this.persistence) {
+      if (this.mongoService) {
         try {
-          await this.persistence.saveLearningSession(this.currentSession);
+          await this.mongoService.saveLearningSession(this.currentSession);
         } catch (error) {
           this.logger.error('❌ Error saving learning session', error);
         }

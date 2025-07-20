@@ -12,6 +12,7 @@ const path = require('path');
 const http = require('http');
 const MongoDataPersistence = require('./services/mongoDataPersistence');
 const { WebSocketLoggingService } = require('./services/WebSocketLoggingService');
+const { ErrorHandler } = require('./middleware/ErrorHandler');
 
 // Import centralized routes
 const apiRoutes = require('./routes/index');
@@ -351,14 +352,9 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, '../dist/index.html'));
 });
 
-// Context7 optimized error handling middleware
-app.use((err, req, res, _next) => {
-  console.error('Server error:', err);
-  res.status(500).json({
-    error: 'Internal server error',
-    timestamp: Date.now()
-  });
-});
+// Context7 optimized error handling middleware using ErrorHandler
+const errorHandler = new ErrorHandler();
+app.use(errorHandler.globalErrorHandler());
 
 /**
  * OSRS Data Scraper API endpoints

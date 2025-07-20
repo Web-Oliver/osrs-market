@@ -1,264 +1,165 @@
 /**
- * 🎯 Item Mapping Controller - Context7 API Layer
+ * 🎯 Item Mapping Controller - Context7 Optimized with BaseController
  *
- * Context7 Pattern: Controller Layer for Item Mapping API
- * - SOLID: Single Responsibility - Handle HTTP requests for item mapping
- * - DRY: Reusable response patterns and error handling
- * - Clean separation between HTTP concerns and business logic
- * - Comprehensive input validation and sanitization
- * - RESTful API design with proper status codes
+ * Context7 Pattern: Controller Layer for Item Mapping Operations
+ * - Extends BaseController for DRY principles
+ * - Eliminates repetitive error handling and method binding
+ * - SOLID principles with single responsibility
+ * - Standardized endpoint creation and validation
  */
 
+const { BaseController } = require('./BaseController');
 const { ItemMappingService } = require('../services/ItemMappingService');
 const { ItemValidator } = require('../validators/ItemValidator');
-const { ApiResponse } = require('../utils/ApiResponse');
-const { Logger } = require('../utils/Logger');
 
-class ItemMappingController {
+class ItemMappingController extends BaseController {
   constructor() {
+    super('ItemMappingController');
     this.itemMappingService = new ItemMappingService();
     this.itemValidator = new ItemValidator();
-    this.logger = new Logger('ItemMappingController');
-
-    // Context7 Pattern: Bind methods to preserve 'this' context
-    this.importMappings = this.importMappings.bind(this);
-    this.getItem = this.getItem.bind(this);
-    this.getItems = this.getItems.bind(this);
-    this.searchItems = this.searchItems.bind(this);
-    this.getHighValueItems = this.getHighValueItems.bind(this);
-    this.getItemsByCategory = this.getItemsByCategory.bind(this);
-    this.getSyncStatus = this.getSyncStatus.bind(this);
-    this.healthCheck = this.healthCheck.bind(this);
-    this.createItem = this.createItem.bind(this);
-    this.updateItem = this.updateItem.bind(this);
-    this.deleteItem = this.deleteItem.bind(this);
-
-    // Enhanced domain-driven endpoints
-    this.getItemEnhanced = this.getItemEnhanced.bind(this);
-    this.getBusinessInsights = this.getBusinessInsights.bind(this);
-    this.findByBusinessCriteria = this.findByBusinessCriteria.bind(this);
   }
 
   /**
    * Context7 Pattern: Import all item mappings (one-time operation)
    * POST /api/items/import
    */
-  async importMappings(req, res, next) {
-    try {
-      this.logger.info('Import mappings request received', {
-        ip: req.ip,
-        requestId: req.id,
-        force: req.body.force
-      });
-
-      const options = {
-        force: req.body.force === true
-      };
-
-      const result = await this.itemMappingService.importAllItemMappings(options);
-
-      this.logger.info('Import mappings completed successfully', {
-        result: {
-          success: result.success,
-          totalItems: result.totalItems,
-          imported: result.imported,
-          updated: result.updated
-        },
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, result, result.message);
-
-    } catch (error) {
-      this.logger.error('Error importing mappings', error, {
-        requestId: req.id
-      });
-      next(error);
+  importMappings = this.createPostEndpoint(
+    async (importData) => {
+      const { force } = importData;
+      const options = { force };
+      return await this.itemMappingService.importAllItemMappings(options);
+    },
+    {
+      operationName: 'import item mappings',
+      parseBody: (req) => ({ force: req.body.force === true })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Get single item by ID
    * GET /api/items/:itemId
    */
-  async getItem(req, res, next) {
-    try {
-      const itemId = parseInt(req.params.itemId);
-
-      this.logger.debug('Get item request', {
-        itemId,
-        requestId: req.id
-      });
-
-      // Validate itemId
+  getItem = this.createGetEndpoint(
+    async (params) => {
+      const { itemId } = params;
+      
       if (!this.itemValidator.isValidItemId(itemId)) {
-        return ApiResponse.badRequest(res, 'Invalid item ID provided');
+        const error = new Error('Invalid item ID provided');
+        error.statusCode = 400;
+        throw error;
       }
 
       const item = await this.itemMappingService.getItemById(itemId);
 
       if (!item) {
-        return ApiResponse.notFound(res, 'Item not found');
+        const error = new Error('Item not found');
+        error.statusCode = 404;
+        throw error;
       }
 
-      this.logger.debug('Item retrieved successfully', {
-        itemId,
-        itemName: item.name,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, item, 'Item retrieved successfully');
-
-    } catch (error) {
-      this.logger.error('Error getting item', error, {
-        itemId: req.params.itemId,
-        requestId: req.id
-      });
-      next(error);
+      return item;
+    },
+    {
+      operationName: 'get item by ID',
+      parseParams: (req) => ({ itemId: parseInt(req.params.itemId) })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Get items with pagination and filtering
    * GET /api/items
    */
-  async getItems(req, res, next) {
-    try {
-      this.logger.debug('Get items request', {
-        query: req.query,
-        requestId: req.id
-      });
-
-      // Validate pagination parameters
-      const validation = this.itemValidator.validatePaginationParams(req.query);
-      if (!validation.isValid) {
-        return ApiResponse.badRequest(res, 'Invalid parameters', validation.errors);
+  getItems = this.createPaginatedEndpoint(
+    async (params) => {
+      return await this.itemMappingService.getItems(params);
+    },
+    {
+      operationName: 'get items with pagination',
+      validator: (req) => this.itemValidator.validatePaginationParams(req.query),
+      parseParams: (req) => {
+        const validation = this.itemValidator.validatePaginationParams(req.query);
+        return validation.sanitizedParams;
       }
-
-      const result = await this.itemMappingService.getItems(validation.sanitizedParams);
-
-      this.logger.debug('Items retrieved successfully', {
-        page: result.pagination.page,
-        totalCount: result.pagination.totalCount,
-        itemCount: result.items.length,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, result, 'Items retrieved successfully');
-
-    } catch (error) {
-      this.logger.error('Error getting items', error, {
-        query: req.query,
-        requestId: req.id
-      });
-      next(error);
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Search items by name
    * GET /api/items/search
    */
-  async searchItems(req, res, next) {
-    try {
-      this.logger.debug('Search items request', {
-        query: req.query,
-        requestId: req.id
-      });
-
-      // Validate search parameters
-      const validation = this.itemValidator.validateSearchParams(req.query);
-      if (!validation.isValid) {
-        return ApiResponse.badRequest(res, 'Invalid search parameters', validation.errors);
-      }
-
-      const { searchTerm } = validation.sanitizedParams;
+  searchItems = this.createGetEndpoint(
+    async (params) => {
+      const { searchTerm, sanitizedParams } = params;
+      
       if (!searchTerm) {
-        return ApiResponse.badRequest(res, 'Search term is required');
+        const error = new Error('Search term is required');
+        error.statusCode = 400;
+        throw error;
       }
 
-      const items = await this.itemMappingService.searchItems(
-        searchTerm,
-        validation.sanitizedParams
-      );
+      const items = await this.itemMappingService.searchItems(searchTerm, sanitizedParams);
 
-      this.logger.debug('Search completed successfully', {
-        searchTerm,
-        resultCount: items.length,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, {
+      return {
         searchTerm,
         items,
         count: items.length
-      }, 'Search completed successfully');
-
-    } catch (error) {
-      this.logger.error('Error searching items', error, {
-        query: req.query,
-        requestId: req.id
-      });
-      next(error);
+      };
+    },
+    {
+      operationName: 'search items by name',
+      validator: (req) => this.itemValidator.validateSearchParams(req.query),
+      parseParams: (req) => {
+        const validation = this.itemValidator.validateSearchParams(req.query);
+        return {
+          searchTerm: validation.sanitizedParams.searchTerm,
+          sanitizedParams: validation.sanitizedParams
+        };
+      }
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Get high-value items
    * GET /api/items/high-value
    */
-  async getHighValueItems(req, res, next) {
-    try {
-      this.logger.debug('Get high-value items request', {
-        query: req.query,
-        requestId: req.id
-      });
-
-      // Validate and sanitize parameters
-      const options = {};
-
-      if (req.query.limit) {
-        const limit = parseInt(req.query.limit);
-        if (limit < 1 || limit > 100) {
-          return ApiResponse.badRequest(res, 'Limit must be between 1 and 100');
-        }
-        options.limit = limit;
-      }
-
-      if (req.query.minValue) {
-        const minValue = parseInt(req.query.minValue);
-        if (minValue < 0) {
-          return ApiResponse.badRequest(res, 'minValue must be non-negative');
-        }
-        options.minValue = minValue;
-      }
-
-      if (req.query.members !== undefined) {
-        options.members = this.itemValidator.parseBooleanParam(req.query.members);
-      }
-
+  getHighValueItems = this.createGetEndpoint(
+    async (options) => {
       const items = await this.itemMappingService.getHighValueItems(options);
-
-      this.logger.debug('High-value items retrieved successfully', {
-        itemCount: items.length,
-        minValue: options.minValue,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, {
+      return {
         items,
         count: items.length,
         criteria: options
-      }, 'High-value items retrieved successfully');
+      };
+    },
+    {
+      operationName: 'get high-value items',
+      parseParams: (req) => {
+        const options = {};
 
-    } catch (error) {
-      this.logger.error('Error getting high-value items', error, {
-        query: req.query,
-        requestId: req.id
-      });
-      next(error);
+        if (req.query.limit) {
+          const limit = parseInt(req.query.limit);
+          if (limit < 1 || limit > 100) {
+            throw new Error('Limit must be between 1 and 100');
+          }
+          options.limit = limit;
+        }
+
+        if (req.query.minValue) {
+          const minValue = parseInt(req.query.minValue);
+          if (minValue < 0) {
+            throw new Error('minValue must be non-negative');
+          }
+          options.minValue = minValue;
+        }
+
+        if (req.query.members !== undefined) {
+          options.members = this.itemValidator.parseBooleanParam(req.query.members);
+        }
+
+        return options;
+      }
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Get items by category
@@ -333,67 +234,19 @@ class ItemMappingController {
    * Context7 Pattern: Get synchronization status
    * GET /api/items/sync/status
    */
-  async getSyncStatus(req, res, next) {
-    try {
-      this.logger.debug('Get sync status request', {
-        requestId: req.id
-      });
-
-      const status = await this.itemMappingService.getSyncStatus();
-
-      this.logger.debug('Sync status retrieved successfully', {
-        totalItems: status.totalItems,
-        syncHealth: status.sync.syncHealth,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, status, 'Sync status retrieved successfully');
-
-    } catch (error) {
-      this.logger.error('Error getting sync status', error, {
-        requestId: req.id
-      });
-      next(error);
-    }
-  }
+  getSyncStatus = this.createGetEndpoint(
+    this.itemMappingService.getSyncStatus,
+    { operationName: 'get synchronization status' }
+  );
 
   /**
    * Context7 Pattern: Health check endpoint
    * GET /api/items/health
    */
-  // eslint-disable-next-line no-unused-vars
-  async healthCheck(req, res, next) {
-    try {
-      this.logger.debug('Health check request', {
-        requestId: req.id
-      });
-
-      const health = await this.itemMappingService.healthCheck();
-
-      const statusCode = health.status === 'healthy' ? 200 : 503;
-
-      return res.status(statusCode).json({
-        success: health.status === 'healthy',
-        data: health,
-        message: `Service is ${health.status}`
-      });
-
-    } catch (error) {
-      this.logger.error('Error in health check', error, {
-        requestId: req.id
-      });
-
-      return res.status(503).json({
-        success: false,
-        data: {
-          status: 'unhealthy',
-          error: error.message,
-          timestamp: new Date().toISOString()
-        },
-        message: 'Service is unhealthy'
-      });
-    }
-  }
+  healthCheck = this.createGetEndpoint(
+    this.itemMappingService.healthCheck,
+    { operationName: 'health check' }
+  );
 
   /**
    * Context7 Pattern: Create new item (admin operation)

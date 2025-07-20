@@ -1,114 +1,49 @@
 /**
- * 📊 Data Collection Controller - Context7 Optimized
+ * 📊 Data Collection Controller - Context7 Optimized with BaseController
  *
  * Context7 Pattern: Controller Layer for Data Collection Operations
- * - Handles data collection lifecycle management
- * - Thin controllers with business logic in services
- * - Proper validation and error handling
- * - DRY principles with reusable patterns
+ * - Extends BaseController for DRY principles
+ * - Eliminates repetitive error handling and method binding
+ * - SOLID principles with single responsibility
+ * - Standardized endpoint creation and validation
  */
 
+const { BaseController } = require('./BaseController');
 const { DataCollectionService } = require('../services/DataCollectionService');
 const { validateRequest } = require('../validators/DataCollectionValidator');
-const { ApiResponse } = require('../utils/ApiResponse');
-const { Logger } = require('../utils/Logger');
 
-class DataCollectionController {
+class DataCollectionController extends BaseController {
   constructor() {
+    super('DataCollectionController');
     this.dataCollectionService = new DataCollectionService();
-    this.logger = new Logger('DataCollectionController');
-
-    // Context7 Pattern: Bind methods to preserve 'this' context
-    this.startCollection = this.startCollection.bind(this);
-    this.stopCollection = this.stopCollection.bind(this);
-    this.getCollectionStatus = this.getCollectionStatus.bind(this);
-    this.getCollectionStats = this.getCollectionStats.bind(this);
-    this.updateConfiguration = this.updateConfiguration.bind(this);
-    this.getSelectedItems = this.getSelectedItems.bind(this);
-    this.refreshItemSelection = this.refreshItemSelection.bind(this);
-    this.getCollectionHealth = this.getCollectionHealth.bind(this);
-    this.clearCache = this.clearCache.bind(this);
   }
 
   /**
    * Context7 Pattern: Start data collection
    * POST /api/data-collection/start
    */
-  async startCollection(req, res, next) {
-    try {
-      this.logger.info('Starting data collection', {
-        ip: req.ip,
-        requestId: req.id
-      });
-
-      const result = await this.dataCollectionService.startCollection();
-
-      this.logger.info('Data collection started successfully', {
-        itemsSelected: result.itemsSelected,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, result, 'Data collection started successfully');
-    } catch (error) {
-      this.logger.error('Error starting data collection', error, {
-        requestId: req.id
-      });
-      next(error);
-    }
-  }
+  startCollection = this.createPostEndpoint(
+    this.dataCollectionService.startCollection,
+    { operationName: 'start data collection' }
+  );
 
   /**
    * Context7 Pattern: Stop data collection
    * POST /api/data-collection/stop
    */
-  async stopCollection(req, res, next) {
-    try {
-      this.logger.info('Stopping data collection', {
-        ip: req.ip,
-        requestId: req.id
-      });
-
-      const result = await this.dataCollectionService.stopCollection();
-
-      this.logger.info('Data collection stopped successfully', {
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, result, 'Data collection stopped successfully');
-    } catch (error) {
-      this.logger.error('Error stopping data collection', error, {
-        requestId: req.id
-      });
-      next(error);
-    }
-  }
+  stopCollection = this.createPostEndpoint(
+    this.dataCollectionService.stopCollection,
+    { operationName: 'stop data collection' }
+  );
 
   /**
    * Context7 Pattern: Get collection status
    * GET /api/data-collection/status
    */
-  async getCollectionStatus(req, res, next) {
-    try {
-      this.logger.debug('Fetching collection status', {
-        requestId: req.id
-      });
-
-      const status = this.dataCollectionService.getCollectionStatus();
-
-      this.logger.debug('Successfully fetched collection status', {
-        isCollecting: status.isCollecting,
-        uptime: status.uptime,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, status, 'Collection status retrieved successfully');
-    } catch (error) {
-      this.logger.error('Error fetching collection status', error, {
-        requestId: req.id
-      });
-      next(error);
-    }
-  }
+  getCollectionStatus = this.createGetEndpoint(
+    () => this.dataCollectionService.getCollectionStatus(),
+    { operationName: 'get collection status' }
+  );
 
   /**
    * Context7 Pattern: Get collection statistics
@@ -175,117 +110,60 @@ class DataCollectionController {
    * Context7 Pattern: Get selected items
    * GET /api/data-collection/selected-items
    */
-  async getSelectedItems(req, res, next) {
-    try {
-      this.logger.debug('Fetching selected items', {
-        requestId: req.id
-      });
-
+  getSelectedItems = this.createGetEndpoint(
+    () => {
       const status = this.dataCollectionService.getCollectionStatus();
       const selectedItems = status.selectedItems;
-
-      this.logger.debug('Successfully fetched selected items', {
-        itemCount: selectedItems.length,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, {
+      
+      return {
         items: selectedItems,
         count: selectedItems.length,
         lastUpdated: status.lastCollection
-      }, 'Selected items retrieved successfully');
-    } catch (error) {
-      this.logger.error('Error fetching selected items', error, {
-        requestId: req.id
-      });
-      next(error);
-    }
-  }
+      };
+    },
+    { operationName: 'get selected items' }
+  );
 
   /**
    * Context7 Pattern: Refresh item selection
    * POST /api/data-collection/refresh-selection
    */
-  async refreshItemSelection(req, res, next) {
-    try {
-      this.logger.info('Refreshing item selection', {
-        requestId: req.id
-      });
-
+  refreshItemSelection = this.createPostEndpoint(
+    async () => {
       await this.dataCollectionService.refreshSmartSelection();
 
       const status = this.dataCollectionService.getCollectionStatus();
       const selectedItems = status.selectedItems;
 
-      this.logger.info('Item selection refreshed successfully', {
-        newItemCount: selectedItems.length,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, {
+      return {
         items: selectedItems,
         count: selectedItems.length,
         refreshedAt: Date.now()
-      }, 'Item selection refreshed successfully');
-    } catch (error) {
-      this.logger.error('Error refreshing item selection', error, {
-        requestId: req.id
-      });
-      next(error);
-    }
-  }
+      };
+    },
+    { operationName: 'refresh item selection' }
+  );
 
   /**
    * Context7 Pattern: Get collection health
    * GET /api/data-collection/health
    */
-  async getCollectionHealth(req, res, next) {
-    try {
-      this.logger.debug('Fetching collection health', {
-        requestId: req.id
-      });
-
-      const health = this.dataCollectionService.getHealth();
-
-      this.logger.debug('Successfully fetched collection health', {
-        status: health.status,
-        requestId: req.id
-      });
-
-      const statusCode = health.status === 'running' ? 200 : 503;
-      return ApiResponse.custom(res, statusCode, health, 'Collection health retrieved successfully');
-    } catch (error) {
-      this.logger.error('Error fetching collection health', error, {
-        requestId: req.id
-      });
-      next(error);
-    }
-  }
+  getCollectionHealth = this.createGetEndpoint(
+    () => this.dataCollectionService.getHealth(),
+    { operationName: 'get collection health' }
+  );
 
   /**
    * Context7 Pattern: Clear cache
    * POST /api/data-collection/clear-cache
    */
-  async clearCache(req, res, next) {
-    try {
-      this.logger.info('Clearing data collection cache', {
-        requestId: req.id
-      });
-
+  clearCache = this.createPostEndpoint(
+    () => {
       this.dataCollectionService.clearCache();
-
-      this.logger.info('Cache cleared successfully', {
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, { cleared: true }, 'Cache cleared successfully');
-    } catch (error) {
-      this.logger.error('Error clearing cache', error, {
-        requestId: req.id
-      });
-      next(error);
-    }
-  }
+      return { cleared: true };
+    },
+    { operationName: 'clear data collection cache' }
+  );
 
   /**
    * Context7 Pattern: Get latest collected data

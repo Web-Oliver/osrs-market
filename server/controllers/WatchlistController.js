@@ -1,62 +1,59 @@
 /**
- * 📋 WatchlistController - Context7 Optimized
+ * 📋 WatchlistController - Context7 Optimized with BaseController
  *
- * Context7 Pattern: Clean Architecture Controller
- * - Handles HTTP requests for watchlist operations
- * - Implements proper error handling and validation
- * - Follows Single Responsibility Principle
- * - Provides consistent API responses
+ * Context7 Pattern: Controller Layer for Watchlist Operations
+ * - Extends BaseController for DRY principles
+ * - Eliminates repetitive error handling and method binding
+ * - SOLID principles with single responsibility
+ * - Standardized endpoint creation and validation
  */
 
+const { BaseController } = require('./BaseController');
 const WatchlistModel = require('../models/WatchlistModel');
-const { ApiResponse } = require('../utils/ApiResponse');
-const { Logger } = require('../utils/Logger');
 
-class WatchlistController {
+class WatchlistController extends BaseController {
   constructor() {
-    this.logger = new Logger('WatchlistController');
+    super('WatchlistController');
   }
 
   /**
    * Context7 Pattern: Get user watchlist
    * GET /api/watchlist?userId=<userId>
    */
-  async getUserWatchlist(req, res) {
-    try {
-      const { userId } = req.query;
-
+  getUserWatchlist = this.createGetEndpoint(
+    async (params) => {
+      const { userId } = params;
+      
       if (!userId) {
-        return ApiResponse.error(res, 'User ID is required', 'MISSING_USER_ID', 400);
+        const error = new Error('User ID is required');
+        error.statusCode = 400;
+        throw error;
       }
 
       const watchlist = await WatchlistModel.findByUserId(userId);
 
-      this.logger.info(`Retrieved watchlist for user ${userId}, ${watchlist.length} items`);
-
-      return ApiResponse.success(res, watchlist, 'Watchlist retrieved successfully');
-    } catch (error) {
-      this.logger.error('Error retrieving watchlist:', error);
-      return ApiResponse.error(res, 'Failed to retrieve watchlist', error.message, 500);
+      return watchlist;
+    },
+    {
+      operationName: 'get user watchlist',
+      parseParams: (req) => ({ userId: req.query.userId })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Add item to watchlist
    * POST /api/watchlist
    */
-  async addItemToWatchlist(req, res) {
-    try {
-      const { userId, itemId, itemName, addedDate, currentPrice, currentMargin } = req.body;
-
-      // Validate required fields
-      if (!userId || !itemId || !itemName) {
-        return ApiResponse.error(res, 'User ID, Item ID, and Item Name are required', 'MISSING_REQUIRED_FIELDS', 400);
-      }
+  addItemToWatchlist = this.createPostEndpoint(
+    async (itemData) => {
+      const { userId, itemId, itemName, addedDate, currentPrice, currentMargin } = itemData;
 
       // Check if item already exists in watchlist
       const existingItem = await WatchlistModel.findByUserIdAndItemId(userId, itemId);
       if (existingItem) {
-        return ApiResponse.error(res, 'Item already exists in watchlist', 'ITEM_ALREADY_EXISTS', 409);
+        const error = new Error('Item already exists in watchlist');
+        error.statusCode = 409;
+        throw error;
       }
 
       // Create new watchlist item
@@ -66,69 +63,82 @@ class WatchlistController {
         currentMargin
       });
 
-      this.logger.info(`Added item ${itemName} (ID: ${itemId}) to watchlist for user ${userId}`);
-
-      return ApiResponse.success(res, watchlistItem, 'Item added to watchlist successfully');
-    } catch (error) {
-      this.logger.error('Error adding item to watchlist:', error);
-
-      // Handle duplicate key error
-      if (error.code === 11000) {
-        return ApiResponse.error(res, 'Item already exists in watchlist', 'ITEM_ALREADY_EXISTS', 409);
+      return watchlistItem;
+    },
+    {
+      operationName: 'add item to watchlist',
+      parseBody: (req) => {
+        const { userId, itemId, itemName, addedDate, currentPrice, currentMargin } = req.body;
+        
+        if (!userId || !itemId || !itemName) {
+          throw new Error('User ID, Item ID, and Item Name are required');
+        }
+        
+        return {
+          userId,
+          itemId: parseInt(itemId),
+          itemName,
+          addedDate,
+          currentPrice: currentPrice ? parseFloat(currentPrice) : undefined,
+          currentMargin: currentMargin ? parseFloat(currentMargin) : undefined
+        };
       }
-
-      return ApiResponse.error(res, 'Failed to add item to watchlist', error.message, 500);
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Remove item from watchlist
    * DELETE /api/watchlist/:itemId?userId=<userId>
    */
-  async removeItemFromWatchlist(req, res) {
-    try {
-      const { itemId } = req.params;
-      const { userId } = req.query;
-
-      if (!userId || !itemId) {
-        return ApiResponse.error(res, 'User ID and Item ID are required', 'MISSING_REQUIRED_FIELDS', 400);
-      }
+  removeItemFromWatchlist = this.createDeleteEndpoint(
+    async (removeData) => {
+      const { userId, itemId } = removeData;
 
       // Check if item exists in watchlist
-      const existingItem = await WatchlistModel.findByUserIdAndItemId(userId, parseInt(itemId));
+      const existingItem = await WatchlistModel.findByUserIdAndItemId(userId, itemId);
       if (!existingItem) {
-        return ApiResponse.error(res, 'Item not found in watchlist', 'ITEM_NOT_FOUND', 404);
+        const error = new Error('Item not found in watchlist');
+        error.statusCode = 404;
+        throw error;
       }
 
       // Remove item from watchlist (soft delete)
-      const removedItem = await WatchlistModel.removeByUserIdAndItemId(userId, parseInt(itemId));
+      const removedItem = await WatchlistModel.removeByUserIdAndItemId(userId, itemId);
 
-      this.logger.info(`Removed item ${itemId} from watchlist for user ${userId}`);
-
-      return ApiResponse.success(res, removedItem, 'Item removed from watchlist successfully');
-    } catch (error) {
-      this.logger.error('Error removing item from watchlist:', error);
-      return ApiResponse.error(res, 'Failed to remove item from watchlist', error.message, 500);
+      return removedItem;
+    },
+    {
+      operationName: 'remove item from watchlist',
+      parseParams: (req) => {
+        const { itemId } = req.params;
+        const { userId } = req.query;
+        
+        if (!userId || !itemId) {
+          throw new Error('User ID and Item ID are required');
+        }
+        
+        return {
+          userId,
+          itemId: parseInt(itemId)
+        };
+      }
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Update watchlist item
    * PUT /api/watchlist/:itemId
    */
-  async updateWatchlistItem(req, res) {
-    try {
-      const { itemId } = req.params;
-      const { userId, currentPrice, currentMargin, notes } = req.body;
-
-      if (!userId || !itemId) {
-        return ApiResponse.error(res, 'User ID and Item ID are required', 'MISSING_REQUIRED_FIELDS', 400);
-      }
+  updateWatchlistItem = this.createPostEndpoint(
+    async (updateData) => {
+      const { userId, itemId, currentPrice, currentMargin, notes } = updateData;
 
       // Find the watchlist item
-      const watchlistItem = await WatchlistModel.findByUserIdAndItemId(userId, parseInt(itemId));
+      const watchlistItem = await WatchlistModel.findByUserIdAndItemId(userId, itemId);
       if (!watchlistItem) {
-        return ApiResponse.error(res, 'Item not found in watchlist', 'ITEM_NOT_FOUND', 404);
+        const error = new Error('Item not found in watchlist');
+        error.statusCode = 404;
+        throw error;
       }
 
       // Update the item
@@ -144,25 +154,41 @@ class WatchlistController {
 
       const updatedItem = await watchlistItem.save();
 
-      this.logger.info(`Updated watchlist item ${itemId} for user ${userId}`);
-
-      return ApiResponse.success(res, updatedItem, 'Watchlist item updated successfully');
-    } catch (error) {
-      this.logger.error('Error updating watchlist item:', error);
-      return ApiResponse.error(res, 'Failed to update watchlist item', error.message, 500);
+      return updatedItem;
+    },
+    {
+      operationName: 'update watchlist item',
+      parseBody: (req) => {
+        const { itemId } = req.params;
+        const { userId, currentPrice, currentMargin, notes } = req.body;
+        
+        if (!userId || !itemId) {
+          throw new Error('User ID and Item ID are required');
+        }
+        
+        return {
+          userId,
+          itemId: parseInt(itemId),
+          currentPrice: currentPrice !== undefined ? parseFloat(currentPrice) : undefined,
+          currentMargin: currentMargin !== undefined ? parseFloat(currentMargin) : undefined,
+          notes
+        };
+      }
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Get watchlist statistics
    * GET /api/watchlist/stats?userId=<userId>
    */
-  async getWatchlistStats(req, res) {
-    try {
-      const { userId } = req.query;
+  getWatchlistStats = this.createGetEndpoint(
+    async (params) => {
+      const { userId } = params;
 
       if (!userId) {
-        return ApiResponse.error(res, 'User ID is required', 'MISSING_USER_ID', 400);
+        const error = new Error('User ID is required');
+        error.statusCode = 400;
+        throw error;
       }
 
       const totalItems = await WatchlistModel.countByUserId(userId);
@@ -179,21 +205,20 @@ class WatchlistController {
         newestItem: watchlist.length > 0 ? watchlist[0] : null
       };
 
-      this.logger.info(`Retrieved watchlist stats for user ${userId}: ${totalItems} items`);
-
-      return ApiResponse.success(res, stats, 'Watchlist statistics retrieved successfully');
-    } catch (error) {
-      this.logger.error('Error retrieving watchlist stats:', error);
-      return ApiResponse.error(res, 'Failed to retrieve watchlist statistics', error.message, 500);
+      return stats;
+    },
+    {
+      operationName: 'get watchlist statistics',
+      parseParams: (req) => ({ userId: req.query.userId })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Health check
    * GET /api/watchlist/health
    */
-  async healthCheck(req, res) {
-    try {
+  healthCheck = this.createGetEndpoint(
+    async () => {
       // Test database connection
       const testCount = await WatchlistModel.countDocuments();
 
@@ -205,12 +230,10 @@ class WatchlistController {
         database: 'connected'
       };
 
-      return ApiResponse.success(res, health, 'Watchlist service is healthy');
-    } catch (error) {
-      this.logger.error('Watchlist health check failed:', error);
-      return ApiResponse.error(res, 'Watchlist service is unhealthy', error.message, 500);
-    }
-  }
+      return health;
+    },
+    { operationName: 'watchlist health check' }
+  );
 }
 
-module.exports = WatchlistController;
+module.exports = { WatchlistController };

@@ -1,113 +1,62 @@
 /**
- * 📊 Monitoring Controller - Context7 Optimized
+ * 📊 Monitoring Controller - Context7 Optimized with BaseController
  *
- * Context7 Pattern: Controller Layer
- * - Handles HTTP requests and responses
- * - Thin controllers with business logic in services
- * - Proper error handling with Context7 patterns
- * - DRY principles with reusable response methods
- * - Solid architecture with single responsibility
+ * Context7 Pattern: Controller Layer for Monitoring Operations
+ * - Extends BaseController for DRY principles
+ * - Eliminates repetitive error handling and method binding
+ * - SOLID principles with single responsibility
+ * - Standardized endpoint creation and validation
  */
 
+const { BaseController } = require('./BaseController');
 const { MonitoringService } = require('../services/MonitoringService');
 const { validateRequest } = require('../validators/MonitoringValidator');
-const { ApiResponse } = require('../utils/ApiResponse');
-const { Logger } = require('../utils/Logger');
 
-class MonitoringController {
+class MonitoringController extends BaseController {
   constructor() {
+    super('MonitoringController');
     this.monitoringService = new MonitoringService();
-    this.logger = new Logger('MonitoringController');
-
-    // Context7 Pattern: Bind methods to preserve 'this' context
-    this.getLiveData = this.getLiveData.bind(this);
-    this.saveLiveData = this.saveLiveData.bind(this);
-    this.getStreamData = this.getStreamData.bind(this);
-    this.getAggregatedStats = this.getAggregatedStats.bind(this);
-    this.getSystemStatus = this.getSystemStatus.bind(this);
-    this.getEfficiencyMetrics = this.getEfficiencyMetrics.bind(this);
-    this.getHealthStatus = this.getHealthStatus.bind(this);
-    this.performDataCleanup = this.performDataCleanup.bind(this);
   }
 
   /**
    * Context7 Pattern: Get live monitoring data
    * GET /api/live-monitoring
    */
-  async getLiveData(req, res, next) {
-    try {
-      this.logger.info('Fetching live monitoring data', {
-        query: req.query,
-        ip: req.ip,
-        userAgent: req.get('User-Agent')
-      });
-
-      // Context7 Pattern: Validate request parameters
-      const validation = validateRequest.getLiveMonitoringData(req.query);
-      if (!validation.isValid) {
-        return ApiResponse.badRequest(res, 'Invalid request parameters', validation.errors);
-      }
-
-      const { limit = 50 } = req.query;
-      const data = await this.monitoringService.getLiveMonitoringData(parseInt(limit));
-
-      this.logger.info('Successfully fetched live monitoring data', {
-        recordCount: data.length,
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, data, 'Live monitoring data fetched successfully');
-    } catch (error) {
-      this.logger.error('Error fetching live monitoring data', error, {
-        query: req.query,
-        requestId: req.id
-      });
-      next(error);
+  getLiveData = this.createGetEndpoint(
+    async (params) => {
+      const { limit } = params;
+      return await this.monitoringService.getLiveMonitoringData(limit);
+    },
+    {
+      operationName: 'fetch live monitoring data',
+      validator: (req) => validateRequest.getLiveMonitoringData(req.query),
+      parseParams: (req) => ({
+        limit: parseInt(req.query.limit || 50)
+      })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Save live monitoring data
    * POST /api/live-monitoring
    */
-  async saveLiveData(req, res, next) {
-    try {
-      this.logger.info('Saving live monitoring data', {
-        bodyKeys: Object.keys(req.body),
-        ip: req.ip,
-        requestId: req.id
-      });
-
-      // Context7 Pattern: Validate request body
-      const validation = validateRequest.saveLiveData(req.body);
-      if (!validation.isValid) {
-        return ApiResponse.badRequest(res, 'Invalid request body', validation.errors);
-      }
-
-      const enrichedData = {
+  saveLiveData = this.createPostEndpoint(
+    async (enrichedData) => {
+      const insertedId = await this.monitoringService.saveLiveMonitoringData(enrichedData);
+      return { id: insertedId };
+    },
+    {
+      operationName: 'save live monitoring data',
+      validator: (req) => validateRequest.saveLiveData(req.body),
+      parseBody: (req) => ({
         ...req.body,
         timestamp: req.body.timestamp || Date.now(),
         clientIp: req.ip,
         userAgent: req.get('User-Agent'),
         requestId: req.id
-      };
-
-      const insertedId = await this.monitoringService.saveLiveMonitoringData(enrichedData);
-
-      this.logger.info('Successfully saved live monitoring data', {
-        insertedId,
-        requestId: req.id
-      });
-
-      return ApiResponse.created(res, { id: insertedId }, 'Live monitoring data saved successfully');
-    } catch (error) {
-      this.logger.error('Error saving live monitoring data', error, {
-        body: req.body,
-        requestId: req.id
-      });
-      next(error);
+      })
     }
-  }
+  );
 
   /**
    * Context7 Pattern: Get streaming data for Server-Sent Events
@@ -210,89 +159,28 @@ class MonitoringController {
    * Context7 Pattern: Get system status
    * GET /api/system-status
    */
-  async getSystemStatus(req, res, next) {
-    try {
-      this.logger.info('Fetching system status', {
-        requestId: req.id
-      });
-
-      const status = await this.monitoringService.getSystemStatus();
-
-      this.logger.info('Successfully fetched system status', {
-        status: status.persistence?.enabled ? 'healthy' : 'degraded',
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, status, 'System status fetched successfully');
-    } catch (error) {
-      this.logger.error('Error fetching system status', error, {
-        requestId: req.id
-      });
-      next(error);
-    }
-  }
+  getSystemStatus = this.createGetEndpoint(
+    this.monitoringService.getSystemStatus,
+    { operationName: 'fetch system status' }
+  );
 
   /**
    * Context7 Pattern: Get efficiency metrics
    * GET /api/efficiency-metrics
    */
-  async getEfficiencyMetrics(req, res, next) {
-    try {
-      this.logger.info('Fetching efficiency metrics', {
-        requestId: req.id
-      });
-
-      const metrics = await this.monitoringService.getEfficiencyMetrics();
-
-      this.logger.info('Successfully fetched efficiency metrics', {
-        requestId: req.id
-      });
-
-      return ApiResponse.success(res, metrics, 'Efficiency metrics fetched successfully');
-    } catch (error) {
-      this.logger.error('Error fetching efficiency metrics', error, {
-        requestId: req.id
-      });
-      next(error);
-    }
-  }
+  getEfficiencyMetrics = this.createGetEndpoint(
+    this.monitoringService.getEfficiencyMetrics,
+    { operationName: 'fetch efficiency metrics' }
+  );
 
   /**
    * Context7 Pattern: Get health status
    * GET /api/health
    */
-  // eslint-disable-next-line no-unused-vars
-  async getHealthStatus(req, res, next) {
-    try {
-      this.logger.info('Performing health check', {
-        requestId: req.id
-      });
-
-      const health = await this.monitoringService.getHealthStatus();
-
-      const statusCode = health.status === 'healthy' ? 200 : 503;
-
-      this.logger.info('Health check completed', {
-        status: health.status,
-        mongodb: health.mongodb,
-        requestId: req.id
-      });
-
-      return ApiResponse.custom(res, statusCode, health, 'Health check completed');
-    } catch (error) {
-      this.logger.error('Error performing health check', error, {
-        requestId: req.id
-      });
-
-      // Context7 Pattern: Always return health status even on error
-      return ApiResponse.custom(res, 503, {
-        status: 'unhealthy',
-        mongodb: false,
-        error: error.message,
-        timestamp: Date.now()
-      }, 'Health check failed');
-    }
-  }
+  getHealthStatus = this.createGetEndpoint(
+    this.monitoringService.getHealthStatus,
+    { operationName: 'perform health check' }
+  );
 
   /**
    * Context7 Pattern: Perform data cleanup

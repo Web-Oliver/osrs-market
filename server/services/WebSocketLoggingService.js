@@ -10,11 +10,15 @@
  */
 
 const WebSocket = require('ws');
-const { Logger } = require('../utils/Logger');
+const { BaseService } = require('./BaseService');
 
-class WebSocketLoggingService {
+class WebSocketLoggingService extends BaseService {
   constructor(server, options = {}) {
-    this.logger = new Logger('WebSocketLogging');
+    super('WebSocketLoggingService', {
+      enableCache: false, // No caching needed for streaming
+      enableMongoDB: false // No MongoDB needed for live streaming
+    });
+    
     this.server = server;
     this.options = {
       port: options.port || 3002,

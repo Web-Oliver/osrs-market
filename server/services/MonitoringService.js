@@ -9,40 +9,21 @@
  * - Data transformation and validation
  */
 
-const MongoDataPersistence = require('./mongoDataPersistence');
-const { Logger } = require('../utils/Logger');
-const { CacheManager } = require('../utils/CacheManager');
+const { BaseService } = require('./BaseService');
 const { MetricsCalculator } = require('../utils/MetricsCalculator');
 
-class MonitoringService {
+class MonitoringService extends BaseService {
   constructor() {
-    this.logger = new Logger('MonitoringService');
-    this.cache = new CacheManager('monitoring', 300); // 5 minutes cache
+    super('MonitoringService', {
+      enableCache: true,
+      cachePrefix: 'monitoring',
+      cacheTTL: 300, // 5 minutes cache
+      enableMongoDB: true
+    });
+    
     this.metricsCalculator = new MetricsCalculator();
-
-    // Context7 Pattern: Initialize MongoDB persistence
-    this.initializeMongoDB();
   }
 
-  /**
-   * Context7 Pattern: Initialize MongoDB with proper error handling
-   */
-  async initializeMongoDB() {
-    try {
-      const mongoConfig = {
-        connectionString: process.env.MONGODB_CONNECTION_STRING || 'mongodb://localhost:27017',
-        databaseName: process.env.MONGODB_DATABASE || 'osrs_market_data'
-      };
-
-      this.mongoService = new MongoDataPersistence(mongoConfig);
-      await this.mongoService.connect();
-
-      this.logger.info('MongoDB persistence initialized successfully');
-    } catch (error) {
-      this.logger.error('Failed to initialize MongoDB persistence', error);
-      this.mongoService = null;
-    }
-  }
 
   /**
    * Context7 Pattern: Get live monitoring data with caching
