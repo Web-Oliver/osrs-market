@@ -11,6 +11,9 @@
 const { BaseController } = require('./BaseController');
 const { DataCollectionService } = require('../services/DataCollectionService');
 const { validateRequest } = require('../validators/DataCollectionValidator');
+const { DataExportService } = require('../services/DataExportService');
+const { TimeFormatterUtil } = require('../utils/TimeFormatterUtil');
+const { MetricsCalculationService } = require('../services/MetricsCalculationService');
 
 
 class DataCollectionController extends BaseController {
@@ -20,7 +23,11 @@ class DataCollectionController extends BaseController {
     // SOLID: Dependency Injection (DIP) - Eliminates direct dependency violation
     this.dataCollectionService = dependencies.dataCollectionService || new DataCollectionService();
     
-    // Initialize endpoints after service is set
+    // SOLID: Inject specialized services for single responsibilities
+    this.dataExportService = dependencies.dataExportService || new DataExportService();
+    this.metricsCalculationService = dependencies.metricsCalculationService || new MetricsCalculationService();
+    
+    // Initialize endpoints after services are set
     this.initializeEndpoints();
   }
 
@@ -232,6 +239,9 @@ class DataCollectionController extends BaseController {
       const stats = this.dataCollectionService.getCollectionStats();
       const health = this.dataCollectionService.getHealth();
 
+      // SOLID: Delegate performance calculation to specialized service
+      const performanceMetrics = this.metricsCalculationService.calculatePerformanceMetrics(stats);
+      
       const performance = {
         collections: {
           total: stats.totalCollections,
@@ -246,7 +256,7 @@ class DataCollectionController extends BaseController {
         },
         timing: {
           averageResponseTime: stats.averageResponseTime,
-          uptime: stats.uptime,
+          uptime: TimeFormatterUtil.formatUptime(stats.uptime || 0),
           lastCollection: stats.lastCollectionTime
         },
         resources: {
@@ -258,7 +268,10 @@ class DataCollectionController extends BaseController {
         errors: {
           count: stats.errors.length,
           recent: stats.errors.slice(-5) // Last 5 errors
-        }
+        },
+        // SOLID: Include calculated metrics from specialized service
+        metrics: performanceMetrics,
+        efficiency: this.metricsCalculationService.calculateEfficiencyMetrics(stats)
       };
 
       this.logger.debug('Successfully fetched performance analytics', {
@@ -315,8 +328,11 @@ class DataCollectionController extends BaseController {
         res.setHeader('Content-Type', 'text/csv');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
 
-        // Convert to CSV
-        const csvData = this.convertToCSV(data);
+        // SOLID: Delegate CSV conversion to specialized service
+        const csvData = this.dataExportService.convertToCSV(data, {
+          dataType: 'marketData',
+          config: { delimiter: ',' }
+        });
         res.send(csvData);
       } else {
         res.setHeader('Content-Type', 'application/json');
@@ -347,58 +363,14 @@ class DataCollectionController extends BaseController {
 
   // Context7 Pattern: Private helper methods
 
-  /**
-   * Convert data to CSV format
-   */
-  convertToCSV(data) {
-    if (!data || data.length === 0) {
-      return '';
-    }
+  // SOLID: Business logic moved to dedicated service - DataExportService
+  // This method now delegates to the service for proper separation of concerns
 
-    const headers = ['timestamp', 'itemId', 'itemName', 'highPrice', 'lowPrice', 'profitMargin', 'spread'];
-    const rows = data.map(item => [
-      new Date(item.timestamp).toISOString(),
-      item.itemId,
-      item.itemName || '',
-      item.priceData?.high || '',
-      item.priceData?.low || '',
-      item.profitMargin || '',
-      item.spread || ''
-    ]);
+  // SOLID: Formatting logic moved to dedicated utility - TimeFormatterUtil
+  // This method now delegates to the utility for proper separation of concerns
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
-
-    return csvContent;
-  }
-
-  /**
-   * Format uptime for display
-   */
-  formatUptime(uptime) {
-    const hours = Math.floor(uptime / (1000 * 60 * 60));
-    const minutes = Math.floor((uptime % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((uptime % (1000 * 60)) / 1000);
-
-    return `${hours}h ${minutes}m ${seconds}s`;
-  }
-
-  /**
-   * Calculate efficiency metrics
-   */
-  calculateEfficiencyMetrics(stats) {
-    const totalItems = 3000; // Approximate total OSRS items
-    const itemSelectionEfficiency = ((totalItems - stats.itemsTracked) / totalItems) * 100;
-
-    return {
-      itemSelectionEfficiency: Math.round(itemSelectionEfficiency * 100) / 100,
-      dataCollectionEfficiency: stats.successRate,
-      averageItemsPerSecond: stats.averageItemsPerCollection / (stats.averageResponseTime / 1000),
-      resourceEfficiency: Math.max(0, 100 - stats.memoryUsage)
-    };
-  }
+  // SOLID: Metrics calculation moved to dedicated service - MetricsCalculationService
+  // This method now delegates to the service for proper separation of concerns
 
   // =========================================
   // DATA PIPELINE ORCHESTRATOR ENDPOINTS

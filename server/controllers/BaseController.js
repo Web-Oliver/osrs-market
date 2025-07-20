@@ -13,6 +13,8 @@ const { Logger } = require('../utils/Logger');
 const { ApiResponse } = require('../utils/ApiResponse');
 const { EndpointFactory } = require('../utils/EndpointFactory');
 const { ParameterParser } = require('../utils/ParameterParser');
+const { ErrorHandler } = require('../middleware/ErrorHandler');
+const { AppConstants } = require('../config/AppConstants');
 
 
 class BaseController {
@@ -300,6 +302,106 @@ class BaseController {
       parseParams: this.parseTimeRangeQuery.bind(this),
       ...options
     });
+  }
+  
+  /**
+   * Context7 Pattern: Validate service exists
+   * DRY: Eliminates service validation duplication using existing ErrorHandler
+   */
+  validateService(service, serviceName, serviceId = null) {
+    if (!service) {
+      const resource = serviceId ? `${serviceName} (ID: ${serviceId})` : serviceName;
+      throw ErrorHandler.createNotFoundError(resource);
+    }
+    return service;
+  }
+
+  /**
+   * Context7 Pattern: Validate required parameters
+   * DRY: Eliminates parameter validation duplication using existing ErrorHandler
+   */
+  validateRequiredParams(params, requiredFields) {
+    const missingParams = [];
+    requiredFields.forEach(field => {
+      if (params[field] === undefined || params[field] === null || params[field] === '') {
+        missingParams.push(field);
+      }
+    });
+    if (missingParams.length > 0) {
+      throw ErrorHandler.createValidationError(
+        `Missing required parameter(s): ${missingParams.join(', ')}`,
+        { missingParams, providedParams: Object.keys(params) }
+      );
+    }
+    return params;
+  }
+
+  /**
+   * Context7 Pattern: Validate non-empty array
+   * DRY: Eliminates array validation duplication
+   */
+  validateNonEmptyArray(array, fieldName = 'Array') {
+    if (!array || !Array.isArray(array) || array.length === 0) {
+      throw ErrorHandler.createValidationError(
+        `${fieldName} is required and cannot be empty`,
+        { provided: array, expected: 'non-empty array' }
+      );
+    }
+    return array;
+  }
+
+  /**
+   * Context7 Pattern: Validate database connection
+   * DRY: Eliminates database connection validation duplication
+   */
+  validateDatabaseConnection(connection, serviceName = 'Database') {
+    if (!connection) {
+      throw ErrorHandler.createError(
+        `${serviceName} connection not available`,
+        503,
+        'Please try again later',
+        'DATABASE_UNAVAILABLE'
+      );
+    }
+    return connection;
+  }
+
+  /**
+   * Context7 Pattern: Validate pagination parameters
+   * DRY: Eliminates pagination parsing duplication
+   * Uses existing ErrorHandler.createValidationError
+   */
+  validatePagination(query, defaultLimit = 50, maxLimit = 500) {
+    const limit = query.limit ? parseInt(query.limit) : defaultLimit;
+    const page = query.page ? parseInt(query.page) : 1;
+    
+    if (isNaN(limit) || limit < 1) {
+      throw ErrorHandler.createValidationError(
+        'Invalid limit parameter: must be a positive integer',
+        { provided: query.limit, expected: 'positive integer' }
+      );
+    }
+    
+    if (limit > maxLimit) {
+      throw ErrorHandler.createValidationError(
+        `Limit too large: maximum allowed is ${maxLimit}`,
+        { provided: limit, maximum: maxLimit }
+      );
+    }
+    
+    if (isNaN(page) || page < 1) {
+      throw ErrorHandler.createValidationError(
+        'Invalid page parameter: must be a positive integer',
+        { provided: query.page, expected: 'positive integer' }
+      );
+    }
+    
+    return {
+      limit,
+      page,
+      offset: (page - 1) * limit,
+      maxLimit
+    };
   }
 }
 

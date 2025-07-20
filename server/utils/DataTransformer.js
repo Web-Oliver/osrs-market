@@ -8,6 +8,8 @@
  * - Data quality assessment
  */
 
+const { AppConstants } = require('../config/AppConstants');
+
 class DataTransformer {
   constructor() {
     this.transformationCache = new Map();
@@ -27,8 +29,8 @@ class DataTransformer {
           priceData: 'object'
         },
         ranges: {
-          itemId: { min: 1, max: 50000 },
-          volume: { min: 0, max: 1000000 }
+          itemId: { min: AppConstants.OSRS.MIN_ITEM_ID, max: AppConstants.OSRS.MAX_ITEM_ID },
+          volume: { min: AppConstants.OSRS.MIN_VOLUME, max: AppConstants.OSRS.MAX_VOLUME }
         }
       },
       monitoringData: {

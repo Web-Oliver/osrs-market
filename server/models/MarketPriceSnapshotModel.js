@@ -442,73 +442,84 @@ MarketPriceSnapshotSchema.methods.getFormattedTimestamp = function() {
 };
 
 /**
- * Calculate profit after GE tax
+ * DRY: Get comprehensive market metrics using FinancialMetricsCalculator
+ * @returns {Object} Complete calculated metrics from FinancialMetricsCalculator
+ */
+MarketPriceSnapshotSchema.methods.getCalculatedMetrics = function() {
+  const { FinancialMetricsCalculator } = require('../utils/FinancialMetricsCalculator');
+  
+  // Lazy-load calculator instance
+  if (!this._metricsCalculator) {
+    this._metricsCalculator = new FinancialMetricsCalculator();
+  }
+
+  const rawData = {
+    itemId: this.itemId,
+    highPrice: this.highPrice,
+    lowPrice: this.lowPrice,
+    volume: this.volume,
+    timestamp: this.timestamp,
+    interval: this.interval,
+    source: 'market_price_snapshot_model'
+  };
+
+  return this._metricsCalculator.calculateAllMetrics(rawData);
+};
+
+/**
+ * DRY: Calculate profit after GE tax - delegates to FinancialMetricsCalculator
  * @returns {number} Net profit after GE tax
  */
 MarketPriceSnapshotSchema.methods.getNetProfitAfterTax = function() {
-  const { calculateProfitAfterTax } = require('../utils/marketConstants');
-  return calculateProfitAfterTax(this.lowPrice, this.highPrice);
+  return this.getCalculatedMetrics().marginGp;
 };
 
 /**
- * Calculate gross profit before GE tax
+ * DRY: Calculate gross profit before GE tax - delegates to FinancialMetricsCalculator
  * @returns {number} Gross profit before tax
  */
 MarketPriceSnapshotSchema.methods.getGrossProfit = function() {
-  return this.highPrice - this.lowPrice;
+  return this.getCalculatedMetrics().grossProfitGp;
 };
 
 /**
- * Calculate GE tax amount
+ * DRY: Calculate GE tax amount - delegates to FinancialMetricsCalculator
  * @returns {number} GE tax amount in GP
  */
 MarketPriceSnapshotSchema.methods.getGETaxAmount = function() {
-  const { calculateGETax } = require('../utils/marketConstants');
-  return calculateGETax(this.highPrice);
+  return this.getCalculatedMetrics().geTaxAmount;
 };
 
 /**
- * Check if this item is tax-free
+ * DRY: Check if this item is tax-free - delegates to FinancialMetricsCalculator
  * @returns {boolean} True if item is tax-free
  */
 MarketPriceSnapshotSchema.methods.isItemTaxFree = function() {
-  const { isTaxFree } = require('../utils/marketConstants');
-  return isTaxFree(this.highPrice);
+  return this.getCalculatedMetrics().isTaxFree;
 };
 
 /**
- * Get comprehensive profit breakdown
+ * DRY: Get comprehensive profit breakdown - delegates to FinancialMetricsCalculator
  * @returns {Object} Detailed profit breakdown with tax information
  */
 MarketPriceSnapshotSchema.methods.getProfitBreakdown = function() {
-  const {
-    calculateProfitAfterTax,
-    calculateGETax,
-    calculateNetSellPrice,
-    isTaxFree
-  } = require('../utils/marketConstants');
-
-  const buyPrice = this.lowPrice;
-  const sellPrice = this.highPrice;
-  const grossProfit = sellPrice - buyPrice;
-  const taxAmount = calculateGETax(sellPrice);
-  const netSellPrice = calculateNetSellPrice(sellPrice);
-  const netProfit = calculateProfitAfterTax(buyPrice, sellPrice);
-  const grossMarginPercent = buyPrice > 0 ? (grossProfit / buyPrice) * 100 : 0;
-  const netMarginPercent = buyPrice > 0 ? (netProfit / buyPrice) * 100 : 0;
+  const metrics = this.getCalculatedMetrics();
 
   return {
-    buyPrice,
-    sellPrice,
-    grossProfit,
-    taxAmount,
-    netSellPrice,
-    netProfit,
-    grossMarginPercent: Math.round(grossMarginPercent * 100) / 100,
-    netMarginPercent: Math.round(netMarginPercent * 100) / 100,
-    isTaxFree: isTaxFree(sellPrice),
-    profitPerSlot: netProfit, // Assuming 1 item per slot
-    expectedProfitPerHour: this.expectedProfitPerHour || null
+    buyPrice: this.lowPrice,
+    sellPrice: this.highPrice,
+    grossProfit: metrics.grossProfitGp,
+    taxAmount: metrics.geTaxAmount,
+    netSellPrice: metrics.netSellPrice,
+    netProfit: metrics.marginGp,
+    grossMarginPercent: metrics.grossProfitPercent,
+    netMarginPercent: metrics.marginPercent,
+    isTaxFree: metrics.isTaxFree,
+    profitPerSlot: metrics.profitPerGeSlot,
+    expectedProfitPerHour: metrics.expectedProfitPerHour,
+    riskScore: metrics.riskScore,
+    volumeScore: metrics.volumeScore,
+    liquidityRating: metrics.liquidityRating
   };
 };
 

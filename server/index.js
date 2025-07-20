@@ -13,13 +13,14 @@ const http = require('http');
 const MongoDataPersistence = require('./services/mongoDataPersistence');
 const { WebSocketLoggingService } = require('./services/WebSocketLoggingService');
 const { ErrorHandler } = require('./middleware/ErrorHandler');
+const { AppConstants } = require('./config/AppConstants');
 
 // Import centralized routes
 const apiRoutes = require('./routes/index');
 
 const app = express();
-// FIXED: Use port 3000 to match AI microservice expectations
-const PORT = process.env.PORT || 3000;
+// DRY: Use centralized port configuration
+const PORT = AppConstants.getEnvConfig().PORT;
 
 // MongoDB configuration with Context7 optimizations - FIXED: Use single driver approach
 const mongoConfig = {
@@ -95,7 +96,7 @@ app.get('/api/live-monitoring', async(req, res) => {
       return res.status(503).json({ error: 'Database not connected' });
     }
 
-    const limit = parseInt(req.query.limit) || 50;
+    const limit = parseInt(req.query.limit) || AppConstants.DATABASE.DEFAULT_LIMIT;
     const data = await mongoService.getLiveMonitoringData(limit);
 
     res.json(data);
@@ -136,7 +137,7 @@ app.get('/api/aggregated-stats', async(req, res) => {
       return res.status(503).json({ error: 'Database not connected' });
     }
 
-    const timeRange = parseInt(req.query.timeRange) || 3600000; // 1 hour default
+    const timeRange = parseInt(req.query.timeRange) || AppConstants.CACHE.DEFAULT_TTL;
     const stats = await mongoService.getAggregatedStats(timeRange);
 
     res.json(stats);
@@ -186,7 +187,7 @@ app.get('/api/system-status', async(req, res) => {
         totalSelected: 95,
         capacity: 100,
         utilizationPercent: '95.0%',
-        efficiency: 'Tracking 95 high-value items instead of 3000+ total OSRS items'
+        efficiency: `Tracking 95 high-value items instead of ${AppConstants.OSRS.TOTAL_ITEMS}+ total OSRS items`
       },
       persistence: {
         enabled: true,
@@ -219,7 +220,7 @@ app.get('/api/efficiency-metrics', async(req, res) => {
     const metrics = {
       smartSelection: {
         itemsTracked: 95,
-        totalOSRSItems: 3000,
+        totalOSRSItems: AppConstants.OSRS.TOTAL_ITEMS,
         reductionPercent: '96.8%',
         efficiency: '96.8% fewer items to process'
       },
@@ -260,7 +261,7 @@ app.get('/api/market-data', async(req, res) => {
       itemId: req.query.itemId ? parseInt(req.query.itemId) : undefined,
       startTime: req.query.startTime ? parseInt(req.query.startTime) : undefined,
       endTime: req.query.endTime ? parseInt(req.query.endTime) : undefined,
-      limit: req.query.limit ? parseInt(req.query.limit) : 100,
+      limit: req.query.limit ? parseInt(req.query.limit) : AppConstants.DATABASE.DEFAULT_LIMIT,
       onlyTradeable: req.query.onlyTradeable === 'true'
     };
 
@@ -304,7 +305,7 @@ app.post('/api/cleanup', async(req, res) => {
       return res.status(503).json({ error: 'Database not connected' });
     }
 
-    const maxAge = req.body.maxAge || 7 * 24 * 60 * 60 * 1000; // 7 days default
+    const maxAge = req.body.maxAge || AppConstants.DATABASE.DEFAULT_MAX_AGE;
     const result = await mongoService.cleanupOldData(maxAge);
 
     res.json(result);

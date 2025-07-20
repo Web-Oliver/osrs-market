@@ -16,6 +16,7 @@
 
 const {
   calculateProfitAfterTax,
+  calculateProfitPercentageAfterTax,
   calculateGETax,
   calculateNetSellPrice,
   isTaxFree

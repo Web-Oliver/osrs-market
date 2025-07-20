@@ -109,11 +109,8 @@ class AITradingController extends BaseController {
   stopTradingSession = this.createDeleteEndpoint(
     async(sessionId) => {
       const sessionInstance = this.orchestratorInstances.get(sessionId);
-      if (!sessionInstance) {
-        const error = new Error('Trading session not found');
-        error.statusCode = 404;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateService(sessionInstance, 'Trading session', sessionId);
 
       // Stop the session
       await sessionInstance.orchestrator.finishLearningSession();
@@ -145,11 +142,8 @@ class AITradingController extends BaseController {
       const { sessionId } = sessionData;
 
       const sessionInstance = this.orchestratorInstances.get(sessionId);
-      if (!sessionInstance) {
-        const error = new Error('Trading session not found');
-        error.statusCode = 404;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateService(sessionInstance, 'Trading session', sessionId);
 
       sessionInstance.orchestrator.pauseLearningSession();
 
@@ -174,11 +168,8 @@ class AITradingController extends BaseController {
       const { sessionId } = sessionData;
 
       const sessionInstance = this.orchestratorInstances.get(sessionId);
-      if (!sessionInstance) {
-        const error = new Error('Trading session not found');
-        error.statusCode = 404;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateService(sessionInstance, 'Trading session', sessionId);
 
       sessionInstance.orchestrator.resumeLearningSession();
 
@@ -203,17 +194,11 @@ class AITradingController extends BaseController {
       const { sessionId, items } = marketData;
 
       const sessionInstance = this.orchestratorInstances.get(sessionId);
-      if (!sessionInstance) {
-        const error = new Error('Trading session not found');
-        error.statusCode = 404;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateService(sessionInstance, 'Trading session', sessionId);
 
-      if (!items || !Array.isArray(items) || items.length === 0) {
-        const error = new Error('Items array is required and cannot be empty');
-        error.statusCode = 400;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateNonEmptyArray(items, 'Items array');
 
       const actions = await sessionInstance.orchestrator.processMarketData(items);
 
@@ -243,11 +228,8 @@ class AITradingController extends BaseController {
       const { sessionId } = params;
 
       const sessionInstance = this.orchestratorInstances.get(sessionId);
-      if (!sessionInstance) {
-        const error = new Error('Trading session not found');
-        error.statusCode = 404;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateService(sessionInstance, 'Trading session', sessionId);
 
       return sessionInstance.orchestrator.getTrainingProgress();
     },
@@ -266,11 +248,8 @@ class AITradingController extends BaseController {
       const { sessionId } = params;
 
       const sessionInstance = this.orchestratorInstances.get(sessionId);
-      if (!sessionInstance) {
-        const error = new Error('Trading session not found');
-        error.statusCode = 404;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateService(sessionInstance, 'Trading session', sessionId);
 
       return sessionInstance.orchestrator.getPerformanceAnalytics();
     },
@@ -289,11 +268,8 @@ class AITradingController extends BaseController {
       const { sessionId, config } = configData;
 
       const sessionInstance = this.orchestratorInstances.get(sessionId);
-      if (!sessionInstance) {
-        const error = new Error('Trading session not found');
-        error.statusCode = 404;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateService(sessionInstance, 'Trading session', sessionId);
 
       sessionInstance.orchestrator.setAdaptiveConfig(config);
       const updatedConfig = sessionInstance.orchestrator.getAdaptiveConfig();
@@ -321,11 +297,8 @@ class AITradingController extends BaseController {
       const { sessionId } = params;
 
       const sessionInstance = this.orchestratorInstances.get(sessionId);
-      if (!sessionInstance) {
-        const error = new Error('Trading session not found');
-        error.statusCode = 404;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateService(sessionInstance, 'Trading session', sessionId);
 
       const modelData = sessionInstance.orchestrator.saveModel();
 
@@ -351,17 +324,11 @@ class AITradingController extends BaseController {
       const { sessionId, modelData } = loadData;
 
       const sessionInstance = this.orchestratorInstances.get(sessionId);
-      if (!sessionInstance) {
-        const error = new Error('Trading session not found');
-        error.statusCode = 404;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateService(sessionInstance, 'Trading session', sessionId);
 
-      if (!modelData) {
-        const error = new Error('Model data is required');
-        error.statusCode = 400;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateRequiredParams({ modelData }, ['modelData']);
 
       sessionInstance.orchestrator.loadModel(modelData);
 
@@ -388,11 +355,8 @@ class AITradingController extends BaseController {
       const { sessionId } = params;
 
       const sessionInstance = this.orchestratorInstances.get(sessionId);
-      if (!sessionInstance) {
-        const error = new Error('Trading session not found');
-        error.statusCode = 404;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateService(sessionInstance, 'Trading session', sessionId);
 
       const exportData = sessionInstance.orchestrator.exportTrainingData();
 
@@ -416,11 +380,8 @@ class AITradingController extends BaseController {
     async(signalData) => {
       const { items } = signalData;
 
-      if (!items || !Array.isArray(items) || items.length === 0) {
-        const error = new Error('Items array is required and cannot be empty');
-        error.statusCode = 400;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateNonEmptyArray(items, 'Items array');
 
       const signals = [];
       for (const item of items) {

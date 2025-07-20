@@ -11,6 +11,7 @@
 
 const { ApiResponse } = require('../utils/ApiResponse');
 const { Logger } = require('../utils/Logger');
+const { AppConstants } = require('../config/AppConstants');
 
 
 class ErrorHandler {
@@ -321,7 +322,7 @@ class ErrorHandler {
    * @param {number} timeout - Timeout in milliseconds
    * @returns {Function} Express middleware
    */
-  static timeout(timeout = 30000) {
+  static timeout(timeout = AppConstants.SERVER.REQUEST_TIMEOUT) {
     return (req, res, next) => {
       const timer = setTimeout(() => {
         if (!res.headersSent) {

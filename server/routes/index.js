@@ -23,7 +23,12 @@ const logger = new Logger('RouteIndex');
 
 // Context7 Pattern: Import route modules
 const monitoringRoutes = require('./monitoringRoutes');
-const marketDataRoutes = require('./marketDataRoutes');
+// SOLID: Refactored market data routes into focused modules
+const coreMarketDataRoutes = require('./core/coreMarketDataRoutes');
+const marketAnalyticsRoutes = require('./analytics/marketAnalyticsRoutes');
+const marketSearchRoutes = require('./search/marketSearchRoutes');
+const marketAlertsRoutes = require('./alerts/marketAlertsRoutes');
+const marketExportRoutes = require('./export/marketExportRoutes');
 const aiTradingRoutes = require('./aiTradingRoutes');
 const autoTrainingRoutes = require('./autoTrainingRoutes');
 const itemMappingRoutes = require('./itemMappingRoutes');
@@ -300,7 +305,12 @@ router.get('/metrics', (req, res) => {
 /**
  * Context7 Pattern: Mount route modules (specific routes first)
  */
-router.use('/market-data', marketDataRoutes);
+// SOLID: Split market data routes into focused single-responsibility modules
+router.use('/market-data/core', coreMarketDataRoutes);
+router.use('/market-data/analytics', marketAnalyticsRoutes);
+router.use('/market-data/search', marketSearchRoutes);
+router.use('/market-data/alerts', marketAlertsRoutes);
+router.use('/market-data/export', marketExportRoutes);
 router.use('/ai-trading', aiTradingRoutes);
 router.use('/auto-training', autoTrainingRoutes);
 router.use('/items', itemMappingRoutes);

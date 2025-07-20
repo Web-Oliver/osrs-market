@@ -11,6 +11,7 @@
 
 const { ApiResponse } = require('../utils/ApiResponse');
 const { Logger } = require('../utils/Logger');
+const { AppConstants } = require('../config/AppConstants');
 
 class ValidationMiddleware {
   constructor() {
@@ -532,8 +533,8 @@ class ValidationMiddleware {
    */
   rateLimit(options = {}) {
     const { 
-      windowMs = 15 * 60 * 1000, // 15 minutes
-      maxRequests = 100,
+      windowMs = AppConstants.RATE_LIMITING.WINDOW_MS,
+      maxRequests = AppConstants.RATE_LIMITING.MAX_REQUESTS,
       message = 'Too many requests, please try again later'
     } = options;
 
@@ -584,7 +585,7 @@ class ValidationMiddleware {
    * Limits the size of incoming requests
    */
   requestSizeLimit(options = {}) {
-    const { limit = '10mb', message = 'Request entity too large' } = options;
+    const { limit = AppConstants.SERVER.JSON_LIMIT, message = 'Request entity too large' } = options;
     
     return (req, res, next) => {
       // Parse limit to bytes

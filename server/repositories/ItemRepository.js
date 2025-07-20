@@ -12,6 +12,7 @@
 const { BaseService } = require('../services/BaseService');
 const { ItemModel } = require('../models/ItemModel');
 const { DataTransformer } = require('../utils/DataTransformer');
+const { AppConstants } = require('../config/AppConstants');
 
 // DOMAIN ENTITIES INTEGRATION
 const { Item } = require('../domain/entities/Item');
@@ -141,7 +142,7 @@ class ItemRepository extends BaseService {
    */
   async getHighValueItems(options = {}) {
     return this.execute(async () => {
-      const minValue = options.minValue || 100000;
+      const minValue = options.minValue || AppConstants.OSRS.HIGH_VALUE_THRESHOLD;
       const limit = options.limit || 50;
 
       this.logger.debug('Getting high-value items', {
@@ -314,7 +315,7 @@ class ItemRepository extends BaseService {
         query.name = { $regex: /food|fish|meat|bread|cake/i };
         break;
       case 'high_value':
-        query.highalch = { $gt: 10000 };
+        query.highalch = { $gt: AppConstants.OSRS.HIGH_ALCH_THRESHOLD };
         break;
       case 'members':
         query.members = true;

@@ -12,6 +12,7 @@
  */
 
 const { MongoClient, ServerApiVersion } = require('mongodb');
+const { AppConstants } = require('../config/AppConstants');
 
 
 class MongoDataPersistence {
@@ -28,18 +29,18 @@ class MongoDataPersistence {
     this.collectionStatsCollection = null;
     this.liveMonitoringCollection = null;
 
-    // OPTIMIZED: Fixed Connection Configuration (reduced from performance-killing 50 connections)
+    // OPTIMIZED: Fixed Connection Configuration using centralized constants
     this.connectionOptions = {
       // Connection Pool Optimization - FIXED for single application
-      maxPoolSize: 10, // REDUCED: Maximum connections in pool (was 50 - too high)
-      minPoolSize: 2, // REDUCED: Minimum connections maintained (was 5)
-      maxConnecting: 2, // REDUCED: Max concurrent connection attempts (was 5)
-      maxIdleTimeMS: 60000, // INCREASED: 60 seconds idle timeout
+      maxPoolSize: AppConstants.DATABASE.MAX_POOL_SIZE,
+      minPoolSize: AppConstants.DATABASE.MIN_POOL_SIZE,
+      maxConnecting: AppConstants.DATABASE.MAX_CONNECTING,
+      maxIdleTimeMS: AppConstants.DATABASE.MAX_IDLE_TIME_MS,
 
       // Timeout Configuration - OPTIMIZED for stability
-      connectTimeoutMS: 30000, // INCREASED: 30 seconds connection timeout (was 10)
-      socketTimeoutMS: 120000, // INCREASED: 120 seconds socket timeout (was 45)
-      serverSelectionTimeoutMS: 30000, // INCREASED: 30 seconds server selection timeout
+      connectTimeoutMS: AppConstants.DATABASE.CONNECT_TIMEOUT_MS,
+      socketTimeoutMS: AppConstants.DATABASE.SOCKET_TIMEOUT_MS,
+      serverSelectionTimeoutMS: AppConstants.DATABASE.SERVER_SELECTION_TIMEOUT_MS
 
       // Reliability & Performance (Context7 Optimized)
       retryWrites: true, // Enable retry for write operations

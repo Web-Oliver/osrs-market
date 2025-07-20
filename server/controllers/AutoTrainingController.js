@@ -33,9 +33,13 @@ class AutoTrainingController extends BaseController {
       if (this.trainingServices.has(userId)) {
         const existingService = this.trainingServices.get(userId);
         if (existingService.isRunning) {
-          const error = new Error('Auto training service already running for this user');
-          error.statusCode = 409;
-          throw error;
+          // DRY: Use ErrorHandler for conflict error
+          throw ErrorHandler.createError(
+            'Auto training service already running for this user',
+            409,
+            null,
+            'CONFLICT_ERROR'
+          );
         }
       }
 
@@ -70,11 +74,8 @@ class AutoTrainingController extends BaseController {
       const { userId } = params;
 
       const service = this.trainingServices.get(userId);
-      if (!service) {
-        const error = new Error('No auto training service found for this user');
-        error.statusCode = 404;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateService(service, 'Auto training service for user', userId);
 
       const finalStatus = service.getStatus();
       service.stop();
@@ -133,11 +134,8 @@ class AutoTrainingController extends BaseController {
       const { userId, config } = configData;
 
       const service = this.trainingServices.get(userId);
-      if (!service) {
-        const error = new Error('No auto training service found for this user');
-        error.statusCode = 404;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateService(service, 'Auto training service for user', userId);
 
       service.updateConfig(config);
       const updatedConfig = service.getConfig();
@@ -165,11 +163,8 @@ class AutoTrainingController extends BaseController {
       const { userId } = params;
 
       const service = this.trainingServices.get(userId);
-      if (!service) {
-        const error = new Error('No auto training service found for this user');
-        error.statusCode = 404;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateService(service, 'Auto training service for user', userId);
 
       await service.manualTriggerTraining();
       const status = service.getStatus();
@@ -196,11 +191,8 @@ class AutoTrainingController extends BaseController {
       const { userId } = params;
 
       const service = this.trainingServices.get(userId);
-      if (!service) {
-        const error = new Error('No auto training service found for this user');
-        error.statusCode = 404;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateService(service, 'Auto training service for user', userId);
 
       const report = await service.exportFullReport();
 
@@ -226,17 +218,18 @@ class AutoTrainingController extends BaseController {
       const { userId } = params;
 
       const service = this.trainingServices.get(userId);
-      if (!service) {
-        const error = new Error('No auto training service found for this user');
-        error.statusCode = 404;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateService(service, 'Auto training service for user', userId);
 
       const modelData = service.saveModel();
       if (!modelData) {
-        const error = new Error('Failed to save model - no model data returned');
-        error.statusCode = 500;
-        throw error;
+        // DRY: Use ErrorHandler for server error
+        throw ErrorHandler.createError(
+          'Failed to save model - no model data returned',
+          500,
+          null,
+          'SERVER_ERROR'
+        );
       }
 
       return {
@@ -262,11 +255,8 @@ class AutoTrainingController extends BaseController {
       const { userId, modelData } = loadData;
 
       const service = this.trainingServices.get(userId);
-      if (!service) {
-        const error = new Error('No auto training service found for this user');
-        error.statusCode = 404;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateService(service, 'Auto training service for user', userId);
 
       service.loadModel(modelData);
 
@@ -301,11 +291,8 @@ class AutoTrainingController extends BaseController {
       const { userId, itemId, timeRange } = params;
 
       const service = this.trainingServices.get(userId);
-      if (!service) {
-        const error = new Error('No auto training service found for this user');
-        error.statusCode = 404;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateService(service, 'Auto training service for user', userId);
 
       const historicalData = service.getHistoricalData(
         itemId ? parseInt(itemId) : undefined,
@@ -332,11 +319,8 @@ class AutoTrainingController extends BaseController {
       const { userId, itemId } = params;
 
       const service = this.trainingServices.get(userId);
-      if (!service) {
-        const error = new Error('No auto training service found for this user');
-        error.statusCode = 404;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateService(service, 'Auto training service for user', userId);
 
       const timeseries = service.getItemTimeseries(parseInt(itemId));
 
