@@ -19,7 +19,7 @@ class NeuralTradingAgentService extends BaseService {
       cacheTTL: 300, // 5 minutes for neural predictions
       enableMongoDB: true // Store training data and model states
     });
-    
+
     this.config = config || {
       inputSize: 8,
       hiddenLayers: [64, 32],
@@ -53,16 +53,13 @@ class NeuralTradingAgentService extends BaseService {
    * Context7 Pattern: Initialize neural networks
    */
   initializeNetworks() {
-    try {
+    this.execute(async() => {
       this.onlineNetwork = this.createNetwork();
       this.targetNetwork = this.createNetwork();
       this.updateTargetNetwork();
 
       this.logger.debug('✅ Neural networks initialized successfully');
-    } catch (error) {
-      this.logger.error('❌ Error initializing neural networks', error);
-      throw error;
-    }
+    }, 'operation', { logSuccess: false });
   }
 
   /**
@@ -90,7 +87,7 @@ class NeuralTradingAgentService extends BaseService {
    * Context7 Pattern: Predict trading action from market state
    */
   predict(state) {
-    try {
+    this.execute(async() => {
       const stateVector = this.encodeState(state);
       const qValues = this.forwardPass(this.onlineNetwork, stateVector);
 
@@ -125,10 +122,7 @@ class NeuralTradingAgentService extends BaseService {
         expectedReturn,
         riskAssessment
       };
-    } catch (error) {
-      this.logger.error('❌ Error generating prediction', error);
-      throw error;
-    }
+    }, 'operation', { logSuccess: false });
   }
 
   /**
@@ -260,7 +254,7 @@ class NeuralTradingAgentService extends BaseService {
       return 0;
     }
 
-    try {
+    this.execute(async() => {
       const batch = this.sampleBatch();
       let totalLoss = 0;
 
@@ -301,175 +295,14 @@ class NeuralTradingAgentService extends BaseService {
       });
 
       return averageLoss;
-    } catch (error) {
-      this.logger.error('❌ Error training on batch', error);
-      return 0;
-    }
-  }
-
-  /**
-   * Context7 Pattern: Sample batch from memory
-   */
-  sampleBatch() {
-    const batch = [];
-    const batchSize = Math.min(this.config.batchSize, this.memory.length);
-
-    for (let i = 0; i < batchSize; i++) {
-      const randomIndex = Math.floor(Math.random() * this.memory.length);
-      batch.push(this.memory[randomIndex]);
-    }
-
-    return batch;
-  }
-
-  /**
-   * Context7 Pattern: Get action index for training
-   */
-  getActionIndex(action) {
-    switch (action.type) {
-    case 'BUY': return 0;
-    case 'SELL': return 1;
-    case 'HOLD': return 2;
-    default: return 2;
-    }
-  }
-
-  /**
-   * Context7 Pattern: Update network weights (simplified backpropagation)
-   */
-  updateWeights(experience, targetValue, currentValue) {
-    const error = targetValue - currentValue;
-    const learningRate = this.config.learningRate;
-
-    // Simplified gradient descent (in real implementation, use automatic differentiation)
-    for (let layerIndex = 0; layerIndex < this.onlineNetwork.length; layerIndex++) {
-      for (let weightIndex = 0; weightIndex < this.onlineNetwork[layerIndex].length; weightIndex++) {
-        this.onlineNetwork[layerIndex][weightIndex] += learningRate * error * 0.01;
-      }
-    }
-  }
-
-  /**
-   * Context7 Pattern: Update epsilon for exploration decay
-   */
-  updateEpsilon() {
-    this.epsilon = Math.max(
-      this.config.epsilonMin,
-      this.epsilon * this.config.epsilonDecay
-    );
-  }
-
-  /**
-   * Context7 Pattern: Update target network
-   */
-  updateTargetNetwork() {
-    this.targetNetwork = this.onlineNetwork.map(layer => [...layer]);
-    this.logger.debug('🔄 Target network updated');
-  }
-
-  /**
-   * Context7 Pattern: Calculate reward for experience
-   */
-  calculateReward(previousState, action, currentState, tradeExecuted, profit) {
-    let profitReward = 0;
-    let timeReward = 0;
-    let riskPenalty = 0;
-    let spreadReward = 0;
-
-    if (tradeExecuted && profit !== undefined) {
-      // Primary reward: actual profit
-      profitReward = profit / 1000; // Scale down for neural network
-
-      // Time efficiency reward
-      const timeDiff = currentState.timestamp - previousState.timestamp;
-      timeReward = Math.max(0, 10 - timeDiff / (60 * 1000)); // Reward faster trades
-
-      // Risk penalty
-      const risk = this.calculateRisk(previousState, action);
-      riskPenalty = -risk * 5;
-
-      // Spread capture reward
-      if (action.type === 'BUY' && profit > 0) {
-        spreadReward = Math.min(5, previousState.spread * 0.1);
-      }
-    } else {
-      // Holding or failed trade penalties/rewards
-      if (action.type === 'HOLD') {
-        // Small positive reward for holding in uncertain conditions
-        timeReward = previousState.volatility > 5 ? 1 : -0.5;
-      } else {
-        // Penalty for failed trades
-        profitReward = -2;
-      }
-    }
-
-    const totalReward = profitReward + timeReward + riskPenalty + spreadReward;
-
-    this.logger.debug('🎁 Reward calculated', {
-      profitReward: profitReward.toFixed(3),
-      timeReward: timeReward.toFixed(3),
-      riskPenalty: riskPenalty.toFixed(3),
-      spreadReward: spreadReward.toFixed(3),
-      totalReward: totalReward.toFixed(3)
-    });
-
-    return {
-      profitReward,
-      timeReward,
-      riskPenalty,
-      spreadReward,
-      totalReward
-    };
-  }
-
-  /**
-   * Context7 Pattern: Get model statistics
-   */
-  getModelStats() {
-    return {
-      epsilon: this.epsilon,
-      memorySize: this.memory.length,
-      totalSteps: this.totalSteps,
-      totalEpisodes: this.totalEpisodes,
-      networkLayers: this.config.hiddenLayers.length + 2,
-      learningRate: this.config.learningRate,
-      memoryCapacity: this.config.memorySize,
-      batchSize: this.config.batchSize
-    };
-  }
-
-  /**
-   * Context7 Pattern: Save model to JSON
-   */
-  saveModel() {
-    try {
-      const modelData = JSON.stringify({
-        config: this.config,
-        onlineNetwork: this.onlineNetwork,
-        epsilon: this.epsilon,
-        totalSteps: this.totalSteps,
-        totalEpisodes: this.totalEpisodes,
-        version: Date.now().toString()
-      });
-
-      this.logger.info('💾 Model saved successfully', {
-        modelSize: modelData.length,
-        epsilon: this.epsilon,
-        totalSteps: this.totalSteps
-      });
-
-      return modelData;
-    } catch (error) {
-      this.logger.error('❌ Error saving model', error);
-      throw error;
-    }
+    }, 'operation', { logSuccess: false });
   }
 
   /**
    * Context7 Pattern: Load model from JSON
    */
   loadModel(modelData) {
-    try {
+    this.execute(async() => {
       const data = JSON.parse(modelData);
       this.config = data.config;
       this.onlineNetwork = data.onlineNetwork;
@@ -483,10 +316,7 @@ class NeuralTradingAgentService extends BaseService {
         epsilon: this.epsilon,
         totalSteps: this.totalSteps
       });
-    } catch (error) {
-      this.logger.error('❌ Error loading model', error);
-      throw error;
-    }
+    }, 'operation', { logSuccess: false });
   }
 
   /**

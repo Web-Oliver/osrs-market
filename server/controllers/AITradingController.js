@@ -14,9 +14,12 @@ const { TradingAnalysisService } = require('../services/TradingAnalysisService')
 const { validateRequest } = require('../validators/AITradingValidator');
 
 class AITradingController extends BaseController {
-  constructor() {
+  constructor(dependencies = {}) {
     super('AITradingController');
-    this.tradingAnalysis = new TradingAnalysisService();
+    
+    // SOLID: Dependency Injection (DIP) - Eliminates direct dependency violation
+    this.aiTradingService = dependencies.aiTradingService || new AITradingOrchestratorService();
+    this.tradingAnalysisService = dependencies.tradingAnalysisService || new TradingAnalysisService();
     this.orchestratorInstances = new Map(); // Multiple orchestrator instances
 
     // Default neural network configuration
@@ -50,10 +53,10 @@ class AITradingController extends BaseController {
    * POST /api/ai-trading/sessions
    */
   startTradingSession = this.createPostEndpoint(
-    async (sessionData) => {
+    async(sessionData) => {
       // Create new orchestrator instance
       const orchestrator = new AITradingOrchestratorService(
-        sessionData.networkConfig, 
+        sessionData.networkConfig,
         sessionData.adaptiveConfig
       );
       const sessionId = orchestrator.startLearningSession();
@@ -104,7 +107,7 @@ class AITradingController extends BaseController {
    * DELETE /api/ai-trading/sessions/:sessionId
    */
   stopTradingSession = this.createDeleteEndpoint(
-    async (sessionId) => {
+    async(sessionId) => {
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
         const error = new Error('Trading session not found');
@@ -138,9 +141,9 @@ class AITradingController extends BaseController {
    * POST /api/ai-trading/sessions/:sessionId/pause
    */
   pauseTradingSession = this.createPostEndpoint(
-    async (sessionData) => {
+    async(sessionData) => {
       const { sessionId } = sessionData;
-      
+
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
         const error = new Error('Trading session not found');
@@ -167,9 +170,9 @@ class AITradingController extends BaseController {
    * POST /api/ai-trading/sessions/:sessionId/resume
    */
   resumeTradingSession = this.createPostEndpoint(
-    async (sessionData) => {
+    async(sessionData) => {
       const { sessionId } = sessionData;
-      
+
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
         const error = new Error('Trading session not found');
@@ -196,9 +199,9 @@ class AITradingController extends BaseController {
    * POST /api/ai-trading/sessions/:sessionId/process-market-data
    */
   processMarketData = this.createPostEndpoint(
-    async (marketData) => {
+    async(marketData) => {
       const { sessionId, items } = marketData;
-      
+
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
         const error = new Error('Trading session not found');
@@ -236,9 +239,9 @@ class AITradingController extends BaseController {
    * GET /api/ai-trading/sessions/:sessionId/progress
    */
   getTrainingProgress = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       const { sessionId } = params;
-      
+
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
         const error = new Error('Trading session not found');
@@ -259,9 +262,9 @@ class AITradingController extends BaseController {
    * GET /api/ai-trading/sessions/:sessionId/analytics
    */
   getPerformanceAnalytics = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       const { sessionId } = params;
-      
+
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
         const error = new Error('Trading session not found');
@@ -282,9 +285,9 @@ class AITradingController extends BaseController {
    * PUT /api/ai-trading/sessions/:sessionId/adaptive-config
    */
   updateAdaptiveConfig = this.createPostEndpoint(
-    async (configData) => {
+    async(configData) => {
       const { sessionId, config } = configData;
-      
+
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
         const error = new Error('Trading session not found');
@@ -314,9 +317,9 @@ class AITradingController extends BaseController {
    * POST /api/ai-trading/sessions/:sessionId/save-model
    */
   saveModel = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       const { sessionId } = params;
-      
+
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
         const error = new Error('Trading session not found');
@@ -344,9 +347,9 @@ class AITradingController extends BaseController {
    * POST /api/ai-trading/sessions/:sessionId/load-model
    */
   loadModel = this.createPostEndpoint(
-    async (loadData) => {
+    async(loadData) => {
       const { sessionId, modelData } = loadData;
-      
+
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
         const error = new Error('Trading session not found');
@@ -381,9 +384,9 @@ class AITradingController extends BaseController {
    * GET /api/ai-trading/sessions/:sessionId/export
    */
   exportTrainingData = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       const { sessionId } = params;
-      
+
       const sessionInstance = this.orchestratorInstances.get(sessionId);
       if (!sessionInstance) {
         const error = new Error('Trading session not found');
@@ -410,7 +413,7 @@ class AITradingController extends BaseController {
    * POST /api/ai-trading/signals
    */
   generateTradingSignals = this.createPostEndpoint(
-    async (signalData) => {
+    async(signalData) => {
       const { items } = signalData;
 
       if (!items || !Array.isArray(items) || items.length === 0) {
@@ -468,7 +471,7 @@ class AITradingController extends BaseController {
    * GET /api/ai-trading/system-status
    */
   getSystemStatus = this.createGetEndpoint(
-    async () => {
+    async() => {
       const systemStatus = {
         activeSessions: this.orchestratorInstances.size,
         sessions: Array.from(this.orchestratorInstances.entries()).map(([sessionId, instance]) => ({
@@ -500,7 +503,7 @@ class AITradingController extends BaseController {
    * GET /api/ai-trading/sessions
    */
   getActiveSessions = this.createGetEndpoint(
-    async () => {
+    async() => {
       const sessions = Array.from(this.orchestratorInstances.entries()).map(([sessionId, instance]) => ({
         sessionId,
         sessionName: instance.sessionName,

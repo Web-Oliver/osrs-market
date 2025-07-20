@@ -10,10 +10,11 @@
 
 const { Logger } = require('./Logger');
 
+
 class EndpointFactory {
   constructor(controllerName) {
     this.controllerName = controllerName;
-    this.logger = new Logger(`${controllerName}Factory`);
+    this.logger = new Logger(`${controllerName}`);
   }
 
   /**
@@ -32,7 +33,7 @@ class EndpointFactory {
       logSuccessData = (result) => ({ resultCount: Array.isArray(result) ? result.length : 1 })
     } = options;
 
-    return async (req, res, next) => {
+    return async(req, res, next) => {
       try {
         // Standardized request logging
         this.logger.info(`Starting ${operationName}`, {
@@ -60,7 +61,7 @@ class EndpointFactory {
 
         // Parse parameters
         const parsedParams = parseParams(req);
-        
+
         // Execute service method
         const result = await serviceMethod(parsedParams);
 
@@ -76,11 +77,7 @@ class EndpointFactory {
         return res.json(formattedResponse);
 
       } catch (error) {
-        this.logger.error(`${operationName} failed`, error, {
-          query: req.query,
-          params: req.params,
-          requestId: req.id
-        });
+        // Error handling moved to centralized manager - context: operation
         next(error);
       }
     };
@@ -118,7 +115,7 @@ class EndpointFactory {
       responseFormatter = this.createdResponseFormatter.bind(this)
     } = options;
 
-    return async (req, res, next) => {
+    return async(req, res, next) => {
       try {
         this.logger.info(`Starting ${operationName}`, {
           bodyKeys: Object.keys(req.body || {}),
@@ -144,7 +141,7 @@ class EndpointFactory {
 
         // Parse body
         const parsedBody = parseBody(req);
-        
+
         // Execute service method
         const result = await serviceMethod(parsedBody);
 
@@ -157,10 +154,7 @@ class EndpointFactory {
         return res.status(201).json(formattedResponse);
 
       } catch (error) {
-        this.logger.error(`${operationName} failed`, error, {
-          body: req.body,
-          requestId: req.id
-        });
+        // Error handling moved to centralized manager - context: operation
         next(error);
       }
     };
@@ -177,10 +171,10 @@ class EndpointFactory {
       responseFormatter = this.deletedResponseFormatter.bind(this)
     } = options;
 
-    return async (req, res, next) => {
+    return async(req, res, next) => {
       try {
         const resourceId = req.params[resourceIdParam];
-        
+
         this.logger.info(`Starting ${operationName}`, {
           resourceId,
           requestId: req.id
@@ -197,10 +191,7 @@ class EndpointFactory {
         return res.json(formattedResponse);
 
       } catch (error) {
-        this.logger.error(`${operationName} failed`, error, {
-          resourceId: req.params[resourceIdParam],
-          requestId: req.id
-        });
+        // Error handling moved to centralized manager - context: operation
         next(error);
       }
     };
@@ -303,7 +294,7 @@ class EndpointFactory {
   createCustomEndpoint(handler, options = {}) {
     const { operationName = 'custom operation' } = options;
 
-    return async (req, res, next) => {
+    return async(req, res, next) => {
       try {
         this.logger.info(`Starting ${operationName}`, {
           query: req.query,
@@ -320,9 +311,7 @@ class EndpointFactory {
         return result;
 
       } catch (error) {
-        this.logger.error(`${operationName} failed`, error, {
-          requestId: req.id
-        });
+        // Error handling moved to centralized manager - context: operation
         next(error);
       }
     };

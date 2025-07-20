@@ -13,9 +13,12 @@ const { MarketDataService } = require('../services/MarketDataService');
 const { validateRequest } = require('../validators/MarketDataValidator');
 
 class MarketDataController extends BaseController {
-  constructor() {
+  constructor(dependencies = {}) {
     super('MarketDataController');
-    this.marketDataService = new MarketDataService();
+    
+    // SOLID: Dependency Injection (DIP) - Eliminates direct dependency violation
+    this.marketDataService = dependencies.marketDataService || new MarketDataService();
+    this.smartItemSelectorService = dependencies.smartItemSelectorService;
   }
 
   /**
@@ -41,11 +44,11 @@ class MarketDataController extends BaseController {
       validator: () => validateRequest.saveMarketData(req.body),
       parseBody: (req) => {
         const { items, collectionSource = 'API' } = req.body;
-        
+
         if (!items || !Array.isArray(items) || items.length === 0) {
           throw new Error('Items array is required and cannot be empty');
         }
-        
+
         return {
           items,
           collectionSource,
@@ -116,11 +119,11 @@ class MarketDataController extends BaseController {
       validator: () => validateRequest.searchItems(req.query),
       parseParams: (req) => {
         const { q: searchTerm, limit = 20, onlyTradeable = false, sortBy = 'relevance' } = req.query;
-        
+
         if (!searchTerm || searchTerm.trim().length < 2) {
           throw new Error('Search term must be at least 2 characters long');
         }
-        
+
         return {
           searchTerm: searchTerm.trim(),
           limit: parseInt(limit),
@@ -181,9 +184,10 @@ class MarketDataController extends BaseController {
    * GET /api/market-data/popular-items
    */
   getPopularItems = this.createGetEndpoint(
-    async (options) => {
+    async(options) => {
       const { SmartItemSelectorService } = require('../services/SmartItemSelectorService');
-      const smartItemSelector = new SmartItemSelectorService();
+      // SOLID: Use injected dependency instead of creating new instance
+      const smartItemSelector = this.smartItemSelectorService;
       return await smartItemSelector.getHighValueItems(this.marketDataService, options.limit);
     },
     {
@@ -239,11 +243,11 @@ class MarketDataController extends BaseController {
       operationName: 'create alert',
       parseBody: (req) => {
         const { itemId, type, threshold, email, webhook, userId = 'default' } = req.body;
-        
+
         if (!itemId || !type || threshold === undefined) {
           throw new Error('Missing required fields: itemId, type, threshold');
         }
-        
+
         return {
           itemId: parseInt(itemId),
           type,
@@ -308,10 +312,10 @@ class MarketDataController extends BaseController {
    * GET /api/market-data/export
    */
   exportData = this.endpointFactory.createCustomEndpoint(
-    async (req, res) => {
+    async(req, res) => {
       const options = this.parseExportQuery(req);
       const exportData = await this.marketDataService.exportData(options);
-      
+
       // Set appropriate content type based on format
       switch (options.format) {
       case 'csv':
@@ -325,7 +329,7 @@ class MarketDataController extends BaseController {
       default:
         res.setHeader('Content-Type', 'application/json');
       }
-      
+
       return res.send(exportData);
     },
     { operationName: 'export data' }
@@ -341,11 +345,11 @@ class MarketDataController extends BaseController {
     {
       parseParams: (req) => {
         const { itemIds, metrics = 'price,volume,margin' } = req.query;
-        
+
         if (!itemIds) {
           throw new Error('itemIds parameter is required');
         }
-        
+
         return {
           itemIds: itemIds.split(',').map(id => parseInt(id)),
           metrics: metrics.split(','),
@@ -365,18 +369,18 @@ class MarketDataController extends BaseController {
     {
       parseParams: (req) => {
         const { items } = req.query;
-        
+
         if (!items) {
           throw new Error('items parameter is required');
         }
-        
+
         let portfolioItems;
         try {
           portfolioItems = JSON.parse(items);
         } catch {
           throw new Error('Invalid JSON format for items parameter');
         }
-        
+
         return {
           items: portfolioItems,
           ...this.parseTimeRangeQuery(req)
@@ -395,11 +399,11 @@ class MarketDataController extends BaseController {
       operationName: 'validate data',
       parseBody: (req) => {
         const { items } = req.body;
-        
+
         if (!items || !Array.isArray(items)) {
           throw new Error('items array is required');
         }
-        
+
         return items;
       }
     }
@@ -415,11 +419,11 @@ class MarketDataController extends BaseController {
       operationName: 'process manual test',
       parseBody: (req) => {
         const { itemId, action, price, quantity, testMode = true } = req.body;
-        
+
         if (!itemId || !action || !price || !quantity) {
           throw new Error('Missing required fields: itemId, action, price, quantity');
         }
-        
+
         return {
           itemId: parseInt(itemId),
           action,

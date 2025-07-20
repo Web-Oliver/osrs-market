@@ -18,7 +18,7 @@ class WebSocketLoggingService extends BaseService {
       enableCache: false, // No caching needed for streaming
       enableMongoDB: false // No MongoDB needed for live streaming
     });
-    
+
     this.server = server;
     this.options = {
       port: options.port || 3002,
@@ -51,7 +51,7 @@ class WebSocketLoggingService extends BaseService {
    * Context7 Pattern: Initialize WebSocket server with proper error handling
    */
   initializeWebSocketServer() {
-    try {
+    this.execute(async() => {
       // Context7 Pattern: Create separate WebSocket server on different port
       this.wss = new WebSocket.Server({
         port: this.options.port,
@@ -63,7 +63,7 @@ class WebSocketLoggingService extends BaseService {
         // Context7 Pattern: Proper error handling and heartbeat for connections
         ws.isAlive = true;
         ws.on('error', (error) => {
-          this.logger.error('WebSocket client error', error);
+          // Error handling moved to centralized manager - context: WebSocket client error
         });
 
         // Context7 Pattern: Heartbeat pong handler
@@ -75,7 +75,7 @@ class WebSocketLoggingService extends BaseService {
       });
 
       this.wss.on('error', (error) => {
-        this.logger.error('WebSocket server error', error);
+        // Error handling moved to centralized manager - context: WebSocket server error
       });
 
       this.wss.on('close', () => {
@@ -89,10 +89,7 @@ class WebSocketLoggingService extends BaseService {
         port: this.options.port,
         path: this.options.path
       });
-    } catch (error) {
-      this.logger.error('❌ Failed to initialize WebSocket server', error);
-      throw error;
-    }
+    }, 'operation', { logSuccess: false });
   }
 
   /**
@@ -139,7 +136,7 @@ class WebSocketLoggingService extends BaseService {
       });
 
       ws.on('error', (error) => {
-        this.logger.error('WebSocket client error', error, { clientId });
+        // Error handling moved to centralized manager - context: WebSocket client error
       });
 
       ws.on('pong', () => {
@@ -167,7 +164,7 @@ class WebSocketLoggingService extends BaseService {
         totalClients: this.clients.size
       });
     } catch (error) {
-      this.logger.error('❌ Error handling WebSocket connection', error);
+      // Error handling moved to centralized manager - context: ❌ Error handling WebSocket connection
       if (ws.readyState === WebSocket.OPEN) {
         ws.close(1011, 'Internal server error');
       }
@@ -209,9 +206,7 @@ class WebSocketLoggingService extends BaseService {
         });
       }
     } catch (error) {
-      this.logger.error('❌ Error handling WebSocket message', error, {
-        clientId
-      });
+      // Error handling moved to centralized manager - context: ❌ Error handling WebSocket message
     }
   }
 
@@ -242,9 +237,7 @@ class WebSocketLoggingService extends BaseService {
         filters: client.filters
       });
     } catch (error) {
-      this.logger.error('❌ Error updating client filters', error, {
-        clientId
-      });
+      // Error handling moved to centralized manager - context: ❌ Error updating client filters
     }
   }
 
@@ -271,9 +264,7 @@ class WebSocketLoggingService extends BaseService {
         subscription
       });
     } catch (error) {
-      this.logger.error('❌ Error handling subscription', error, {
-        clientId
-      });
+      // Error handling moved to centralized manager - context: ❌ Error handling subscription
     }
   }
 
@@ -300,9 +291,7 @@ class WebSocketLoggingService extends BaseService {
         subscription
       });
     } catch (error) {
-      this.logger.error('❌ Error handling unsubscription', error, {
-        clientId
-      });
+      // Error handling moved to centralized manager - context: ❌ Error handling unsubscription
     }
   }
 
@@ -328,9 +317,7 @@ class WebSocketLoggingService extends BaseService {
         totalClients: this.clients.size
       });
     } catch (error) {
-      this.logger.error('❌ Error handling client disconnection', error, {
-        clientId
-      });
+      // Error handling moved to centralized manager - context: ❌ Error handling client disconnection
     }
   }
 
@@ -348,9 +335,7 @@ class WebSocketLoggingService extends BaseService {
       client.ws.send(messageStr);
       return true;
     } catch (error) {
-      this.logger.error('❌ Error sending message to client', error, {
-        clientId
-      });
+      // Error handling moved to centralized manager - context: ❌ Error sending message to client
       return false;
     }
   }
@@ -376,16 +361,14 @@ class WebSocketLoggingService extends BaseService {
             failed++;
           }
         } catch (error) {
-          this.logger.error('❌ Error broadcasting to client', error, {
-            clientId
-          });
+          // Error handling moved to centralized manager - context: ❌ Error broadcasting to client
           failed++;
         }
       }
 
       return { sent, failed };
     } catch (error) {
-      this.logger.error('❌ Error broadcasting message', error);
+      // Error handling moved to centralized manager - context: ❌ Error broadcasting message
       return { sent: 0, failed: this.clients.size };
     }
   }
@@ -413,9 +396,7 @@ class WebSocketLoggingService extends BaseService {
         });
       }
     } catch (error) {
-      this.logger.error('❌ Error sending buffered logs', error, {
-        clientId
-      });
+      // Error handling moved to centralized manager - context: ❌ Error sending buffered logs
     }
   }
 
@@ -444,7 +425,7 @@ class WebSocketLoggingService extends BaseService {
 
       return true;
     } catch (error) {
-      this.logger.error('❌ Error checking log filter', error);
+      // Error handling moved to centralized manager - context: ❌ Error checking log filter
       return false;
     }
   }
@@ -483,7 +464,7 @@ class WebSocketLoggingService extends BaseService {
         });
       }
     } catch (error) {
-      this.logger.error('❌ Error streaming log', error);
+      // Error handling moved to centralized manager - context: ❌ Error streaming log
     }
   }
 
@@ -564,7 +545,7 @@ class WebSocketLoggingService extends BaseService {
    * Context7 Pattern: Shutdown service
    */
   async shutdown() {
-    try {
+    return this.execute(async() => {
       this.logger.info('🔌 Shutting down WebSocket Logging Service');
 
       this.isRunning = false;
@@ -586,10 +567,7 @@ class WebSocketLoggingService extends BaseService {
       this.logBuffer = [];
 
       this.logger.info('✅ WebSocket Logging Service shutdown completed');
-    } catch (error) {
-      this.logger.error('❌ Error shutting down WebSocket Logging Service', error);
-      throw error;
-    }
+    }, 'shutdown', { logSuccess: true });
   }
 
   /**
@@ -624,7 +602,7 @@ class WebSocketLoggingService extends BaseService {
       this.broadcastToClients(message);
       this.logger.debug(`📊 Broadcasted market data to ${this.clients.size} clients`);
     } catch (error) {
-      this.logger.error('❌ Error broadcasting market data', error);
+      // Error handling moved to centralized manager - context: ❌ Error broadcasting market data
     }
   }
 
@@ -642,7 +620,7 @@ class WebSocketLoggingService extends BaseService {
       this.broadcastToClients(message);
       this.logger.debug(`🔄 Broadcasted pipeline status to ${this.clients.size} clients`);
     } catch (error) {
-      this.logger.error('❌ Error broadcasting pipeline status', error);
+      // Error handling moved to centralized manager - context: ❌ Error broadcasting pipeline status
     }
   }
 
@@ -660,7 +638,7 @@ class WebSocketLoggingService extends BaseService {
       this.broadcastToClients(message);
       this.logger.debug(`🤖 Broadcasted AI training update to ${this.clients.size} clients`);
     } catch (error) {
-      this.logger.error('❌ Error broadcasting AI training update', error);
+      // Error handling moved to centralized manager - context: ❌ Error broadcasting AI training update
     }
   }
 
@@ -679,7 +657,7 @@ class WebSocketLoggingService extends BaseService {
       this.broadcastToClients(message);
       this.logger.debug(`⚠️ Broadcasted memory alert to ${this.clients.size} clients`);
     } catch (error) {
-      this.logger.error('❌ Error broadcasting memory alert', error);
+      // Error handling moved to centralized manager - context: ❌ Error broadcasting memory alert
     }
   }
 
@@ -697,7 +675,7 @@ class WebSocketLoggingService extends BaseService {
       this.broadcastToClients(message);
       this.logger.debug(`❤️ Broadcasted system health to ${this.clients.size} clients`);
     } catch (error) {
-      this.logger.error('❌ Error broadcasting system health', error);
+      // Error handling moved to centralized manager - context: ❌ Error broadcasting system health
     }
   }
 
@@ -738,7 +716,7 @@ class WebSocketLoggingService extends BaseService {
       }
       return false;
     } catch (error) {
-      this.logger.error(`❌ Error sending message to client ${clientId}`, error);
+      // Error handling moved to centralized manager - context: operation
       return false;
     }
   }

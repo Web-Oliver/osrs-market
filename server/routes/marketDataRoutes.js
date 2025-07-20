@@ -9,15 +9,16 @@
  */
 
 const express = require('express');
-const { MarketDataController } = require('../controllers/MarketDataController');
+const { getControllerFactory } = require('../factories/ControllerFactory');
 const { ValidationMiddleware } = require('../middleware/ValidationMiddleware');
 const { ErrorHandler } = require('../middleware/ErrorHandler');
 const { validateRequest } = require('../validators/MarketDataValidator');
 
 const router = express.Router();
 
-// Context7 Pattern: Initialize dependencies with optimized middleware
-const marketDataController = new MarketDataController();
+// Context7 Pattern: Use ControllerFactory for proper dependency injection
+const controllerFactory = getControllerFactory();
+const marketDataController = controllerFactory.createMarketDataController();
 const validationMiddleware = new ValidationMiddleware();
 const errorHandler = new ErrorHandler();
 

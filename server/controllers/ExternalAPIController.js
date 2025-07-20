@@ -13,9 +13,11 @@ const { OSRSWikiService } = require('../services/OSRSWikiService');
 const { validateRequest } = require('../validators/ExternalAPIValidator');
 
 class ExternalAPIController extends BaseController {
-  constructor() {
+  constructor(dependencies = {}) {
     super('ExternalAPIController');
-    this.osrsWikiService = new OSRSWikiService();
+    
+    // SOLID: Dependency Injection (DIP) - Eliminates direct dependency violation
+    this.osrsWikiService = dependencies.osrsWikiService || new OSRSWikiService();
   }
 
   /**
@@ -41,7 +43,7 @@ class ExternalAPIController extends BaseController {
    * GET /api/external/osrs-wiki/timeseries/:itemId
    */
   getTimeseries = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       const { itemId, timestep } = params;
       return await this.osrsWikiService.getTimeseries(itemId, timestep);
     },
@@ -60,7 +62,7 @@ class ExternalAPIController extends BaseController {
    * GET /api/external/osrs-wiki/search
    */
   searchItems = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       const { query, limit } = params;
       return await this.osrsWikiService.searchItems(query, limit);
     },
@@ -79,7 +81,7 @@ class ExternalAPIController extends BaseController {
    * GET /api/external/osrs-wiki/item/:itemId
    */
   getItemData = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       const { itemId } = params;
       return await this.osrsWikiService.getItemData(itemId);
     },
@@ -97,7 +99,7 @@ class ExternalAPIController extends BaseController {
    * POST /api/external/osrs-wiki/bulk-items
    */
   getBulkItemData = this.createPostEndpoint(
-    async (bulkData) => {
+    async(bulkData) => {
       const { itemIds } = bulkData;
       return await this.osrsWikiService.getBulkItemData(itemIds);
     },
@@ -143,7 +145,7 @@ class ExternalAPIController extends BaseController {
    * GET /api/external/osrs-wiki/market-summary
    */
   getMarketSummary = this.createGetEndpoint(
-    async () => {
+    async() => {
       // Get both latest prices and item mapping
       const [latestPrices, itemMapping] = await Promise.all([
         this.osrsWikiService.getLatestPrices(),
@@ -161,7 +163,7 @@ class ExternalAPIController extends BaseController {
    * GET /api/external/osrs-wiki/trending
    */
   getTrendingItems = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       const { limit } = params;
 
       // Get latest prices

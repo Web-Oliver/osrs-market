@@ -10,13 +10,14 @@
  */
 
 const express = require('express');
-const { AutoTrainingController } = require('../controllers/AutoTrainingController');
+const { getControllerFactory } = require('../factories/ControllerFactory');
 const { ErrorMiddleware } = require('../middleware/ErrorMiddleware');
 const { RequestMiddleware } = require('../middleware/RequestMiddleware');
 const { Logger } = require('../utils/Logger');
 
 const router = express.Router();
-const controller = new AutoTrainingController();
+const controllerFactory = getControllerFactory();
+const controller = controllerFactory.createAutoTrainingController();
 const errorMiddleware = new ErrorMiddleware();
 const requestMiddleware = new RequestMiddleware();
 const logger = new Logger('AutoTrainingRoutes');

@@ -12,10 +12,13 @@ const { BaseController } = require('./BaseController');
 const { MonitoringService } = require('../services/MonitoringService');
 const { validateRequest } = require('../validators/MonitoringValidator');
 
+
 class MonitoringController extends BaseController {
-  constructor() {
+  constructor(dependencies = {}) {
     super('MonitoringController');
-    this.monitoringService = new MonitoringService();
+    
+    // SOLID: Dependency Injection (DIP) - Eliminates direct dependency violation
+    this.monitoringService = dependencies.monitoringService || new MonitoringService();
   }
 
   /**
@@ -23,7 +26,7 @@ class MonitoringController extends BaseController {
    * GET /api/live-monitoring
    */
   getLiveData = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       const { limit } = params;
       return await this.monitoringService.getLiveMonitoringData(limit);
     },
@@ -41,7 +44,7 @@ class MonitoringController extends BaseController {
    * POST /api/live-monitoring
    */
   saveLiveData = this.createPostEndpoint(
-    async (enrichedData) => {
+    async(enrichedData) => {
       const insertedId = await this.monitoringService.saveLiveMonitoringData(enrichedData);
       return { id: insertedId };
     },
@@ -89,7 +92,7 @@ class MonitoringController extends BaseController {
             res.write(`data: ${JSON.stringify(data[0])}\n\n`);
           }
         } catch (error) {
-          this.logger.error('Error streaming monitoring data', error);
+          // Error handling moved to centralized manager - context: Error streaming monitoring data
           res.write(`data: ${JSON.stringify({ type: 'error', message: 'Stream error' })}\n\n`);
         }
       }, 2000); // Send data every 2 seconds
@@ -106,16 +109,11 @@ class MonitoringController extends BaseController {
       // Handle server errors
       req.on('error', (error) => {
         clearInterval(intervalId);
-        this.logger.error('Live monitoring stream error', error, {
-          ip: req.ip,
-          requestId: req.id
-        });
+        // Error handling moved to centralized manager - context: Live monitoring stream error
       });
 
     } catch (error) {
-      this.logger.error('Error setting up live monitoring stream', error, {
-        requestId: req.id
-      });
+      // Error handling moved to centralized manager - context: Error setting up live monitoring stream
       next(error);
     }
   }
@@ -147,10 +145,7 @@ class MonitoringController extends BaseController {
 
       return ApiResponse.success(res, stats, 'Aggregated statistics fetched successfully');
     } catch (error) {
-      this.logger.error('Error fetching aggregated statistics', error, {
-        query: req.query,
-        requestId: req.id
-      });
+      // Error handling moved to centralized manager - context: Error fetching aggregated statistics
       next(error);
     }
   }
@@ -210,10 +205,7 @@ class MonitoringController extends BaseController {
 
       return ApiResponse.success(res, result, 'Data cleanup completed successfully');
     } catch (error) {
-      this.logger.error('Error performing data cleanup', error, {
-        body: req.body,
-        requestId: req.id
-      });
+      // Error handling moved to centralized manager - context: Error performing data cleanup
       next(error);
     }
   }

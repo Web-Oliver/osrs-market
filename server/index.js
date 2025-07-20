@@ -362,13 +362,13 @@ app.use(errorHandler.globalErrorHandler());
 let scraperService = null;
 
 // Initialize scraper service
-app.get('/api/scraper/status', async (req, res) => {
+app.get('/api/scraper/status', async(req, res) => {
   try {
     if (!scraperService) {
       const { OSRSDataScraperService } = require('./services/OSRSDataScraperService');
       scraperService = new OSRSDataScraperService();
     }
-    
+
     const status = scraperService.getStatus();
     res.json(status);
   } catch (error) {
@@ -378,16 +378,16 @@ app.get('/api/scraper/status', async (req, res) => {
 });
 
 // Start scraper for all categories
-app.post('/api/scraper/start', async (req, res) => {
+app.post('/api/scraper/start', async(req, res) => {
   try {
     if (!scraperService) {
       const { OSRSDataScraperService } = require('./services/OSRSDataScraperService');
       scraperService = new OSRSDataScraperService();
     }
-    
+
     console.log('🕷️ Starting full OSRS data scrape...');
     const result = await scraperService.performFullScrape();
-    
+
     console.log(`✅ Scraper completed: ${result.itemsScraped} items collected`);
     res.json(result);
   } catch (error) {
@@ -397,24 +397,24 @@ app.post('/api/scraper/start', async (req, res) => {
 });
 
 // Start scraper for specific category
-app.post('/api/scraper/start/:category', async (req, res) => {
+app.post('/api/scraper/start/:category', async(req, res) => {
   try {
     const { category } = req.params;
-    
+
     if (!scraperService) {
       const { OSRSDataScraperService } = require('./services/OSRSDataScraperService');
       scraperService = new OSRSDataScraperService();
     }
-    
+
     console.log(`🕷️ Starting scraper for category: ${category}`);
-    
+
     // For individual categories, we'll trigger a full scrape
     // since the scraper is designed to collect all 4 categories
     const result = await scraperService.performFullScrape();
-    
+
     console.log(`✅ Scraper completed: ${result.itemsScraped} items collected`);
-    res.json({ 
-      category, 
+    res.json({
+      category,
       ...result,
       message: `Scraper completed for all categories including ${category}`
     });
@@ -492,11 +492,11 @@ process.on('SIGINT', async() => {
 // Context7 Pattern: Enhanced error handling with operational error detection
 process.on('uncaughtException', (error) => {
   console.error('❌ Uncaught Exception:', error);
-  
+
   // Context7 Pattern: Check if error is operational
   const isOperational = error.isOperational === true;
   const logLevel = isOperational ? 'warn' : 'error';
-  
+
   console[logLevel](`${isOperational ? '⚠️ Operational' : '💥 Programming'} error detected:`, {
     message: error.message,
     stack: error.stack,
@@ -512,7 +512,7 @@ process.on('uncaughtException', (error) => {
 
 process.on('unhandledRejection', (reason, promise) => {
   console.error('🔄 Unhandled Promise Rejection at:', promise, 'reason:', reason);
-  
+
   // Context7 Pattern: Re-throw to be caught by uncaughtException handler
   throw reason;
 });

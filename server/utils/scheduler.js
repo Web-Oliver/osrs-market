@@ -15,6 +15,7 @@
 const { Logger } = require('./Logger');
 const { DataCollectionService } = require('../services/DataCollectionService');
 
+
 const logger = new Logger('Scheduler');
 
 // Store interval IDs for cleanup

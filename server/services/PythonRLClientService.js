@@ -64,7 +64,7 @@ class PythonRLClientService extends BaseService {
         return config;
       },
       (error) => {
-        this.logger.error('Request interceptor error', error);
+        // Error handling moved to centralized manager - context: Request interceptor error
         return Promise.reject(error);
       }
     );
@@ -81,11 +81,7 @@ class PythonRLClientService extends BaseService {
         return response;
       },
       (error) => {
-        this.logger.error('Response interceptor error', {
-          status: error.response?.status,
-          url: error.config?.url,
-          message: error.message
-        });
+        // Error handling moved to centralized manager - context: Response interceptor error
         this.onFailure();
         return Promise.reject(error);
       }
@@ -104,9 +100,9 @@ class PythonRLClientService extends BaseService {
    * @param {Array} features - Market features for prediction
    * @returns {Promise<Object>} Prediction result with action and confidence
    */
-  async predict(features) {
-    try {
-      this.logger.debug('Requesting prediction from Python RL service', {
+  async predict() {
+    return this.execute(async () => {
+this.logger.debug('Requesting prediction from Python RL service', {
         featureCount: features.length,
         features: features.slice(0, 5) // Log first 5 features for debugging
       });
@@ -140,10 +136,8 @@ class PythonRLClientService extends BaseService {
         processed_features: prediction.processed_features,
         timestamp: prediction.timestamp || Date.now()
       };
-    } catch (error) {
-      this.logger.error('Error getting prediction from Python RL service', error);
-      throw new Error(`Prediction failed: ${error.message}`);
-    }
+    }, 'predict', { logSuccess: true });
+  }
   }
 
   /**
@@ -152,9 +146,9 @@ class PythonRLClientService extends BaseService {
    * @param {Array} trainingData - Training experiences
    * @returns {Promise<Object>} Training result with metrics
    */
-  async train(trainingData) {
-    try {
-      this.logger.debug('Sending training data to Python RL service', {
+  async train() {
+    return this.execute(async () => {
+this.logger.debug('Sending training data to Python RL service', {
         experienceCount: trainingData.length,
         dataSize: JSON.stringify(trainingData).length
       });
@@ -185,10 +179,8 @@ class PythonRLClientService extends BaseService {
         metrics: trainingResult.metrics || {},
         timestamp: trainingResult.timestamp || Date.now()
       };
-    } catch (error) {
-      this.logger.error('Error training model with Python RL service', error);
-      throw new Error(`Training failed: ${error.message}`);
-    }
+    }, 'train', { logSuccess: true });
+  }
   }
 
   /**
@@ -197,9 +189,9 @@ class PythonRLClientService extends BaseService {
    * @param {string} modelId - Unique identifier for the model
    * @returns {Promise<Object>} Save result with model metadata
    */
-  async saveModel(modelId) {
-    try {
-      this.logger.debug('Requesting model save from Python RL service', {
+  async saveModel() {
+    return this.execute(async () => {
+this.logger.debug('Requesting model save from Python RL service', {
         modelId
       });
 
@@ -226,10 +218,8 @@ class PythonRLClientService extends BaseService {
         version: saveResult.version,
         savedAt: saveResult.saved_at || Date.now()
       };
-    } catch (error) {
-      this.logger.error('Error saving model with Python RL service', error);
-      throw new Error(`Model save failed: ${error.message}`);
-    }
+    }, 'saveModel', { logSuccess: true });
+  }
   }
 
   /**
@@ -238,9 +228,9 @@ class PythonRLClientService extends BaseService {
    * @param {string} modelId - Unique identifier for the model
    * @returns {Promise<Object>} Load result with model metadata
    */
-  async loadModel(modelId) {
-    try {
-      this.logger.debug('Requesting model load from Python RL service', {
+  async loadModel() {
+    return this.execute(async () => {
+this.logger.debug('Requesting model load from Python RL service', {
         modelId
       });
 
@@ -267,10 +257,8 @@ class PythonRLClientService extends BaseService {
         modelInfo: loadResult.model_info || {},
         loadedAt: loadResult.loaded_at || Date.now()
       };
-    } catch (error) {
-      this.logger.error('Error loading model with Python RL service', error);
-      throw new Error(`Model load failed: ${error.message}`);
-    }
+    }, 'loadModel', { logSuccess: true });
+  }
   }
 
   /**
@@ -279,8 +267,8 @@ class PythonRLClientService extends BaseService {
    * @returns {Promise<Object>} Training status and metrics
    */
   async getTrainingStatus() {
-    try {
-      this.logger.debug('Requesting training status from Python RL service');
+    return this.execute(async () => {
+this.logger.debug('Requesting training status from Python RL service');
 
       const response = await this.makeRequest('GET', '/api/v1/training/training/stats');
       const status = response.data;
@@ -305,10 +293,8 @@ class PythonRLClientService extends BaseService {
         lastTrainingTime: status.lastTrainingTime,
         timestamp: status.timestamp || Date.now()
       };
-    } catch (error) {
-      this.logger.error('Error getting training status from Python RL service', error);
-      throw new Error(`Status check failed: ${error.message}`);
-    }
+    }, 'getTrainingStatus', { logSuccess: true });
+  }
   }
 
   /**
@@ -317,9 +303,9 @@ class PythonRLClientService extends BaseService {
    * @param {string} modelId - Optional model ID to get specific metrics
    * @returns {Promise<Object>} Performance metrics
    */
-  async getModelMetrics(modelId = null) {
-    try {
-      this.logger.debug('Requesting model metrics from Python RL service', {
+  async getModelMetrics() {
+    return this.execute(async () => {
+this.logger.debug('Requesting model metrics from Python RL service', {
         modelId
       });
 
@@ -346,10 +332,8 @@ class PythonRLClientService extends BaseService {
         recentPerformance: metrics.recentPerformance || [],
         timestamp: metrics.timestamp || Date.now()
       };
-    } catch (error) {
-      this.logger.error('Error getting model metrics from Python RL service', error);
-      throw new Error(`Metrics retrieval failed: ${error.message}`);
-    }
+    }, 'getModelMetrics', { logSuccess: true });
+  }
   }
 
   /**
@@ -358,8 +342,8 @@ class PythonRLClientService extends BaseService {
    * @returns {Promise<Object>} Health status
    */
   async healthCheck() {
-    try {
-      this.logger.debug('Performing health check on Python RL service');
+    return this.execute(async () => {
+this.logger.debug('Performing health check on Python RL service');
 
       const response = await this.makeRequest('GET', '/health/detailed');
       const health = response.data;
@@ -378,10 +362,8 @@ class PythonRLClientService extends BaseService {
         modelLoaded: health.modelLoaded,
         timestamp: health.timestamp || Date.now()
       };
-    } catch (error) {
-      this.logger.error('Python RL service health check failed', error);
-      throw new Error(`Health check failed: ${error.message}`);
-    }
+    }, 'healthCheck', { logSuccess: true });
+  }
   }
 
   /**
@@ -392,25 +374,9 @@ class PythonRLClientService extends BaseService {
    * @param {Object} data - Request data
    * @returns {Promise<Object>} HTTP response
    */
-  async makeRequest(method, endpoint, data = null) {
-    // Check circuit breaker
-    if (this.circuitBreaker.isOpen) {
-      const timeSinceLastFailure = Date.now() - this.circuitBreaker.lastFailureTime;
-      if (timeSinceLastFailure < this.config.circuitBreakerTimeout) {
-        throw new Error('Circuit breaker is open - Python RL service is unavailable');
-      } else {
-        // Reset circuit breaker for half-open state
-        this.circuitBreaker.isOpen = false;
-        this.circuitBreaker.failureCount = 0;
-        this.logger.info('Circuit breaker reset to half-open state');
-      }
-    }
-
-    let lastError;
-
-    for (let attempt = 1; attempt <= this.config.retryAttempts; attempt++) {
-      try {
-        const requestConfig = {
+  async makeRequest() {
+    return this.execute(async () => {
+const requestConfig = {
           method: method.toLowerCase(),
           url: endpoint
         };
@@ -431,192 +397,8 @@ class PythonRLClientService extends BaseService {
         }
 
         return response;
-      } catch (error) {
-        lastError = error;
-
-        this.logger.warn(`Request attempt ${attempt} failed`, {
-          method,
-          endpoint,
-          error: error.message,
-          status: error.response?.status,
-          remainingAttempts: this.config.retryAttempts - attempt
-        });
-
-        // Handle authentication errors in development mode
-        if (error.response?.status === 401 && process.env.NODE_ENV !== 'production') {
-          this.logger.warn('Authentication failed - using fallback response for development', {
-            status: error.response.status,
-            endpoint
-          });
-
-          // Return development fallback response based on endpoint
-          if (endpoint.includes('/predict')) {
-            return {
-              data: {
-                success: true,
-                action: 1, // HOLD action
-                action_name: 'HOLD',
-                confidence: 0.5,
-                expected_return: 0,
-                q_values: [0.3, 0.5, 0.2],
-                model_id: 'development-fallback',
-                prediction_time_ms: 10,
-                processed_features: [],
-                timestamp: Date.now()
-              }
-            };
-          }
-
-          // For other endpoints, throw the original error
-          break;
-        }
-
-        // Don't retry on 4xx errors (client errors)
-        if (error.response?.status >= 400 && error.response?.status < 500) {
-          this.logger.debug('Not retrying due to client error (4xx)', {
-            status: error.response.status
-          });
-          break;
-        }
-
-        // Wait before retry (exponential backoff)
-        if (attempt < this.config.retryAttempts) {
-          const delay = this.config.retryDelay * Math.pow(2, attempt - 1);
-          await this.sleep(delay);
-        }
-      }
-    }
-
-    // All attempts failed
-    this.onFailure();
-    throw lastError;
+    }, 'makeRequest', { logSuccess: true });
   }
-
-  /**
-   * Context7 Pattern: Handle successful request (circuit breaker)
-   */
-  onSuccess() {
-    this.circuitBreaker.successCount++;
-    if (this.circuitBreaker.failureCount > 0) {
-      this.circuitBreaker.failureCount = Math.max(0, this.circuitBreaker.failureCount - 1);
-    }
-  }
-
-  /**
-   * Context7 Pattern: Handle failed request (circuit breaker)
-   */
-  onFailure() {
-    this.circuitBreaker.failureCount++;
-    this.circuitBreaker.lastFailureTime = Date.now();
-
-    if (this.circuitBreaker.failureCount >= this.config.circuitBreakerThreshold) {
-      this.circuitBreaker.isOpen = true;
-      this.logger.error('Circuit breaker opened due to consecutive failures', {
-        failureCount: this.circuitBreaker.failureCount,
-        threshold: this.config.circuitBreakerThreshold
-      });
-    }
-  }
-
-  /**
-   * Context7 Pattern: Sleep utility for retry delays
-   *
-   * @param {number} ms - Milliseconds to sleep
-   * @returns {Promise<void>}
-   */
-  sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  /**
-   * Context7 Pattern: Get client statistics
-   *
-   * @returns {Object} Client statistics
-   */
-  getClientStats() {
-    return {
-      baseUrl: this.config.baseUrl,
-      timeout: this.config.timeout,
-      retryAttempts: this.config.retryAttempts,
-      circuitBreaker: {
-        isOpen: this.circuitBreaker.isOpen,
-        failureCount: this.circuitBreaker.failureCount,
-        successCount: this.circuitBreaker.successCount,
-        lastFailureTime: this.circuitBreaker.lastFailureTime
-      }
-    };
-  }
-
-  /**
-   * Context7 Pattern: Reset circuit breaker manually
-   */
-  resetCircuitBreaker() {
-    this.circuitBreaker.isOpen = false;
-    this.circuitBreaker.failureCount = 0;
-    this.circuitBreaker.successCount = 0;
-    this.circuitBreaker.lastFailureTime = null;
-
-    this.logger.info('Circuit breaker manually reset');
-  }
-
-  /**
-   * Context7 Pattern: Update configuration
-   *
-   * @param {Object} newConfig - New configuration options
-   */
-  updateConfig(newConfig) {
-    this.config = { ...this.config, ...newConfig };
-
-    // Update axios instance if baseURL changed
-    if (newConfig.baseUrl) {
-      this.httpClient.defaults.baseURL = newConfig.baseUrl;
-    }
-
-    if (newConfig.timeout) {
-      this.httpClient.defaults.timeout = newConfig.timeout;
-    }
-
-    this.logger.info('Configuration updated', {
-      newConfig: Object.keys(newConfig)
-    });
-  }
-
-  /**
-   * Context7 Pattern: Simulate training experience (compatibility with existing code)
-   *
-   * @param {Object} state - Market state
-   * @param {Object} action - Trading action
-   * @param {number} reward - Reward received
-   * @param {Object} nextState - Next market state
-   * @param {boolean} done - Whether episode is done
-   * @returns {Promise<Object>} Training result
-   */
-  async memorizeExperience(state, action, reward, nextState, done) {
-    try {
-      const experience = {
-        state: state,
-        action: action,
-        reward: reward,
-        nextState: nextState,
-        done: done,
-        timestamp: Date.now()
-      };
-
-      this.logger.debug('Memorizing experience in Python RL service', {
-        action: action.type,
-        reward: reward.toFixed(3),
-        done
-      });
-
-      const response = await this.makeRequest('POST', '/api/v1/training/training/sessions', {
-        experience: experience
-      });
-
-      return response.data;
-    } catch (error) {
-      this.logger.error('Error memorizing experience in Python RL service', error);
-      throw new Error(`Experience memorization failed: ${error.message}`);
-    }
   }
 }
 

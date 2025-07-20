@@ -33,7 +33,7 @@ class IItemRepository {
    * @throws {Error} If operation fails
    */
   async findById(itemId, options = {}) {
-    // eslint-disable-next-line no-unused-vars
+
     throw new Error('IItemRepository.findById must be implemented');
   }
 
@@ -47,7 +47,7 @@ class IItemRepository {
    * @throws {Error} If operation fails
    */
   async findByIds(itemIds, options = {}) {
-    // eslint-disable-next-line no-unused-vars
+
     throw new Error('IItemRepository.findByIds must be implemented');
   }
 
@@ -59,7 +59,7 @@ class IItemRepository {
    * @throws {Error} If operation fails
    */
   async search(criteria, pagination = {}) {
-    // eslint-disable-next-line no-unused-vars
+
     throw new Error('IItemRepository.search must be implemented');
   }
 
@@ -74,7 +74,7 @@ class IItemRepository {
    * @throws {Error} If operation fails
    */
   async searchByName(searchTerm, options = {}) {
-    // eslint-disable-next-line no-unused-vars
+
     throw new Error('IItemRepository.searchByName must be implemented');
   }
 
@@ -88,7 +88,7 @@ class IItemRepository {
    * @throws {Error} If operation fails
    */
   async getHighValueItems(options = {}) {
-    // eslint-disable-next-line no-unused-vars
+
     throw new Error('IItemRepository.getHighValueItems must be implemented');
   }
 
@@ -99,7 +99,7 @@ class IItemRepository {
    * @throws {Error} If operation fails
    */
   async getItemsRequiringSync(maxAge = 24 * 60 * 60 * 1000) {
-    // eslint-disable-next-line no-unused-vars
+
     throw new Error('IItemRepository.getItemsRequiringSync must be implemented');
   }
 
@@ -114,7 +114,7 @@ class IItemRepository {
    * @throws {Error} If operation fails
    */
   async getItemsByCategory(category, options = {}) {
-    // eslint-disable-next-line no-unused-vars
+
     throw new Error('IItemRepository.getItemsByCategory must be implemented');
   }
 
@@ -130,7 +130,7 @@ class IItemRepository {
    * @throws {Error} If operation fails
    */
   async getPaginatedItems(pagination, filters = {}) {
-    // eslint-disable-next-line no-unused-vars
+
     throw new Error('IItemRepository.getPaginatedItems must be implemented');
   }
 
@@ -141,7 +141,7 @@ class IItemRepository {
    * @throws {Error} If operation fails
    */
   async save(item) {
-    // eslint-disable-next-line no-unused-vars
+
     throw new Error('IItemRepository.save must be implemented');
   }
 
@@ -155,7 +155,7 @@ class IItemRepository {
    * @throws {Error} If operation fails
    */
   async saveMany(items, options = {}) {
-    // eslint-disable-next-line no-unused-vars
+
     throw new Error('IItemRepository.saveMany must be implemented');
   }
 
@@ -166,7 +166,7 @@ class IItemRepository {
    * @throws {Error} If operation fails
    */
   async delete(itemId) {
-    // eslint-disable-next-line no-unused-vars
+
     throw new Error('IItemRepository.delete must be implemented');
   }
 
@@ -177,7 +177,7 @@ class IItemRepository {
    * @throws {Error} If operation fails
    */
   async hardDelete(itemId) {
-    // eslint-disable-next-line no-unused-vars
+
     throw new Error('IItemRepository.hardDelete must be implemented');
   }
 
@@ -188,7 +188,7 @@ class IItemRepository {
    * @throws {Error} If operation fails
    */
   async markItemsAsSynced(itemIds) {
-    // eslint-disable-next-line no-unused-vars
+
     throw new Error('IItemRepository.markItemsAsSynced must be implemented');
   }
 
@@ -208,7 +208,7 @@ class IItemRepository {
    * @throws {Error} If operation fails
    */
   async count(criteria = {}) {
-    // eslint-disable-next-line no-unused-vars
+
     throw new Error('IItemRepository.count must be implemented');
   }
 
@@ -219,7 +219,7 @@ class IItemRepository {
    * @throws {Error} If operation fails
    */
   async exists(itemId) {
-    // eslint-disable-next-line no-unused-vars
+
     throw new Error('IItemRepository.exists must be implemented');
   }
 
@@ -230,7 +230,7 @@ class IItemRepository {
    * @throws {Error} If operation fails
    */
   async transaction(operation) {
-    // eslint-disable-next-line no-unused-vars
+
     throw new Error('IItemRepository.transaction must be implemented');
   }
 
@@ -268,7 +268,7 @@ class IItemRepository {
    * @throws {Error} If operation fails
    */
   async backup(destination) {
-    // eslint-disable-next-line no-unused-vars
+
     throw new Error('IItemRepository.backup must be implemented');
   }
 
@@ -281,7 +281,7 @@ class IItemRepository {
    * @throws {Error} If operation fails
    */
   async restore(source, options = {}) {
-    // eslint-disable-next-line no-unused-vars
+
     throw new Error('IItemRepository.restore must be implemented');
   }
 }

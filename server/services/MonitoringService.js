@@ -28,9 +28,9 @@ class MonitoringService extends BaseService {
   /**
    * Context7 Pattern: Get live monitoring data with caching
    */
-  async getLiveMonitoringData(limit = 50) {
-    try {
-      this.logger.debug('Fetching live monitoring data', { limit });
+  async getLiveMonitoringData() {
+    return this.execute(async () => {
+this.logger.debug('Fetching live monitoring data', { limit });
 
       const cacheKey = `live_data_${limit}`;
       const cachedData = this.cache.get(cacheKey);
@@ -58,18 +58,15 @@ class MonitoringService extends BaseService {
       });
 
       return transformedData;
-    } catch (error) {
-      this.logger.error('Error fetching live monitoring data', error);
-      throw error;
-    }
+    }, 'getLiveMonitoringData', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Save live monitoring data with validation
    */
-  async saveLiveMonitoringData(data) {
-    try {
-      this.logger.debug('Saving live monitoring data', {
+  async saveLiveMonitoringData() {
+    return this.execute(async () => {
+this.logger.debug('Saving live monitoring data', {
         keys: Object.keys(data),
         timestamp: data.timestamp
       });
@@ -92,18 +89,15 @@ class MonitoringService extends BaseService {
       } else {
         throw new Error('Database connection unavailable - cannot save monitoring data');
       }
-    } catch (error) {
-      this.logger.error('Error saving live monitoring data', error, { data });
-      throw error;
-    }
+    }, 'saveLiveMonitoringData', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get aggregated statistics with caching
    */
-  async getAggregatedStats(timeRange = 3600000) {
-    try {
-      this.logger.debug('Fetching aggregated statistics', { timeRange });
+  async getAggregatedStats() {
+    return this.execute(async () => {
+this.logger.debug('Fetching aggregated statistics', { timeRange });
 
       const cacheKey = `aggregated_stats_${timeRange}`;
       const cachedStats = this.cache.get(cacheKey);
@@ -131,18 +125,15 @@ class MonitoringService extends BaseService {
       });
 
       return enhancedStats;
-    } catch (error) {
-      this.logger.error('Error fetching aggregated statistics', error, { timeRange });
-      throw error;
-    }
+    }, 'getAggregatedStats', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get comprehensive system status
    */
   async getSystemStatus() {
-    try {
-      this.logger.debug('Fetching system status');
+    return this.execute(async () => {
+this.logger.debug('Fetching system status');
 
       const [dbSummary, healthCheck] = await Promise.all([
         this.getDatabaseSummary(),
@@ -204,18 +195,15 @@ class MonitoringService extends BaseService {
       });
 
       return systemStatus;
-    } catch (error) {
-      this.logger.error('Error fetching system status', error);
-      throw error;
-    }
+    }, 'getSystemStatus', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get efficiency metrics
    */
   async getEfficiencyMetrics() {
-    try {
-      this.logger.debug('Fetching efficiency metrics');
+    return this.execute(async () => {
+this.logger.debug('Fetching efficiency metrics');
 
       const metrics = {
         smartSelection: {
@@ -248,18 +236,15 @@ class MonitoringService extends BaseService {
 
       this.logger.debug('Successfully fetched efficiency metrics');
       return metrics;
-    } catch (error) {
-      this.logger.error('Error fetching efficiency metrics', error);
-      throw error;
-    }
+    }, 'getEfficiencyMetrics', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get health status with robust error handling
    */
   async getHealthStatus() {
-    try {
-      this.logger.debug('Performing health check');
+    return this.execute(async () => {
+this.logger.debug('Performing health check');
 
       // Check if MongoDB service is initialized
       if (!this.mongoService) {
@@ -282,14 +267,12 @@ class MonitoringService extends BaseService {
               total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024)
             }
           };
-        } catch (mongoError) {
-          this.logger.warn('MongoDB health check failed', mongoError);
+        } catch (error) {
+          this.logger.error('Error getting MongoDB health check', { error: error.message });
           return {
-            status: 'degraded',
+            status: 'unhealthy',
             mongodb: false,
-            database: 'osrs_market_data',
-            collections: [],
-            error: mongoError.message,
+            error: error.message,
             timestamp: Date.now(),
             uptime: process.uptime(),
             memory: {
@@ -302,9 +285,7 @@ class MonitoringService extends BaseService {
         return {
           status: 'unhealthy',
           mongodb: false,
-          database: 'osrs_market_data',
-          collections: [],
-          error: 'MongoDB service failed to initialize',
+          error: 'MongoDB service not initialized',
           timestamp: Date.now(),
           uptime: process.uptime(),
           memory: {
@@ -313,51 +294,7 @@ class MonitoringService extends BaseService {
           }
         };
       }
-    } catch (error) {
-      this.logger.error('Error performing health check', error);
-      return {
-        status: 'unhealthy',
-        mongodb: false,
-        error: error.message,
-        timestamp: Date.now(),
-        uptime: process.uptime(),
-        memory: {
-          used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-          total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024)
-        }
-      };
-    }
-  }
-
-  /**
-   * Context7 Pattern: Perform data cleanup
-   */
-  async performDataCleanup(maxAge = 7 * 24 * 60 * 60 * 1000) {
-    try {
-      this.logger.info('Starting data cleanup', { maxAge });
-
-      if (this.mongoService) {
-        const result = await this.mongoService.cleanupOldData(maxAge);
-
-        // Context7 Pattern: Invalidate cache after cleanup
-        this.cache.clear();
-
-        this.logger.info('Data cleanup completed successfully', result);
-        return result;
-      } else {
-        this.logger.warn('MongoDB unavailable, simulating cleanup operation');
-        return {
-          marketDataDeleted: 0,
-          tradeOutcomesDeleted: 0,
-          trainingMetricsDeleted: 0,
-          collectionStatsDeleted: 0,
-          liveMonitoringDeleted: 0
-        };
-      }
-    } catch (error) {
-      this.logger.error('Error performing data cleanup', error, { maxAge });
-      throw error;
-    }
+    }, 'getHealthStatus', { logSuccess: true });
   }
 
   // Context7 Pattern: Private helper methods for data transformation
@@ -382,7 +319,7 @@ class MonitoringService extends BaseService {
         };
       }
     } catch (error) {
-      this.logger.error('Error fetching database summary', error);
+      // Error handling moved to centralized manager - context: Error fetching database summary
       return {
         marketDataCount: 0,
         tradeOutcomesCount: 0,

@@ -13,8 +13,11 @@ const { AutoTrainingService } = require('../services/AutoTrainingService');
 const { AutoTrainingValidator } = require('../validators/AutoTrainingValidator');
 
 class AutoTrainingController extends BaseController {
-  constructor() {
+  constructor(dependencies = {}) {
     super('AutoTrainingController');
+    
+    // SOLID: Dependency Injection (DIP) - Eliminates direct dependency violation
+    this.autoTrainingService = dependencies.autoTrainingService || new AutoTrainingService();
     this.trainingServices = new Map(); // userId -> AutoTrainingService
     this.logger.info('🔄 Auto Training Controller initialized');
   }
@@ -23,9 +26,9 @@ class AutoTrainingController extends BaseController {
    * Context7 Pattern: Start auto training service
    */
   startAutoTraining = this.createPostEndpoint(
-    async (trainingData) => {
+    async(trainingData) => {
       const { userId, config } = trainingData;
-      
+
       // Check if service already running for user
       if (this.trainingServices.has(userId)) {
         const existingService = this.trainingServices.get(userId);
@@ -63,9 +66,9 @@ class AutoTrainingController extends BaseController {
    * Context7 Pattern: Stop auto training service
    */
   stopAutoTraining = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       const { userId } = params;
-      
+
       const service = this.trainingServices.get(userId);
       if (!service) {
         const error = new Error('No auto training service found for this user');
@@ -95,9 +98,9 @@ class AutoTrainingController extends BaseController {
    * Context7 Pattern: Get auto training status
    */
   getAutoTrainingStatus = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       const { userId } = params;
-      
+
       const service = this.trainingServices.get(userId);
       if (!service) {
         return {
@@ -126,9 +129,9 @@ class AutoTrainingController extends BaseController {
    * Context7 Pattern: Update auto training configuration
    */
   updateAutoTrainingConfig = this.createPostEndpoint(
-    async (configData) => {
+    async(configData) => {
       const { userId, config } = configData;
-      
+
       const service = this.trainingServices.get(userId);
       if (!service) {
         const error = new Error('No auto training service found for this user');
@@ -158,9 +161,9 @@ class AutoTrainingController extends BaseController {
    * Context7 Pattern: Manually trigger training cycle
    */
   triggerTrainingCycle = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       const { userId } = params;
-      
+
       const service = this.trainingServices.get(userId);
       if (!service) {
         const error = new Error('No auto training service found for this user');
@@ -189,9 +192,9 @@ class AutoTrainingController extends BaseController {
    * Context7 Pattern: Export full training report
    */
   exportTrainingReport = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       const { userId } = params;
-      
+
       const service = this.trainingServices.get(userId);
       if (!service) {
         const error = new Error('No auto training service found for this user');
@@ -219,9 +222,9 @@ class AutoTrainingController extends BaseController {
    * Context7 Pattern: Save AI model
    */
   saveModel = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       const { userId } = params;
-      
+
       const service = this.trainingServices.get(userId);
       if (!service) {
         const error = new Error('No auto training service found for this user');
@@ -255,9 +258,9 @@ class AutoTrainingController extends BaseController {
    * Context7 Pattern: Load AI model
    */
   loadModel = this.createPostEndpoint(
-    async (loadData) => {
+    async(loadData) => {
       const { userId, modelData } = loadData;
-      
+
       const service = this.trainingServices.get(userId);
       if (!service) {
         const error = new Error('No auto training service found for this user');
@@ -277,11 +280,11 @@ class AutoTrainingController extends BaseController {
       operationName: 'load AI model',
       parseBody: (req) => {
         const { modelData } = req.body;
-        
+
         if (!modelData) {
           throw new Error('Model data is required');
         }
-        
+
         return {
           userId: req.user?.userId || 'default',
           modelData
@@ -294,9 +297,9 @@ class AutoTrainingController extends BaseController {
    * Context7 Pattern: Get historical data
    */
   getHistoricalData = this.createTimeBasedEndpoint(
-    async (params) => {
+    async(params) => {
       const { userId, itemId, timeRange } = params;
-      
+
       const service = this.trainingServices.get(userId);
       if (!service) {
         const error = new Error('No auto training service found for this user');
@@ -325,9 +328,9 @@ class AutoTrainingController extends BaseController {
    * Context7 Pattern: Get item timeseries
    */
   getItemTimeseries = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       const { userId, itemId } = params;
-      
+
       const service = this.trainingServices.get(userId);
       if (!service) {
         const error = new Error('No auto training service found for this user');
@@ -347,11 +350,11 @@ class AutoTrainingController extends BaseController {
       operationName: 'get item timeseries',
       parseParams: (req) => {
         const { itemId } = req.params;
-        
+
         if (!itemId) {
           throw new Error('Item ID is required');
         }
-        
+
         return {
           userId: req.user?.userId || 'default',
           itemId
@@ -364,7 +367,7 @@ class AutoTrainingController extends BaseController {
    * Context7 Pattern: Get all active training services
    */
   getActiveServices = this.createGetEndpoint(
-    async () => {
+    async() => {
       const activeServices = [];
 
       for (const [userId, service] of this.trainingServices.entries()) {
@@ -391,7 +394,7 @@ class AutoTrainingController extends BaseController {
    * Context7 Pattern: Get system health
    */
   getSystemHealth = this.createGetEndpoint(
-    async () => {
+    async() => {
       const totalServices = this.trainingServices.size;
       const runningServices = Array.from(this.trainingServices.values())
         .filter(service => service.isRunning).length;

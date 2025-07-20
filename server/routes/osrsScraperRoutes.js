@@ -9,12 +9,13 @@
  */
 
 const express = require('express');
-const { OSRSScraperController } = require('../controllers/OSRSScraperController');
+const { getControllerFactory } = require('../factories/ControllerFactory');
 const { RequestMiddleware } = require('../middleware/RequestMiddleware');
 const { ErrorMiddleware } = require('../middleware/ErrorMiddleware');
 
 const router = express.Router();
-const scraperController = new OSRSScraperController();
+const controllerFactory = getControllerFactory();
+const scraperController = controllerFactory.createOSRSScraperController();
 const requestMiddleware = new RequestMiddleware();
 const errorMiddleware = new ErrorMiddleware();
 

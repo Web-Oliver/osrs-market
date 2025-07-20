@@ -3,7 +3,7 @@
  *
  * Context7 Pattern: Base class implementing common controller patterns
  * - Single Responsibility: Common controller functionality
- * - Open/Closed: Open for extension, closed for modification  
+ * - Open/Closed: Open for extension, closed for modification
  * - DRY: Eliminates repetitive patterns across all controllers
  * - Standardized error handling and method binding
  * - Consistent logging and response patterns
@@ -14,18 +14,19 @@ const { ApiResponse } = require('../utils/ApiResponse');
 const { EndpointFactory } = require('../utils/EndpointFactory');
 const { ParameterParser } = require('../utils/ParameterParser');
 
+
 class BaseController {
   constructor(controllerName) {
     if (!controllerName) {
       throw new Error('Controller name is required for BaseController');
     }
-    
+
     this.logger = new Logger(controllerName);
     this.controllerName = controllerName;
-    
+
     // Initialize endpoint factory for creating standardized endpoints
     this.endpointFactory = new EndpointFactory(controllerName);
-    
+
     // Automatically bind all methods to preserve 'this' context
     this.bindMethods();
   }
@@ -37,7 +38,7 @@ class BaseController {
   bindMethods() {
     const methods = Object.getOwnPropertyNames(Object.getPrototypeOf(this))
       .filter(method => {
-        return method !== 'constructor' && 
+        return method !== 'constructor' &&
                method !== 'bindMethods' &&
                method !== 'handleError' &&
                method !== 'validateAndExecute' &&
@@ -68,7 +69,7 @@ class BaseController {
       ...context
     };
 
-    this.logger.error(`Error in ${this.controllerName}`, error, errorContext);
+    // Error handling moved to centralized manager - context: operation
 
     // Don't call next() if response already sent
     if (res.headersSent) {
@@ -125,7 +126,7 @@ class BaseController {
    * @returns {Function} Wrapped handler with error handling
    */
   asyncHandler(handler) {
-    return async (req, res, next) => {
+    return async(req, res, next) => {
       try {
         await handler(req, res, next);
       } catch (error) {
@@ -171,7 +172,7 @@ class BaseController {
    */
   createGetEndpoint(serviceMethod, options = {}) {
     return this.endpointFactory.createStandardGetEndpoint(
-      serviceMethod.bind(this), 
+      serviceMethod.bind(this),
       options
     );
   }
@@ -182,7 +183,7 @@ class BaseController {
    */
   createPaginatedEndpoint(serviceMethod, options = {}) {
     return this.endpointFactory.createPaginatedEndpoint(
-      serviceMethod.bind(this), 
+      serviceMethod.bind(this),
       options
     );
   }
@@ -193,7 +194,7 @@ class BaseController {
    */
   createPostEndpoint(serviceMethod, options = {}) {
     return this.endpointFactory.createStandardPostEndpoint(
-      serviceMethod.bind(this), 
+      serviceMethod.bind(this),
       options
     );
   }
@@ -204,7 +205,7 @@ class BaseController {
    */
   createDeleteEndpoint(serviceMethod, options = {}) {
     return this.endpointFactory.createStandardDeleteEndpoint(
-      serviceMethod.bind(this), 
+      serviceMethod.bind(this),
       options
     );
   }

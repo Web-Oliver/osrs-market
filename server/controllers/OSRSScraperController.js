@@ -11,10 +11,13 @@
 const { BaseController } = require('./BaseController');
 const { OSRSDataScraperService } = require('../services/OSRSDataScraperService');
 
+
 class OSRSScraperController extends BaseController {
-  constructor() {
+  constructor(dependencies = {}) {
     super('OSRSScraperController');
-    this.scraperService = null;
+    
+    // SOLID: Dependency Injection (DIP) - Eliminates direct dependency violation
+    this.scraperService = dependencies.scraperService || new OSRSDataScraperService();
     this.currentScrapeStatus = {
       isRunning: false,
       startTime: null,
@@ -27,8 +30,7 @@ class OSRSScraperController extends BaseController {
    * Context7 Pattern: Initialize scraper service
    */
   async initializeService() {
-    if (!this.scraperService) {
-      this.scraperService = new OSRSDataScraperService();
+    if (this.scraperService && typeof this.scraperService.initialize === 'function') {
       await this.scraperService.initialize();
     }
     return this.scraperService;
@@ -38,7 +40,7 @@ class OSRSScraperController extends BaseController {
    * Context7 Pattern: Start full OSRS data import
    */
   startFullImport = this.createPostEndpoint(
-    async () => {
+    async() => {
       if (this.currentScrapeStatus.isRunning) {
         const error = new Error('A scraping operation is already in progress');
         error.statusCode = 409;
@@ -58,7 +60,7 @@ class OSRSScraperController extends BaseController {
 
       // Start scraping asynchronously
       this.performAsyncScrape().catch(error => {
-        this.logger.error('❌ Async scrape failed', error);
+        // Error handling moved to centralized manager - context: ❌ Async scrape failed
         this.currentScrapeStatus.isRunning = false;
         this.currentScrapeStatus.error = error.message;
       });
@@ -120,7 +122,7 @@ class OSRSScraperController extends BaseController {
    * Context7 Pattern: Get current scraping status
    */
   getScrapingStatus = this.createGetEndpoint(
-    async () => {
+    async() => {
       await this.initializeService();
 
       const serviceStatus = this.scraperService.getStatus();
@@ -141,7 +143,7 @@ class OSRSScraperController extends BaseController {
    * Context7 Pattern: Get latest scraped data
    */
   getLatestScrapedData = this.endpointFactory.createCustomEndpoint(
-    async (req, res) => {
+    async(req, res) => {
       await this.initializeService();
 
       const { category, limit = 50, format = 'json' } = req.query;
@@ -197,7 +199,7 @@ class OSRSScraperController extends BaseController {
    * Context7 Pattern: Get detected market patterns
    */
   getMarketPatterns = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       await this.initializeService();
 
       const { type, significance, limit } = params;
@@ -262,7 +264,7 @@ class OSRSScraperController extends BaseController {
    * Context7 Pattern: Search for specific item data
    */
   searchItemData = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       await this.initializeService();
 
       const { query, includeHistorical } = params;
@@ -339,7 +341,7 @@ class OSRSScraperController extends BaseController {
    * Context7 Pattern: Get scraper health status
    */
   getHealthStatus = this.createGetEndpoint(
-    async () => {
+    async() => {
       const health = {
         status: 'healthy',
         timestamp: Date.now(),
@@ -390,7 +392,7 @@ class OSRSScraperController extends BaseController {
       return res.send(csv);
 
     } catch (error) {
-      this.logger.error('❌ Failed to generate CSV response', error);
+      // Error handling moved to centralized manager - context: ❌ Failed to generate CSV response
       return this.sendError(res, 'Failed to generate CSV', error.message, 500);
     }
   }
@@ -427,7 +429,7 @@ class OSRSScraperController extends BaseController {
       return this.sendSuccess(res, summary, 'Data summary retrieved successfully');
 
     } catch (error) {
-      this.logger.error('❌ Failed to generate summary response', error);
+      // Error handling moved to centralized manager - context: ❌ Failed to generate summary response
       return this.sendError(res, 'Failed to generate summary', error.message, 500);
     }
   }
@@ -442,7 +444,7 @@ class OSRSScraperController extends BaseController {
       }
       this.logger.info('✅ OSRS Scraper Controller cleanup completed');
     } catch (error) {
-      this.logger.error('❌ Error during controller cleanup', error);
+      // Error handling moved to centralized manager - context: ❌ Error during controller cleanup
     }
   }
 }

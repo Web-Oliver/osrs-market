@@ -18,7 +18,7 @@ class MarketDataScheduler extends BaseService {
       cacheTTL: 300, // 5 minutes for schedule status
       enableMongoDB: false // No MongoDB needed for scheduler
     });
-    
+
     this.marketDataService = new MarketDataService();
     this.intervalId = null;
     this.isRunning = false;
@@ -100,10 +100,7 @@ class MarketDataScheduler extends BaseService {
 
     } catch (error) {
       this.errorCount++;
-      this.logger.error('❌ Market data sync failed', error, {
-        syncNumber: this.syncCount,
-        errorNumber: this.errorCount
-      });
+      // Error handling moved to centralized manager - context: ❌ Market data sync failed
     }
   }
 

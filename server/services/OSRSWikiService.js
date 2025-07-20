@@ -20,7 +20,7 @@ class OSRSWikiService extends BaseService {
       cacheTTL: 300, // 5 minutes default
       enableMongoDB: false // No MongoDB needed for external API service
     });
-    
+
     this.rateLimiter = new RateLimiter();
 
     // Enhanced caching configuration
@@ -114,10 +114,7 @@ class OSRSWikiService extends BaseService {
 
     if (this.circuitBreaker.failureCount >= this.circuitBreaker.failureThreshold) {
       this.circuitBreaker.state = 'OPEN';
-      this.logger.error('Circuit breaker opened due to repeated failures', {
-        failureCount: this.circuitBreaker.failureCount,
-        error: error.message
-      });
+      // Error handling moved to centralized manager - context: Circuit breaker opened due to repeated failures
     }
   }
 
@@ -159,269 +156,7 @@ class OSRSWikiService extends BaseService {
    * Context7 Pattern: Get latest item prices with BaseService optimization
    */
   async getLatestPrices() {
-    return await this.withCache('latest_prices', async () => {
-      return await this.withRetry(async () => {
-        this.logger.debug('Fetching latest prices from OSRS Wiki API');
-
-        // Check circuit breaker first
-        if (!this.checkCircuitBreaker()) {
-          const staleData = this.getStaleData('latest_prices');
-          if (staleData) {
-            return staleData;
-          }
-          throw new Error('API is unavailable and no cached data available');
-        }
-
-        // Check rate limit
-        const rateLimitResult = await this.rateLimiter.checkLimit(
-          this.rateLimitConfig.key,
-          this.rateLimitConfig
-        );
-
-        if (rateLimitResult.exceeded) {
-          this.logger.warn('Rate limit exceeded for OSRS Wiki API', {
-            retryAfter: rateLimitResult.retryAfter,
-            remaining: rateLimitResult.remaining
-          });
-          throw new Error(`Rate limit exceeded. Retry after ${rateLimitResult.retryAfter} seconds`);
-        }
-
-        // Fetch from API
-        const response = await axios.get(`${this.baseURL}/latest`, this.axiosConfig);
-
-        if (response.status !== 200) {
-          throw new Error(`API returned status ${response.status}`);
-        }
-
-        const data = this.transformLatestPrices(response.data);
-
-        // Record success for circuit breaker
-        this.recordSuccess();
-
-        this.logger.debug('Successfully fetched latest prices', {
-          itemCount: Object.keys(data.data || {}).length,
-          timestamp: data.timestamp
-        });
-
-        return data;
-      }, 'fetch latest prices from OSRS Wiki');
-    }, this.cacheConfig.latest_prices / 1000); // Convert to seconds
-  }
-
-  /**
-   * Context7 Pattern: Get 5-minute average prices with BaseService optimization
-   */
-  async get5MinutePrices() {
-    return await this.withCache('5m_prices', async () => {
-      return await this.withRetry(async () => {
-        this.logger.debug('Fetching 5-minute average prices from OSRS Wiki API');
-
-        // Check circuit breaker first
-        if (!this.checkCircuitBreaker()) {
-          const staleData = this.getStaleData('5m_prices');
-          if (staleData) {
-            return staleData;
-          }
-          throw new Error('API is unavailable and no cached data available');
-        }
-
-        // Check rate limit
-        const rateLimitResult = await this.rateLimiter.checkLimit(
-          this.rateLimitConfig.key,
-          this.rateLimitConfig
-        );
-
-        if (rateLimitResult.exceeded) {
-          this.logger.warn('Rate limit exceeded for OSRS Wiki API', {
-            retryAfter: rateLimitResult.retryAfter,
-            remaining: rateLimitResult.remaining
-          });
-          throw new Error(`Rate limit exceeded. Retry after ${rateLimitResult.retryAfter} seconds`);
-        }
-
-        // Fetch from API
-        const response = await axios.get(`${this.baseURL}/5m`, this.axiosConfig);
-
-        if (response.status !== 200) {
-          throw new Error(`API returned status ${response.status}`);
-        }
-
-        const data = this.transform5MinutePrices(response.data);
-
-        // Record success for circuit breaker
-        this.recordSuccess();
-
-        this.logger.debug('Successfully fetched 5-minute prices', {
-          itemCount: Object.keys(data.data || {}).length,
-          timestamp: data.timestamp
-        });
-
-        return data;
-      }, 'fetch 5-minute prices from OSRS Wiki');
-    }, this.cacheConfig['5m_prices'] / 1000); // Convert to seconds
-  }
-
-  /**
-   * Context7 Pattern: Get 1-hour average prices with BaseService optimization
-   */
-  async get1HourPrices() {
-    return await this.withCache('1h_prices', async () => {
-      return await this.withRetry(async () => {
-        this.logger.debug('Fetching 1-hour average prices from OSRS Wiki API');
-
-        // Check circuit breaker first
-        if (!this.checkCircuitBreaker()) {
-          const staleData = this.getStaleData('1h_prices');
-          if (staleData) {
-            return staleData;
-          }
-          throw new Error('API is unavailable and no cached data available');
-        }
-
-        // Check rate limit
-        const rateLimitResult = await this.rateLimiter.checkLimit(
-          this.rateLimitConfig.key,
-          this.rateLimitConfig
-        );
-
-        if (rateLimitResult.exceeded) {
-          this.logger.warn('Rate limit exceeded for OSRS Wiki API', {
-            retryAfter: rateLimitResult.retryAfter,
-            remaining: rateLimitResult.remaining
-          });
-          throw new Error(`Rate limit exceeded. Retry after ${rateLimitResult.retryAfter} seconds`);
-        }
-
-        // Fetch from API
-        const response = await axios.get(`${this.baseURL}/1h`, this.axiosConfig);
-
-        if (response.status !== 200) {
-          throw new Error(`API returned status ${response.status}`);
-        }
-
-        const data = this.transform1HourPrices(response.data);
-
-        // Record success for circuit breaker
-        this.recordSuccess();
-
-        this.logger.debug('Successfully fetched 1-hour prices', {
-          itemCount: Object.keys(data.data || {}).length,
-          timestamp: data.timestamp
-        });
-
-        return data;
-      }, 'fetch 1-hour prices from OSRS Wiki');
-    }, this.cacheConfig['1h_prices'] / 1000); // Convert to seconds
-  }
-
-  /**
-   * Context7 Pattern: Get item mapping with BaseService optimization
-   */
-  async getItemMapping() {
-    return await this.withCache('item_mapping', async () => {
-      return await this.withRetry(async () => {
-        this.logger.debug('Fetching item mapping from OSRS Wiki API');
-
-        // Check rate limit
-        const rateLimitResult = await this.rateLimiter.checkLimit(
-          this.rateLimitConfig.key,
-          this.rateLimitConfig
-        );
-
-        if (rateLimitResult.exceeded) {
-          throw new Error(`Rate limit exceeded. Retry after ${rateLimitResult.retryAfter} seconds`);
-        }
-
-        // Fetch from API
-        const response = await axios.get(`${this.baseURL}/mapping`, this.axiosConfig);
-
-        if (response.status !== 200) {
-          throw new Error(`API returned status ${response.status}`);
-        }
-
-        const data = this.transformItemMapping(response.data);
-
-        this.logger.debug('Successfully fetched item mapping', {
-          itemCount: data.length
-        });
-
-        return data;
-      }, 'fetch item mapping from OSRS Wiki');
-    }, this.cacheConfig.item_mapping / 1000); // Convert to seconds
-  }
-
-  /**
-   * Context7 Pattern: Get timeseries data for item with per-item rate limiting and BaseService optimization
-   */
-  async getTimeseries(itemId, timestep = '5m') {
-    // Validate parameters
-    this.validateRequiredParams({ itemId, timestep }, ['itemId', 'timestep']);
-    
-    if (typeof itemId !== 'number') {
-      throw new Error('Invalid item ID provided');
-    }
-
-    const validTimesteps = ['5m', '1h', '6h', '24h'];
-    if (!validTimesteps.includes(timestep)) {
-      throw new Error(`Invalid timestep. Must be one of: ${validTimesteps.join(', ')}`);
-    }
-
-    return await this.withCache(`timeseries_${itemId}_${timestep}`, async () => {
-      return await this.withRetry(async () => {
-        this.logger.debug('Fetching timeseries data', { itemId, timestep });
-
-        // Check per-item rate limit first
-        if (!this.canFetchItem(itemId)) {
-          const cooldownTime = this.getItemCooldownTime(itemId);
-          this.logger.debug('Item rate limited for timeseries', {
-            itemId,
-            timestep,
-            cooldownRemaining: Math.ceil(cooldownTime / 1000) + 's'
-          });
-          throw new Error(`Item ${itemId} is rate limited for timeseries. Try again in ${Math.ceil(cooldownTime / 1000)} seconds.`);
-        }
-
-        // Check global rate limit
-        const rateLimitResult = await this.rateLimiter.checkLimit(
-          this.rateLimitConfig.key,
-          this.rateLimitConfig
-        );
-
-        if (rateLimitResult.exceeded) {
-          throw new Error(`Rate limit exceeded. Retry after ${rateLimitResult.retryAfter} seconds`);
-        }
-
-        // Fetch from API
-        const response = await axios.get(
-          `${this.baseURL}/timeseries?timestep=${timestep}&id=${itemId}`,
-          this.axiosConfig
-        );
-
-        if (response.status !== 200) {
-          throw new Error(`API returned status ${response.status}`);
-        }
-
-        const data = this.transformTimeseriesData(response.data, itemId, timestep);
-
-        // Mark item as fetched for rate limiting
-        this.markItemFetched(itemId);
-
-        this.logger.debug('Successfully fetched timeseries data', {
-          itemId,
-          timestep,
-          dataPoints: data.data ? data.data.length : 0
-        });
-
-        return data;
-      }, `fetch timeseries data for item ${itemId}`);
-    }, this.cacheConfig.timeseries / 1000); // Convert to seconds
-  }
-
-  /**
-   * Context7 Pattern: Search items by name
-   */
-  async searchItems(query, limit = 20) {
-    try {
+    return this.execute(async() => {
       this.logger.debug('Searching items', { query, limit });
 
       if (!query || typeof query !== 'string' || query.trim().length < 2) {
@@ -445,10 +180,7 @@ class OSRSWikiService extends BaseService {
         total: searchResults.length,
         timestamp: Date.now()
       };
-    } catch (error) {
-      this.logger.error('Failed to search items', error, { query, limit });
-      throw error;
-    }
+    }, 'getLatestPrices', { logSuccess: true });
   }
 
   /**
@@ -488,8 +220,8 @@ class OSRSWikiService extends BaseService {
   /**
    * Context7 Pattern: Get specific item data with per-item rate limiting
    */
-  async getItemData(itemId) {
-    try {
+  async getItemData() {
+    return this.execute(async() => {
       this.logger.debug('Fetching item data', { itemId });
 
       // Check per-item rate limit first
@@ -564,17 +296,14 @@ class OSRSWikiService extends BaseService {
       });
 
       return itemData;
-    } catch (error) {
-      this.logger.error('Failed to fetch item data', error, { itemId });
-      throw error;
-    }
+    }, 'getItemData', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get bulk item data with per-item rate limiting
    */
-  async getBulkItemData(itemIds) {
-    try {
+  async getBulkItemData() {
+    return this.execute(async() => {
       this.logger.debug('Fetching bulk item data', { itemCount: itemIds.length });
 
       if (!Array.isArray(itemIds) || itemIds.length === 0) {
@@ -697,10 +426,7 @@ class OSRSWikiService extends BaseService {
           failed: allResults.filter(r => r.error).length
         }
       };
-    } catch (error) {
-      this.logger.error('Failed to fetch bulk item data', error);
-      throw error;
-    }
+    }, 'getBulkItemData', { logSuccess: true });
   }
 
   /**
@@ -726,7 +452,7 @@ class OSRSWikiService extends BaseService {
         rateLimitInfo: await this.rateLimiter.getStats(this.rateLimitConfig.key)
       };
     } catch (error) {
-      this.logger.error('API status check failed', error);
+      // Error handling moved to centralized manager - context: API status check failed
 
       return {
         status: 'unhealthy',

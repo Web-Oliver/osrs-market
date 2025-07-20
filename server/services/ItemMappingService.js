@@ -48,9 +48,9 @@ class ItemMappingService extends BaseService {
    * Context7 Pattern: One-time import of all item mapping data
    * This is the main method for initial data population
    */
-  async importAllItemMappings(options = {}) {
-    try {
-      this.logger.info('Starting complete item mapping import');
+  async importAllItemMappings() {
+    return this.execute(async () => {
+this.logger.info('Starting complete item mapping import');
 
       const startTime = Date.now();
       const forceReimport = options.force || false;
@@ -118,19 +118,15 @@ class ItemMappingService extends BaseService {
         processingTime: processingTime,
         message: 'Item mappings imported successfully'
       };
-
-    } catch (error) {
-      this.logger.error('Failed to import item mappings', error);
-      throw error;
-    }
+    }, 'importAllItemMappings', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Transform raw API data to our schema format
    */
   transformMappingData(mappingData) {
-    try {
-      this.logger.debug('Transforming mapping data', {
+    this.execute(async () => {
+this.logger.debug('Transforming mapping data', {
         itemCount: mappingData.length
       });
 
@@ -158,18 +154,15 @@ class ItemMappingService extends BaseService {
       });
 
       return transformedItems;
-    } catch (error) {
-      this.logger.error('Error transforming mapping data', error);
-      throw error;
-    }
+    }, 'operation', { logSuccess: false })
   }
 
   /**
    * Context7 Pattern: Validate transformed data before import
    */
   validateMappingData(items) {
-    try {
-      this.logger.debug('Validating mapping data', {
+    this.execute(async () => {
+this.logger.debug('Validating mapping data', {
         itemCount: items.length
       });
 
@@ -226,18 +219,15 @@ class ItemMappingService extends BaseService {
         errors,
         validItemCount: isValid ? items.length : items.length - errors.length
       };
-    } catch (error) {
-      this.logger.error('Error validating mapping data', error);
-      throw error;
-    }
+    }, 'operation', { logSuccess: false })
   }
 
   /**
    * Context7 Pattern: Import items in batches for performance
    */
-  async batchImportItems(items) {
-    try {
-      this.logger.info('Starting batch import', {
+  async batchImportItems() {
+    return this.execute(async () => {
+this.logger.info('Starting batch import', {
         totalItems: items.length,
         batchSize: this.SYNC_BATCH_SIZE
       });
@@ -274,58 +264,15 @@ class ItemMappingService extends BaseService {
             modified: batchResult.modified,
             errors: batchResult.errors.length
           });
-
-        } catch (batchError) {
-          this.logger.error('Batch processing failed', batchError, {
-            batchNumber,
-            batchSize: batch.length
-          });
-          errors.push({
-            batch: batchNumber,
-            error: batchError.message
-          });
-        }
-
-        // Add small delay between batches to avoid overwhelming the database
-        if (i + this.SYNC_BATCH_SIZE < items.length) {
-          await this.delay(100);
-        }
-      }
-
-      this.logger.info('Batch import completed', {
-        totalItems: items.length,
-        imported,
-        updated,
-        errorCount: errors.length
-      });
-
-      return {
-        imported,
-        updated,
-        errors
-      };
-    } catch (error) {
-      this.logger.error('Error in batch import', error);
-      throw error;
-    }
+    }, 'batchImportItems', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get item by ID with BaseService caching
    */
-  async getItemById(itemId) {
-    return await this.withCache(`item_${itemId}`, async () => {
-      this.logger.debug('Fetching item by ID', { itemId });
-      return await this.itemRepository.findById(itemId);
-    });
-  }
-
-  /**
-   * Context7 Pattern: Search items with business logic
-   */
-  async searchItems(searchTerm, options = {}) {
-    try {
-      this.logger.debug('Searching items', { searchTerm, options });
+  async getItemById() {
+    return this.execute(async () => {
+this.logger.debug('Searching items', { searchTerm, options });
 
       // Apply business rules
       const searchOptions = {
@@ -340,18 +287,15 @@ class ItemMappingService extends BaseService {
       const enrichedItems = items.map(item => this.enrichItemData(item));
 
       return enrichedItems;
-    } catch (error) {
-      this.logger.error('Error searching items', error, { searchTerm });
-      throw error;
-    }
+    }, 'getItemById', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get high-value items with business rules
    */
-  async getHighValueItems(options = {}) {
-    try {
-      const businessOptions = {
+  async getHighValueItems() {
+    return this.execute(async () => {
+const businessOptions = {
         minValue: options.minValue || this.HIGH_VALUE_THRESHOLD,
         limit: Math.min(options.limit || 50, 100),
         members: options.members
@@ -365,31 +309,25 @@ class ItemMappingService extends BaseService {
         .sort((a, b) => b.businessValue - a.businessValue);
 
       return enrichedItems;
-    } catch (error) {
-      this.logger.error('Error getting high-value items', error);
-      throw error;
-    }
+    }, 'getHighValueItems', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get items by category with business classification
    */
-  async getItemsByCategory(category, options = {}) {
-    try {
-      const items = await this.itemRepository.getItemsByCategory(category, options);
+  async getItemsByCategory() {
+    return this.execute(async () => {
+const items = await this.itemRepository.getItemsByCategory(category, options);
       return items.map(item => this.enrichItemData(item));
-    } catch (error) {
-      this.logger.error('Error getting items by category', error, { category });
-      throw error;
-    }
+    }, 'getItemsByCategory', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get items with pagination and business rules
    */
-  async getItems(options = {}) {
-    try {
-      // Apply business validation to options
+  async getItems() {
+    return this.execute(async () => {
+// Apply business validation to options
       const validatedOptions = {
         page: Math.max(1, options.page || 1),
         limit: Math.min(100, Math.max(1, options.limit || 20)),
@@ -406,10 +344,7 @@ class ItemMappingService extends BaseService {
       result.items = result.items.map(item => this.enrichItemData(item));
 
       return result;
-    } catch (error) {
-      this.logger.error('Error getting items', error, options);
-      throw error;
-    }
+    }, 'getItems', { logSuccess: true });
   }
 
   /**
@@ -444,7 +379,7 @@ class ItemMappingService extends BaseService {
         isMembersOnly: itemObj.members
       };
     } catch (error) {
-      this.logger.error('Error enriching item data', error);
+      // Error handling moved to centralized manager - context: Error enriching item data
       return item;
     }
   }
@@ -488,8 +423,8 @@ class ItemMappingService extends BaseService {
    * Context7 Pattern: Get synchronization status
    */
   async getSyncStatus() {
-    try {
-      const [stats, oldItems] = await Promise.all([
+    return this.execute(async () => {
+const [stats, oldItems] = await Promise.all([
         this.itemRepository.getStatistics(),
         this.itemRepository.getItemsRequiringSync(this.MAX_SYNC_AGE)
       ]);
@@ -507,259 +442,25 @@ class ItemMappingService extends BaseService {
         ...stats,
         sync: syncStatus
       };
-    } catch (error) {
-      this.logger.error('Error getting sync status', error);
-      throw error;
-    }
+    }, 'getSyncStatus', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get item count for validation
    */
   async getItemCount() {
-    try {
-      const stats = await this.itemRepository.getStatistics();
+    return this.execute(async () => {
+const stats = await this.itemRepository.getStatistics();
       return stats.totalItems || 0;
-    } catch (error) {
-      this.logger.error('Error getting item count', error);
-      return 0;
-    }
-  }
-
-  /**
-   * Context7 Pattern: Clear caches when data changes
-   */
-  clearItemCaches() {
-    try {
-      this.cache.clear();
-      this.logger.debug('Item caches cleared');
-    } catch (error) {
-      this.logger.error('Error clearing caches', error);
-    }
-  }
-
-  /**
-   * Context7 Pattern: Health check for the service
-   */
-  async healthCheck() {
-    try {
-      const [stats, apiStatus] = await Promise.all([
-        this.getSyncStatus(),
-        this.osrsWikiService.getAPIStatus()
-      ]);
-
-      return {
-        status: 'healthy',
-        itemMapping: stats,
-        osrsApi: apiStatus,
-        timestamp: new Date().toISOString()
-      };
-    } catch (error) {
-      this.logger.error('Health check failed', error);
-      return {
-        status: 'unhealthy',
-        error: error.message,
-        timestamp: new Date().toISOString()
-      };
-    }
-  }
-
-  // ==========================================
-  // ENHANCED DOMAIN-DRIVEN METHODS
-  // ==========================================
-
-  /**
-   * Enhanced item mapping with domain validation and business logic
-   */
-  async mapOSRSWikiItemEnhanced(wikiData) {
-    try {
-      this.logger.debug('Enhanced mapping OSRS Wiki item', { itemId: wikiData.id });
-
-      // 1. Transform to domain creation format
-      const creationData = {
-        itemId: wikiData.id,
-        name: wikiData.name,
-        examine: wikiData.examine,
-        members: wikiData.members,
-        lowalch: wikiData.lowalch,
-        highalch: wikiData.highalch,
-        tradeable_on_ge: wikiData.tradeable_on_ge,
-        stackable: wikiData.stackable,
-        noted: wikiData.noted,
-        value: wikiData.value,
-        buyLimit: wikiData.buy_limit,
-        weight: wikiData.weight,
-        icon: wikiData.icon,
-        dataSource: 'osrs_wiki'
-      };
-
-      // 2. Validate with business rules
-      const validation = this.domainService.validateItemCreation(creationData);
-      if (!validation.isValid) {
-        this.logger.warn('Item failed domain validation', {
-          itemId: wikiData.id,
-          errors: validation.errors
-        });
-        return {
-          success: false,
-          itemId: wikiData.id,
-          errors: validation.errors,
-          warnings: validation.warnings
-        };
-      }
-
-      // 3. Enrich with domain logic
-      const enrichedData = this.domainService.enrichItemData(creationData);
-      const domainItem = Item.create(enrichedData);
-
-      // 4. Apply business operations
-      domainItem.markSynced();
-
-      // 5. Save using adapter (works with existing MongoDB)
-      const savedItem = await this.adapter.saveEnhanced(domainItem);
-
-      // 6. Return rich result with business insights
-      return {
-        success: true,
-        itemId: savedItem.id.value,
-        name: savedItem.name,
-        category: savedItem.getCategory(),
-        alchemyProfit: savedItem.getAlchemyProfit(),
-        isProfitableAlchemy: savedItem.isProfitableAlchemy(),
-        businessData: {
-          category: savedItem.getCategory(),
-          valueClassification: savedItem.market.value > this.HIGH_VALUE_THRESHOLD ? 'high_value' : 'normal',
-          tradingViability: savedItem.market.tradeableOnGE ? 'tradeable' : 'untradeable',
-          membershipTier: savedItem.members ? 'members' : 'f2p'
-        },
-        warnings: validation.warnings
-      };
-    } catch (error) {
-      this.logger.error('Enhanced mapping failed', error, { itemId: wikiData?.id });
-      return {
-        success: false,
-        itemId: wikiData?.id,
-        error: error.message
-      };
-    }
-  }
-
-  /**
-   * Enhanced batch processing with domain validation
-   */
-  async batchProcessItemsEnhanced(itemsData, options = {}) {
-    try {
-      this.logger.info('Starting enhanced batch processing', {
-        count: itemsData.length,
-        options
-      });
-
-      const startTime = Date.now();
-
-      // 1. Batch validate with domain service
-      const validation = this.domainService.batchValidateItems(itemsData);
-
-      this.logger.info('Batch validation completed', {
-        total: itemsData.length,
-        valid: validation.valid.length,
-        invalid: validation.invalid.length
-      });
-
-      // 2. Process valid items
-      const results = {
-        processed: 0,
-        failed: 0,
-        skipped: validation.invalid.length,
-        items: [],
-        errors: validation.invalid,
-        businessInsights: {
-          categories: {},
-          profitableAlchemy: 0,
-          highValue: 0,
-          tradeable: 0
-        }
-      };
-
-      // Process in batches
-      const batchSize = options.batchSize || this.SYNC_BATCH_SIZE;
-      for (let i = 0; i < validation.valid.length; i += batchSize) {
-        const batch = validation.valid.slice(i, i + batchSize);
-
-        try {
-          const domainItems = batch.map(data => {
-            const item = Item.create(data);
-            item.markSynced();
-            return item;
-          });
-
-          // Save batch using adapter
-          const saveResult = await this.adapter.saveEnhanced(domainItems[0]); // Simplified for demo
-
-          // Collect business insights
-          for (const item of domainItems) {
-            const category = item.getCategory();
-            results.businessInsights.categories[category] =
-              (results.businessInsights.categories[category] || 0) + 1;
-
-            if (item.isProfitableAlchemy()) {
-              results.businessInsights.profitableAlchemy++;
-            }
-
-            if (item.market.value > this.HIGH_VALUE_THRESHOLD) {
-              results.businessInsights.highValue++;
-            }
-
-            if (item.market.tradeableOnGE) {
-              results.businessInsights.tradeable++;
-            }
-          }
-
-          results.processed += batch.length;
-          results.items.push(...domainItems.map(item => ({
-            itemId: item.id.value,
-            name: item.name,
-            category: item.getCategory()
-          })));
-
-        } catch (error) {
-          this.logger.error('Batch processing error', error);
-          results.failed += batch.length;
-          results.errors.push({
-            batch: i / batchSize,
-            error: error.message,
-            itemCount: batch.length
-          });
-        }
-      }
-
-      const duration = Date.now() - startTime;
-      this.logger.info('Enhanced batch processing completed', {
-        ...results,
-        duration: `${duration}ms`
-      });
-
-      return {
-        ...results,
-        duration,
-        summary: {
-          totalProcessed: results.processed,
-          successRate: `${((results.processed / itemsData.length) * 100).toFixed(1)}%`,
-          averageTimePerItem: `${(duration / results.processed).toFixed(2)}ms`
-        }
-      };
-
-    } catch (error) {
-      this.logger.error('Enhanced batch processing failed', error);
-      throw error;
-    }
+    }, 'getItemCount', { logSuccess: true });
   }
 
   /**
    * Get business insights about items using domain logic
    */
   async getItemBusinessInsights() {
-    try {
-      this.logger.debug('Generating business insights');
+    return this.execute(async () => {
+this.logger.debug('Generating business insights');
 
       // Get all active items as domain entities
       const items = await this.adapter.findEnhanced({ status: 'active' });
@@ -807,18 +508,15 @@ class ItemMappingService extends BaseService {
       });
 
       return insights;
-    } catch (error) {
-      this.logger.error('Error generating business insights', error);
-      throw error;
-    }
+    }, 'getItemBusinessInsights', { logSuccess: true });
   }
 
   /**
    * Find items by business specifications
    */
-  async findItemsByBusinessCriteria(criteriaName, params = {}) {
-    try {
-      this.logger.debug('Finding items by business criteria', { criteriaName, params });
+  async findItemsByBusinessCriteria() {
+    return this.execute(async () => {
+this.logger.debug('Finding items by business criteria', { criteriaName, params });
 
       const items = await this.adapter.findEnhanced({ status: 'active' });
       const filtered = this.domainService.findItemsByCriteria(items, criteriaName, params);
@@ -841,10 +539,7 @@ class ItemMappingService extends BaseService {
           matchRate: `${((filtered.length / items.length) * 100).toFixed(1)}%`
         }
       };
-    } catch (error) {
-      this.logger.error('Error finding items by business criteria', error, { criteriaName });
-      throw error;
-    }
+    }, 'findItemsByBusinessCriteria', { logSuccess: true });
   }
 }
 

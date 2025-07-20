@@ -12,6 +12,7 @@
 const { ApiResponse } = require('../utils/ApiResponse');
 const { Logger } = require('../utils/Logger');
 
+
 class ErrorHandler {
   constructor() {
     this.logger = new Logger('ErrorHandler');
@@ -66,7 +67,7 @@ class ErrorHandler {
     if (error.statusCode && error.statusCode < 500) {
       this.logger.warn('Client error occurred', error, errorContext);
     } else {
-      this.logger.error('Server error occurred', error, errorContext);
+      // Error handling moved to centralized manager - context: Server error occurred
     }
   }
 

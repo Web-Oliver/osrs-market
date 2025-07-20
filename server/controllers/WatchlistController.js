@@ -21,9 +21,9 @@ class WatchlistController extends BaseController {
    * GET /api/watchlist?userId=<userId>
    */
   getUserWatchlist = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       const { userId } = params;
-      
+
       if (!userId) {
         const error = new Error('User ID is required');
         error.statusCode = 400;
@@ -45,7 +45,7 @@ class WatchlistController extends BaseController {
    * POST /api/watchlist
    */
   addItemToWatchlist = this.createPostEndpoint(
-    async (itemData) => {
+    async(itemData) => {
       const { userId, itemId, itemName, addedDate, currentPrice, currentMargin } = itemData;
 
       // Check if item already exists in watchlist
@@ -69,11 +69,11 @@ class WatchlistController extends BaseController {
       operationName: 'add item to watchlist',
       parseBody: (req) => {
         const { userId, itemId, itemName, addedDate, currentPrice, currentMargin } = req.body;
-        
+
         if (!userId || !itemId || !itemName) {
           throw new Error('User ID, Item ID, and Item Name are required');
         }
-        
+
         return {
           userId,
           itemId: parseInt(itemId),
@@ -91,7 +91,7 @@ class WatchlistController extends BaseController {
    * DELETE /api/watchlist/:itemId?userId=<userId>
    */
   removeItemFromWatchlist = this.createDeleteEndpoint(
-    async (removeData) => {
+    async(removeData) => {
       const { userId, itemId } = removeData;
 
       // Check if item exists in watchlist
@@ -112,11 +112,11 @@ class WatchlistController extends BaseController {
       parseParams: (req) => {
         const { itemId } = req.params;
         const { userId } = req.query;
-        
+
         if (!userId || !itemId) {
           throw new Error('User ID and Item ID are required');
         }
-        
+
         return {
           userId,
           itemId: parseInt(itemId)
@@ -130,7 +130,7 @@ class WatchlistController extends BaseController {
    * PUT /api/watchlist/:itemId
    */
   updateWatchlistItem = this.createPostEndpoint(
-    async (updateData) => {
+    async(updateData) => {
       const { userId, itemId, currentPrice, currentMargin, notes } = updateData;
 
       // Find the watchlist item
@@ -161,11 +161,11 @@ class WatchlistController extends BaseController {
       parseBody: (req) => {
         const { itemId } = req.params;
         const { userId, currentPrice, currentMargin, notes } = req.body;
-        
+
         if (!userId || !itemId) {
           throw new Error('User ID and Item ID are required');
         }
-        
+
         return {
           userId,
           itemId: parseInt(itemId),
@@ -182,7 +182,7 @@ class WatchlistController extends BaseController {
    * GET /api/watchlist/stats?userId=<userId>
    */
   getWatchlistStats = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       const { userId } = params;
 
       if (!userId) {
@@ -218,7 +218,7 @@ class WatchlistController extends BaseController {
    * GET /api/watchlist/health
    */
   healthCheck = this.createGetEndpoint(
-    async () => {
+    async() => {
       // Test database connection
       const testCount = await WatchlistModel.countDocuments();
 

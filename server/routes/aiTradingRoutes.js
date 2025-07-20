@@ -10,14 +10,15 @@
  */
 
 const express = require('express');
-const { AITradingController } = require('../controllers/AITradingController');
+const { getControllerFactory } = require('../factories/ControllerFactory');
 const { validateRequest } = require('../validators/AITradingValidator');
 const { ErrorMiddleware } = require('../middleware/ErrorMiddleware');
 const { ApiResponse } = require('../utils/ApiResponse');
 const { Logger } = require('../utils/Logger');
 
 const router = express.Router();
-const controller = new AITradingController();
+const controllerFactory = getControllerFactory();
+const controller = controllerFactory.createAITradingController();
 const errorMiddleware = new ErrorMiddleware();
 const logger = new Logger('AITradingRoutes');
 

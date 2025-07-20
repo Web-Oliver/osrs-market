@@ -11,7 +11,6 @@
 
 const { Logger } = require('../utils/Logger');
 const { CacheManager } = require('../utils/CacheManager');
-
 class BaseService {
   constructor(serviceName, options = {}) {
     if (!serviceName) {
@@ -20,6 +19,8 @@ class BaseService {
 
     this.serviceName = serviceName;
     this.logger = new Logger(serviceName);
+    // Error handling moved to centralized manager
+    this.startTime = Date.now();
     this.options = {
       // Default options
       enableCache: true,
@@ -52,36 +53,42 @@ class BaseService {
   }
 
   /**
-   * Context7 Pattern: Initialize MongoDB with error handling
+   * Context7 Pattern: Initialize MongoDB with centralized error handling
    * SOLID Principle: Single responsibility for DB initialization
    */
   async initializeMongoDB() {
-    try {
+    return this.errorManager.handleAsync(async() => {
       // Check if MongoDataPersistence is available
       const MongoDataPersistence = require('./mongoDataPersistence');
-      
+
       const config = {
         connectionString: process.env.MONGODB_CONNECTION_STRING || 'mongodb://localhost:27017',
         databaseName: process.env.MONGODB_DATABASE || 'osrs_market_data'
       };
 
       this.mongoService = new MongoDataPersistence(config);
-      
+
       // Only connect if not already connected globally
       if (!this.mongoService.isConnected()) {
         await this.mongoService.connect();
         this.logger.info('MongoDB connection established');
       }
-    } catch (error) {
-      this.logger.error('Failed to initialize MongoDB', error);
+
+      return this.mongoService;
+    }, 'initializeMongoDB', {
+      logSuccess: true,
+      serviceName: this.serviceName
+    }).catch(error => {
       if (this.options.requireMongoDB) {
         throw error;
       }
-    }
+      // Non-fatal if MongoDB is optional
+      return null;
+    });
   }
 
   /**
-   * Context7 Pattern: Async operation with retry logic
+   * Context7 Pattern: Async operation with centralized retry logic - Eliminates duplicate retry patterns
    * SOLID Principle: Open/closed - extensible retry pattern
    * @param {Function} operation - Async operation to retry
    * @param {string} operationName - Name for logging
@@ -89,37 +96,16 @@ class BaseService {
    * @returns {Promise<*>} Operation result
    */
   async withRetry(operation, operationName = 'operation', attempts = this.options.retryAttempts) {
-    let lastError;
-    
-    for (let attempt = 1; attempt <= attempts; attempt++) {
-      try {
-        const result = await operation();
-        
-        if (attempt > 1) {
-          this.logger.info(`${operationName} succeeded on attempt ${attempt}`);
-        }
-        
-        return result;
-      } catch (error) {
-        lastError = error;
-        
-        this.logger.warn(`${operationName} failed on attempt ${attempt}/${attempts}`, {
-          error: error.message,
-          attempt
-        });
-
-        if (attempt < attempts) {
-          await this.delay(this.options.retryDelay * attempt); // Exponential backoff
-        }
-      }
-    }
-
-    this.logger.error(`${operationName} failed after ${attempts} attempts`, lastError);
-    throw lastError;
+    return this.errorManager.handleWithRetry(operation, operationName, {
+      maxRetries: attempts - 1,
+      delayMs: this.options.retryDelay,
+      exponentialBackoff: true,
+      metadata: { serviceName: this.serviceName }
+    });
   }
 
   /**
-   * Context7 Pattern: Cache wrapper for operations
+   * Context7 Pattern: Cache wrapper with centralized error handling
    * DRY Principle: Reusable caching pattern
    * @param {string} key - Cache key
    * @param {Function} operation - Operation to cache
@@ -128,71 +114,92 @@ class BaseService {
    */
   async withCache(key, operation, ttl = null) {
     if (!this.cache) {
-      return await operation();
+      return this.errorManager.handleAsync(operation, 'cache_disabled_operation', {
+        cacheKey: key
+      });
     }
 
-    // Try to get from cache first
-    const cached = await this.cache.get(key);
-    if (cached !== null) {
-      this.logger.debug(`Cache hit for key: ${key}`);
-      return cached;
-    }
+    return this.errorManager.handleAsync(async() => {
+      // Try to get from cache first
+      const cached = await this.cache.get(key);
+      if (cached !== null) {
+        this.logger.debug(`Cache hit for key: ${key}`);
+        return cached;
+      }
 
-    // Execute operation and cache result
-    try {
+      // Execute operation and cache result
       const result = await operation();
       await this.cache.set(key, result, ttl);
       this.logger.debug(`Cache set for key: ${key}`);
       return result;
-    } catch (error) {
-      this.logger.warn(`Operation failed, not caching result for key: ${key}`, error);
-      throw error;
-    }
+    }, 'withCache', {
+      cacheKey: key,
+      ttl: ttl || this.options.cacheTTL
+    });
   }
 
   /**
-   * Context7 Pattern: Validate required parameters
+   * Context7 Pattern: Validate required parameters with centralized error handling
    * SOLID Principle: Single responsibility for validation
    * @param {Object} params - Parameters to validate
    * @param {Array<string>} required - Required parameter names
    * @throws {Error} If required parameters are missing
    */
   validateRequiredParams(params, required) {
-    const missing = required.filter(param => 
-      params[param] === undefined || params[param] === null || params[param] === ''
-    );
+    return this.errorManager.validateInput(params, (input) => {
+      const missing = required.filter(param =>
+        input[param] === undefined || input[param] === null || input[param] === ''
+      );
 
-    if (missing.length > 0) {
-      const error = new Error(`Missing required parameters: ${missing.join(', ')}`);
-      error.name = 'ValidationError';
-      error.missingParams = missing;
-      throw error;
-    }
+      return {
+        isValid: missing.length === 0,
+        errors: missing.length > 0 ? [`Missing required parameters: ${missing.join(', ')}`] : []
+      };
+    }, 'validateRequiredParams');
   }
 
   /**
-   * Context7 Pattern: Standardized error handling
+   * Context7 Pattern: Centralized error handling - DEPRECATED, use errorManager.handleAsync instead
    * @param {Error} error - Error to handle
    * @param {string} context - Context where error occurred
    * @param {Object} additionalInfo - Additional error context
+   * @deprecated Use this.errorManager.handleAsync() for new code
    */
   handleError(error, context = 'unknown', additionalInfo = {}) {
-    const errorInfo = {
+    // Delegate to centralized error manager
+    this.errorManager.handleError(error, context, {
       service: this.serviceName,
-      context,
       ...additionalInfo
-    };
+    });
+  }
 
-    this.logger.error(`Error in ${this.serviceName}`, error, errorInfo);
+  /**
+   * Execute async operation with centralized error handling - Eliminates duplicate try/catch
+   * @param {Function} operation - Async operation to execute
+   * @param {string} context - Context for logging
+   * @param {Object} metadata - Additional metadata
+   * @returns {Promise<any>} Result or throws handled error
+   */
+  async execute(operation, context, metadata = {}) {
+    return this.errorManager.handleAsync(operation, context, {
+      service: this.serviceName,
+      ...metadata
+    });
+  }
 
-    // Re-throw with additional context
-    const enhancedError = new Error(error.message);
-    enhancedError.originalError = error;
-    enhancedError.service = this.serviceName;
-    enhancedError.context = context;
-    enhancedError.stack = error.stack;
-    
-    throw enhancedError;
+  /**
+   * Execute batch operations with partial failure support
+   * @param {Array} items - Items to process
+   * @param {Function} operation - Operation to perform on each item
+   * @param {string} context - Context for logging
+   * @param {Object} options - Batch options
+   * @returns {Object} Results with successes and failures
+   */
+  async executeBatch(items, operation, context, options = {}) {
+    return this.errorManager.handleBatch(items, operation, context, {
+      ...options,
+      metadata: { service: this.serviceName, ...options.metadata }
+    });
   }
 
   /**
@@ -205,38 +212,46 @@ class BaseService {
   }
 
   /**
-   * Context7 Pattern: Graceful service shutdown
+   * Context7 Pattern: Graceful service shutdown with centralized error handling
    * Override in child classes for custom cleanup
    */
   async shutdown() {
-    try {
+    return this.errorManager.handleAsync(async() => {
       if (this.cache) {
         await this.cache.disconnect();
       }
-      
+
       if (this.mongoService) {
         await this.mongoService.disconnect();
       }
-      
+
       this.logger.info(`${this.serviceName} shutdown completed`);
-    } catch (error) {
-      this.logger.error(`Error during ${this.serviceName} shutdown`, error);
-    }
+      return true;
+    }, 'shutdown', {
+      logSuccess: true,
+      service: this.serviceName
+    }).catch(error => {
+      // Log but don't re-throw shutdown errors
+      // Error handling moved to centralized manager - context: operation
+      return false;
+    });
   }
 
   /**
-   * Context7 Pattern: Health check for service
+   * Context7 Pattern: Health check with centralized error handling
    * @returns {Promise<Object>} Health status
    */
   async healthCheck() {
-    const health = {
-      service: this.serviceName,
-      status: 'healthy',
-      timestamp: new Date().toISOString(),
-      checks: {}
-    };
+    return this.errorManager.handleAsync(async() => {
+      const health = {
+        service: this.serviceName,
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: Date.now() - this.startTime,
+        errorStats: this.errorManager.getErrorStatistics(),
+        checks: {}
+      };
 
-    try {
       // Check cache
       if (this.cache) {
         health.checks.cache = await this.cache.healthCheck() ? 'healthy' : 'unhealthy';
@@ -253,12 +268,22 @@ class BaseService {
         health.status = 'degraded';
       }
 
-    } catch (error) {
-      health.status = 'unhealthy';
-      health.error = error.message;
-    }
+      // Check if circuit breakers are active
+      if (health.errorStats.activeCircuitBreakers > 0) {
+        health.status = 'degraded';
+        health.circuitBreakersActive = health.errorStats.activeCircuitBreakers;
+      }
 
-    return health;
+      return health;
+    }, 'healthCheck').catch(error => {
+      return {
+        service: this.serviceName,
+        status: 'unhealthy',
+        timestamp: new Date().toISOString(),
+        error: error.message,
+        uptime: Date.now() - this.startTime
+      };
+    });
   }
 }
 

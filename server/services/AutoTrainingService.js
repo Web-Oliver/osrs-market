@@ -86,16 +86,8 @@ class AutoTrainingService extends BaseService {
    * Context7 Pattern: Start the automated training service
    */
   async start() {
-    if (this.isRunning) {
-      this.logger.warn('⚠️ Auto training service already running');
-      return;
-    }
-
-    this.logger.info('🚀 Starting automated AI training service...');
-    this.isRunning = true;
-
-    try {
-      // Initialize MongoDB persistence for historical data access
+    return this.execute(async () => {
+// Initialize MongoDB persistence for historical data access
       const mongoConfig = {
         connectionString: process.env.MONGODB_CONNECTION_STRING || 'mongodb://localhost:27017',
         databaseName: process.env.MONGODB_DATABASE || 'osrs_market_data'
@@ -122,23 +114,7 @@ class AutoTrainingService extends BaseService {
         this.trainingIntervalId = setInterval(async() => {
           try {
             await this.performTrainingCycle();
-          } catch (error) {
-            this.logger.error('❌ Error in training cycle', error);
-          }
-        }, this.config.training.trainingInterval);
-      }
-
-      this.logger.info('✅ Auto training service started successfully', {
-        sessionId: this.sessionId,
-        autoTraining: this.config.training.enableAutoTraining,
-        trainingInterval: this.config.training.trainingInterval
-      });
-
-    } catch (error) {
-      this.logger.error('❌ Failed to start auto training service', error);
-      this.isRunning = false;
-      throw error;
-    }
+    }, 'start', { logSuccess: true });
   }
 
   /**
@@ -174,7 +150,7 @@ class AutoTrainingService extends BaseService {
       this.logger.info('✅ Auto training service stopped successfully');
 
     } catch (error) {
-      this.logger.error('❌ Error stopping auto training service', error);
+      // Error handling moved to centralized manager - context: ❌ Error stopping auto training service
     }
   }
 
@@ -182,10 +158,8 @@ class AutoTrainingService extends BaseService {
    * Context7 Pattern: Perform a single training cycle
    */
   async performTrainingCycle() {
-    this.logger.debug('🔄 Performing automated training cycle...');
-
-    try {
-      if (!this.dataCollector || !this.aiOrchestrator) {
+    return this.execute(async () => {
+if (!this.dataCollector || !this.aiOrchestrator) {
         throw new Error('Services not initialized');
       }
 
@@ -228,30 +202,15 @@ class AutoTrainingService extends BaseService {
 
           // Small delay between batches to prevent API rate limiting
           await this.delay(1000);
-        } catch (error) {
-          this.logger.error('❌ Error processing batch', {
-            batchStart: i,
-            batchEnd: i + batchSize,
-            error: error.message
-          });
-        }
-      }
-
-      // Generate training report
-      this.generateTrainingReport();
-
-    } catch (error) {
-      this.logger.error('❌ Training cycle failed', error);
-      throw error;
-    }
+    }, 'performTrainingCycle', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get historical training data from MongoDB
    */
   async getHistoricalTrainingData() {
-    try {
-      if (!this.mongoPersistence) {
+    return this.execute(async () => {
+if (!this.mongoPersistence) {
         throw new Error('MongoDB persistence not initialized');
       }
 
@@ -322,177 +281,7 @@ class AutoTrainingService extends BaseService {
       });
 
       return itemsWithHistory;
-    } catch (error) {
-      this.logger.error('❌ Error fetching historical training data', error);
-      return [];
-    }
-  }
-
-  /**
-   * Context7 Pattern: Select items for training based on filters
-   */
-  selectTrainingItems(items) {
-    if (!this.config.itemSelection.enableSmartFiltering) {
-      return items.slice(0, this.config.itemSelection.maxItemsToTrade);
-    }
-
-    const filtered = items.filter(item => {
-      // Ensure item has sufficient price history for AI training
-      if (!item.priceHistory || item.priceHistory.length < 3) {
-        return false;
-      }
-
-      // Price range filter using latest price data
-      const avgPrice = ((item.priceData?.high || 0) + (item.priceData?.low || 0)) / 2;
-      if (avgPrice < this.config.itemSelection.priceRangeMin) {
-        return false;
-      }
-      if (avgPrice > this.config.itemSelection.priceRangeMax) {
-        return false;
-      }
-
-      // Spread threshold filter
-      const high = item.priceData?.high || 0;
-      const low = item.priceData?.low || 0;
-      if (high === 0 || low === 0) {
-        return false;
-      }
-
-      const spreadPercentage = ((high - low) / low) * 100;
-      if (spreadPercentage < this.config.itemSelection.spreadThreshold) {
-        return false;
-      }
-
-      // Must be tradeable on Grand Exchange
-      if (!item.grandExchange) {
-        return false;
-      }
-
-      return true;
-    });
-
-    // Sort by trading potential (spread percentage desc) and price history quality
-    const sorted = filtered.sort((a, b) => {
-      const spreadA = this.calculateSpread(a);
-      const spreadB = this.calculateSpread(b);
-
-      // Factor in price history quality (more history = better for training)
-      const historyQualityA = a.priceHistory.length;
-      const historyQualityB = b.priceHistory.length;
-
-      // Combined score: spread percentage + history quality bonus
-      const scoreA = spreadA + (historyQualityA * 0.1);
-      const scoreB = spreadB + (historyQualityB * 0.1);
-
-      return scoreB - scoreA;
-    });
-
-    return sorted.slice(0, this.config.itemSelection.maxItemsToTrade);
-  }
-
-  /**
-   * Context7 Pattern: Calculate spread percentage for an item
-   */
-  calculateSpread(item) {
-    const high = item.priceData?.high || 0;
-    const low = item.priceData?.low || 0;
-    if (low === 0) {
-      return 0;
-    }
-    return ((high - low) / low) * 100;
-  }
-
-  /**
-   * Context7 Pattern: Generate training cycle report
-   */
-  generateTrainingReport() {
-    try {
-      const progress = this.aiOrchestrator.getTrainingProgress();
-      const analytics = this.aiOrchestrator.getPerformanceAnalytics();
-      const collectorStats = this.dataCollector.getStats();
-
-      this.logger.info('📊 Training Cycle Report', {
-        dataCollection: {
-          totalCollections: collectorStats.totalCollections,
-          lastCollection: collectorStats.lastCollection
-        },
-        session: progress?.session ? {
-          id: progress.session.id,
-          episodeCount: progress.session.episodeCount,
-          totalTrades: progress.session.totalTrades,
-          totalProfit: progress.session.totalProfit?.toFixed(2) + ' GP'
-        } : null,
-        performance: analytics?.overall ? {
-          successRate: analytics.overall.successRate?.toFixed(1) + '%',
-          averageProfit: analytics.overall.averageProfit?.toFixed(2) + ' GP',
-          profitFactor: analytics.overall.profitFactor?.toFixed(2)
-        } : null
-      });
-
-    } catch (error) {
-      this.logger.error('❌ Error generating training report', error);
-    }
-  }
-
-  /**
-   * Context7 Pattern: Get current service status
-   */
-  getStatus() {
-    const dataCollectorStats = this.dataCollector?.getStats() || {};
-    const trainingProgress = this.aiOrchestrator?.getTrainingProgress() || {};
-    const analytics = this.aiOrchestrator?.getPerformanceAnalytics() || {};
-
-    return {
-      isRunning: this.isRunning,
-      sessionId: this.sessionId,
-      dataCollection: {
-        status: dataCollectorStats.isCollecting ? 'ACTIVE' : 'STOPPED',
-        totalCollections: dataCollectorStats.totalCollections || 0,
-        lastCollection: dataCollectorStats.lastCollection || null,
-        memoryUsage: dataCollectorStats.memoryUsage || 0
-      },
-      training: {
-        session: trainingProgress?.session || null,
-        metrics: trainingProgress?.recentMetrics?.slice(-10) || [],
-        performance: trainingProgress?.performance || null,
-        modelStats: trainingProgress?.modelStats || null
-      },
-      analytics: analytics
-    };
-  }
-
-  /**
-   * Context7 Pattern: Export full training report
-   */
-  async exportFullReport() {
-    try {
-      const status = this.getStatus();
-      const marketMetrics = this.dataCollector?.getMarketMetrics() || {};
-      const trainingData = this.aiOrchestrator?.exportTrainingData() || { outcomes: [], metrics: [] };
-
-      const report = {
-        timestamp: new Date().toISOString(),
-        config: this.config,
-        status,
-        marketMetrics,
-        trainingData: {
-          totalOutcomes: trainingData.outcomes.length,
-          totalMetrics: trainingData.metrics.length,
-          model: 'EXPORTED_SEPARATELY' // Too large for report
-        },
-        systemHealth: {
-          dataQuality: this.assessDataQuality(),
-          trainingEfficiency: this.assessTrainingEfficiency(),
-          recommendations: this.generateRecommendations()
-        }
-      };
-
-      return JSON.stringify(report, null, 2);
-
-    } catch (error) {
-      this.logger.error('❌ Error exporting full report', error);
-      throw error;
-    }
+    }, 'getHistoricalTrainingData', { logSuccess: true });
   }
 
   /**
@@ -587,7 +376,7 @@ class AutoTrainingService extends BaseService {
       }
 
     } catch (error) {
-      this.logger.error('❌ Error generating recommendations', error);
+      // Error handling moved to centralized manager - context: ❌ Error generating recommendations
     }
 
     return recommendations;

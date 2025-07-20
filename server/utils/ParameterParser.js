@@ -73,9 +73,9 @@ class ParameterParser {
     const defaultTimeRange = 24 * 60 * 60 * 1000; // 24 hours
 
     return {
-      startTime: startTime ? this.parseTimestamp(startTime) : 
-                 timeRange ? now - this.parseInteger(timeRange, defaultTimeRange) : 
-                 now - defaultTimeRange,
+      startTime: startTime ? this.parseTimestamp(startTime) :
+        timeRange ? now - this.parseInteger(timeRange, defaultTimeRange) :
+          now - defaultTimeRange,
       endTime: endTime ? this.parseTimestamp(endTime) : now,
       timeRange: timeRange ? this.parseInteger(timeRange, defaultTimeRange) : defaultTimeRange,
       interval: this.parseInterval(interval),
@@ -193,9 +193,13 @@ class ParameterParser {
       return defaultValue;
     }
 
-    if (min !== null && parsed < min) return min;
-    if (max !== null && parsed > max) return max;
-    
+    if (min !== null && parsed < min) {
+      return min;
+    }
+    if (max !== null && parsed > max) {
+      return max;
+    }
+
     return parsed;
   }
 
@@ -209,9 +213,13 @@ class ParameterParser {
       return defaultValue;
     }
 
-    if (min !== null && parsed < min) return min;
-    if (max !== null && parsed > max) return max;
-    
+    if (min !== null && parsed < min) {
+      return min;
+    }
+    if (max !== null && parsed > max) {
+      return max;
+    }
+
     return parsed;
   }
 
@@ -220,7 +228,9 @@ class ParameterParser {
       return defaultValue;
     }
 
-    if (typeof value === 'boolean') return value;
+    if (typeof value === 'boolean') {
+      return value;
+    }
     if (typeof value === 'string') {
       const lowered = value.toLowerCase();
       return lowered === 'true' || lowered === '1' || lowered === 'yes';
@@ -233,40 +243,50 @@ class ParameterParser {
   }
 
   static parseTimestamp(value) {
-    if (!value) return null;
-    
+    if (!value) {
+      return null;
+    }
+
     const parsed = parseInt(value);
-    if (isNaN(parsed)) return null;
-    
+    if (isNaN(parsed)) {
+      return null;
+    }
+
     // Handle both seconds and milliseconds timestamps
     return parsed > 10000000000 ? parsed : parsed * 1000;
   }
 
   static parseIntegerArray(value, separator = ',') {
-    if (!value) return [];
-    
+    if (!value) {
+      return [];
+    }
+
     if (Array.isArray(value)) {
       return value.map(v => this.parseInteger(v)).filter(v => !isNaN(v));
     }
-    
+
     if (typeof value === 'string') {
       return value.split(separator)
         .map(v => this.parseInteger(v.trim()))
         .filter(v => !isNaN(v));
     }
-    
+
     return [];
   }
 
   static parseStringArray(value, separator = ',') {
-    if (!value) return [];
-    
-    if (Array.isArray(value)) return value;
-    
+    if (!value) {
+      return [];
+    }
+
+    if (Array.isArray(value)) {
+      return value;
+    }
+
     if (typeof value === 'string') {
       return value.split(separator).map(v => v.trim()).filter(v => v.length > 0);
     }
-    
+
     return [];
   }
 
@@ -317,9 +337,11 @@ class ParameterParser {
   static createRange(min, max) {
     const parsedMin = min ? this.parseFloat(min) : null;
     const parsedMax = max ? this.parseFloat(max) : null;
-    
-    if (parsedMin === null && parsedMax === null) return undefined;
-    
+
+    if (parsedMin === null && parsedMax === null) {
+      return undefined;
+    }
+
     return {
       min: parsedMin,
       max: parsedMax
@@ -328,7 +350,7 @@ class ParameterParser {
 
   static parseRemainingParams(params) {
     const parsed = {};
-    
+
     for (const [key, value] of Object.entries(params)) {
       // Try to intelligently parse the value
       if (value === 'true' || value === 'false') {
@@ -339,7 +361,7 @@ class ParameterParser {
         parsed[key] = value;
       }
     }
-    
+
     return parsed;
   }
 
@@ -351,30 +373,30 @@ class ParameterParser {
    */
   static validateParsedParams(params, schema) {
     const errors = [];
-    
+
     for (const [field, rules] of Object.entries(schema)) {
       const value = params[field];
-      
+
       if (rules.required && (value === undefined || value === null)) {
         errors.push(`${field} is required`);
         continue;
       }
-      
+
       if (value !== undefined && value !== null) {
         if (rules.min !== undefined && value < rules.min) {
           errors.push(`${field} must be at least ${rules.min}`);
         }
-        
+
         if (rules.max !== undefined && value > rules.max) {
           errors.push(`${field} must be no more than ${rules.max}`);
         }
-        
+
         if (rules.enum && !rules.enum.includes(value)) {
           errors.push(`${field} must be one of: ${rules.enum.join(', ')}`);
         }
       }
     }
-    
+
     return {
       isValid: errors.length === 0,
       errors

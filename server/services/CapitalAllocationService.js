@@ -30,7 +30,7 @@ class CapitalAllocationService extends BaseService {
       cacheTTL: 180, // 3 minutes for allocation decisions
       enableMongoDB: true // Store allocation history
     });
-    
+
     this.metricsCalculator = new FinancialMetricsCalculator();
     this.marketDataService = new MarketDataService();
 
@@ -87,8 +87,8 @@ class CapitalAllocationService extends BaseService {
    * @param {Object} marketConditions - Current market conditions
    * @returns {Object} Capital allocation recommendations
    */
-  async allocateCapital(totalCapital, opportunities, marketConditions = {}) {
-    try {
+  async allocateCapital() {
+    return this.execute(async() => {
       this.logger.debug('Starting capital allocation', {
         totalCapital,
         opportunityCount: opportunities.length,
@@ -174,17 +174,14 @@ class CapitalAllocationService extends BaseService {
       });
 
       return allocation;
-    } catch (error) {
-      this.logger.error('❌ Error allocating capital', error);
-      throw error;
-    }
+    }, 'allocateCapital', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Analyze current market conditions
    */
-  async analyzeMarketConditions(marketConditions) {
-    try {
+  async analyzeMarketConditions() {
+    return this.execute(async() => {
       const analysis = {
         volatility: marketConditions.volatility || 0.1,
         liquidity: marketConditions.liquidity || 0.7,
@@ -213,10 +210,7 @@ class CapitalAllocationService extends BaseService {
       });
 
       return analysis;
-    } catch (error) {
-      this.logger.error('❌ Error analyzing market conditions', error);
-      throw error;
-    }
+    }, 'analyzeMarketConditions', { logSuccess: true });
   }
 
   /**

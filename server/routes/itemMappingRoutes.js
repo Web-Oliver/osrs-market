@@ -10,14 +10,15 @@
  */
 
 const express = require('express');
-const { ItemMappingController } = require('../controllers/ItemMappingController');
+const { getControllerFactory } = require('../factories/ControllerFactory');
 const { RequestMiddleware } = require('../middleware/RequestMiddleware');
 const { ErrorMiddleware } = require('../middleware/ErrorMiddleware');
 
 const router = express.Router();
 
-// Context7 Pattern: Initialize dependencies
-const itemMappingController = new ItemMappingController();
+// Context7 Pattern: Use ControllerFactory for proper dependency injection
+const controllerFactory = getControllerFactory();
+const itemMappingController = controllerFactory.createItemMappingController();
 const requestMiddleware = new RequestMiddleware();
 const errorMiddleware = new ErrorMiddleware();
 

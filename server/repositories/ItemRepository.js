@@ -18,6 +18,7 @@ const { Item } = require('../domain/entities/Item');
 const { ItemId } = require('../domain/value-objects/ItemId');
 const { ItemModelAdapter } = require('../domain/adapters/ItemModelAdapter');
 
+
 class ItemRepository {
   constructor() {
     this.logger = new Logger('ItemRepository');
@@ -25,15 +26,15 @@ class ItemRepository {
     this.adapter = new ItemModelAdapter();
     this.defaultProjection = {
       __v: 0 // Exclude version key from results
-    };
+    }
   }
 
   /**
    * ENHANCED: Find item by ID returning domain entity
    */
-  async findById(itemId, options = {}) {
-    try {
-      // Convert to ItemId value object if needed
+  async findById() {
+    return this.errorManager.handleAsync(async () => {
+// Convert to ItemId value object if needed
       const id = typeof itemId === 'number' ? new ItemId(itemId) : itemId;
       this.logger.debug('Finding item by ID (ENHANCED)', { itemId: id.value });
 
@@ -53,18 +54,15 @@ class ItemRepository {
       });
 
       return domainItem;
-    } catch (error) {
-      this.logger.error('Error finding item by ID', error, { itemId });
-      throw error;
-    }
+    }, 'findById', { logSuccess: true });
   }
 
   /**
    * ENHANCED: Find multiple items by IDs returning domain entities
    */
-  async findByIds(itemIds, options = {}) {
-    try {
-      // Convert to ItemId value objects if needed
+  async findByIds() {
+    return this.errorManager.handleAsync(async () => {
+// Convert to ItemId value objects if needed
       const ids = itemIds.map(id => typeof id === 'number' ? new ItemId(id) : id);
       const values = ids.map(id => id.value);
 
@@ -86,20 +84,15 @@ class ItemRepository {
       });
 
       return domainItems;
-    } catch (error) {
-      this.logger.error('Error finding items by IDs', error, {
-        itemCount: itemIds.length
-      });
-      throw error;
-    }
+    }, 'findByIds', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Search items with text search optimization
    */
-  async searchByName(searchTerm, options = {}) {
-    try {
-      this.logger.debug('Searching items by name', {
+  async searchByName() {
+    return this.errorManager.handleAsync(async () => {
+this.logger.debug('Searching items by name', {
         searchTerm,
         options
       });
@@ -134,20 +127,15 @@ class ItemRepository {
       });
 
       return items;
-    } catch (error) {
-      this.logger.error('Error searching items by name', error, {
-        searchTerm
-      });
-      throw error;
-    }
+    }, 'searchByName', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get high-value tradeable items
    */
-  async getHighValueItems(options = {}) {
-    try {
-      const minValue = options.minValue || 100000;
+  async getHighValueItems() {
+    return this.errorManager.handleAsync(async () => {
+const minValue = options.minValue || 100000;
       const limit = options.limit || 50;
 
       this.logger.debug('Getting high-value items', {
@@ -175,20 +163,15 @@ class ItemRepository {
       });
 
       return items;
-    } catch (error) {
-      this.logger.error('Error getting high-value items', error, {
-        minValue: options.minValue
-      });
-      throw error;
-    }
+    }, 'getHighValueItems', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get items requiring sync with age-based filtering
    */
-  async getItemsRequiringSync(maxAge = 24 * 60 * 60 * 1000) {
-    try {
-      const cutoff = new Date(Date.now() - maxAge);
+  async getItemsRequiringSync() {
+    return this.errorManager.handleAsync(async () => {
+const cutoff = new Date(Date.now() - maxAge);
 
       this.logger.debug('Getting items requiring sync', {
         cutoff,
@@ -210,18 +193,15 @@ class ItemRepository {
       });
 
       return items;
-    } catch (error) {
-      this.logger.error('Error getting items requiring sync', error);
-      throw error;
-    }
+    }, 'getItemsRequiringSync', { logSuccess: true });
   }
 
   /**
    * ENHANCED: Bulk upsert items using domain entities with business logic
    */
-  async upsertItems(itemsData, options = {}) {
-    try {
-      const itemCount = itemsData.length;
+  async upsertItems() {
+    return this.errorManager.handleAsync(async () => {
+const itemCount = itemsData.length;
       this.logger.debug('Upserting items (ENHANCED)', { itemCount });
 
       // Create domain entities for validation and business logic
@@ -237,107 +217,15 @@ class ItemRepository {
           });
           domainItem.markSynced(); // Mark as synced since we're importing fresh data
           domainItems.push(domainItem);
-        } catch (error) {
-          errors.push({
-            itemId: itemData.itemId,
-            error: error.message
-          });
-        }
-      }
-
-      if (domainItems.length === 0) {
-        return {
-          success: false,
-          upserted: 0,
-          modified: 0,
-          matched: 0,
-          errors
-        };
-      }
-
-      // Convert to MongoDB operations
-      const operations = domainItems.map(item => {
-        const data = item.toPersistenceData();
-        return {
-          updateOne: {
-            filter: { itemId: item.id.value },
-            update: {
-              $set: data,
-              $setOnInsert: {
-                createdAt: new Date()
-                // Remove version from $setOnInsert to avoid conflict with domain entity version
-              }
-            },
-            upsert: true
-          }
-        };
-      });
-
-      const result = await ItemModel.bulkWrite(operations, {
-        ordered: false, // Continue on errors
-        ...options
-      });
-
-      // Log business insights from the batch
-      const categories = {};
-      let profitableAlchemy = 0;
-      let highValue = 0;
-
-      for (const item of domainItems) {
-        const category = item.getCategory();
-        categories[category] = (categories[category] || 0) + 1;
-
-        if (item.isProfitableAlchemy()) {
-          profitableAlchemy++;
-        }
-
-        if (item.market.value > 100000) {
-          highValue++;
-        }
-      }
-
-      this.logger.info('Items upserted successfully (ENHANCED)', {
-        itemCount,
-        validItems: domainItems.length,
-        invalidItems: errors.length,
-        upserted: result.upsertedCount,
-        modified: result.modifiedCount,
-        matched: result.matchedCount,
-        businessInsights: {
-          categories,
-          profitableAlchemy,
-          highValue,
-          successRate: `${((domainItems.length / itemCount) * 100).toFixed(1)}%`
-        }
-      });
-
-      return {
-        success: true,
-        upserted: result.upsertedCount,
-        modified: result.modifiedCount,
-        matched: result.matchedCount,
-        validItems: domainItems.length,
-        errors: [...errors, ...(result.writeErrors || [])],
-        businessInsights: {
-          categories,
-          profitableAlchemy,
-          highValue
-        }
-      };
-    } catch (error) {
-      this.logger.error('Error upserting items', error, {
-        itemCount: itemsData.length
-      });
-      throw error;
-    }
+    }, 'upsertItems', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Mark items as synced with bulk update
    */
-  async markItemsAsSynced(itemIds) {
-    try {
-      this.logger.debug('Marking items as synced', {
+  async markItemsAsSynced() {
+    return this.errorManager.handleAsync(async () => {
+this.logger.debug('Marking items as synced', {
         count: itemIds.length
       });
 
@@ -357,20 +245,15 @@ class ItemRepository {
       });
 
       return result;
-    } catch (error) {
-      this.logger.error('Error marking items as synced', error, {
-        itemCount: itemIds.length
-      });
-      throw error;
-    }
+    }, 'markItemsAsSynced', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get items by category with filtering
    */
-  async getItemsByCategory(category, options = {}) {
-    try {
-      this.logger.debug('Getting items by category', {
+  async getItemsByCategory() {
+    return this.errorManager.handleAsync(async () => {
+this.logger.debug('Getting items by category', {
         category,
         options
       });
@@ -428,38 +311,30 @@ class ItemRepository {
       });
 
       return items;
-    } catch (error) {
-      this.logger.error('Error getting items by category', error, {
-        category
-      });
-      throw error;
-    }
+    }, 'getItemsByCategory', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get repository statistics
    */
   async getStatistics() {
-    try {
-      this.logger.debug('Getting repository statistics');
+    return this.errorManager.handleAsync(async () => {
+this.logger.debug('Getting repository statistics');
 
       const stats = await ItemModel.getStatistics();
 
       this.logger.debug('Statistics retrieved successfully', stats);
 
       return stats;
-    } catch (error) {
-      this.logger.error('Error getting statistics', error);
-      throw error;
-    }
+    }, 'getStatistics', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get items with pagination
    */
-  async getPaginatedItems(options = {}) {
-    try {
-      const page = Math.max(1, options.page || 1);
+  async getPaginatedItems() {
+    return this.errorManager.handleAsync(async () => {
+const page = Math.max(1, options.page || 1);
       const limit = Math.min(100, Math.max(1, options.limit || 20));
       const skip = (page - 1) * limit;
 
@@ -519,18 +394,15 @@ class ItemRepository {
           hasPrevPage
         }
       };
-    } catch (error) {
-      this.logger.error('Error getting paginated items', error, options);
-      throw error;
-    }
+    }, 'getPaginatedItems', { logSuccess: true });
   }
 
   /**
    * ENHANCED: Create single item using domain entity
    */
-  async createItem(itemData) {
-    try {
-      this.logger.debug('Creating new item (ENHANCED)', {
+  async createItem() {
+    return this.errorManager.handleAsync(async () => {
+this.logger.debug('Creating new item (ENHANCED)', {
         itemId: itemData.itemId,
         name: itemData.name
       });
@@ -553,20 +425,15 @@ class ItemRepository {
       });
 
       return savedItem;
-    } catch (error) {
-      this.logger.error('Error creating item', error, {
-        itemId: itemData.itemId
-      });
-      throw error;
-    }
+    }, 'createItem', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Update item with optimistic concurrency
    */
-  async updateItem(itemId, updateData) {
-    try {
-      this.logger.debug('Updating item', {
+  async updateItem() {
+    return this.errorManager.handleAsync(async () => {
+this.logger.debug('Updating item', {
         itemId,
         updateFields: Object.keys(updateData)
       });
@@ -599,18 +466,15 @@ class ItemRepository {
       });
 
       return updatedItem;
-    } catch (error) {
-      this.logger.error('Error updating item', error, { itemId });
-      throw error;
-    }
+    }, 'updateItem', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Soft delete item (mark as removed)
    */
-  async deleteItem(itemId) {
-    try {
-      this.logger.debug('Soft deleting item', { itemId });
+  async deleteItem() {
+    return this.errorManager.handleAsync(async () => {
+this.logger.debug('Soft deleting item', { itemId });
 
       const deletedItem = await ItemModel.findOneAndUpdate(
         { itemId, status: 'active' },
@@ -635,10 +499,7 @@ class ItemRepository {
       });
 
       return deletedItem;
-    } catch (error) {
-      this.logger.error('Error deleting item', error, { itemId });
-      throw error;
-    }
+    }, 'deleteItem', { logSuccess: true });
   }
 }
 

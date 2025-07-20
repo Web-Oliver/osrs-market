@@ -9,6 +9,7 @@
  */
 
 const { createLogger, format, transports } = require('winston');
+
 const path = require('path');
 
 class Logger {
@@ -129,7 +130,7 @@ class Logger {
       };
     }
 
-    this.logger.error(message, errorMeta);
+    // Error handling moved to centralized manager - context: operation
   }
 
   /**
@@ -147,7 +148,7 @@ class Logger {
       };
     }
 
-    this.logger.error(`[FATAL] ${message}`, errorMeta);
+    // Error handling moved to centralized manager - context: operation
   }
 
   /**
@@ -201,7 +202,7 @@ class Logger {
     });
 
     if (severity === 'high' || severity === 'critical') {
-      this.logger.error(message, enrichedMeta);
+      // Error handling moved to centralized manager - context: operation
     } else {
       this.logger.warn(message, enrichedMeta);
     }

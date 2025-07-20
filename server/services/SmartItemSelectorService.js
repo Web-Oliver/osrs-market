@@ -20,15 +20,15 @@ class SmartItemSelectorService extends BaseService {
       cacheTTL: 300, // 5 minutes for item selection
       enableMongoDB: false // No MongoDB needed for selection logic
     });
-    
+
     this.osrsWikiService = new OSRSWikiService();
   }
 
   /**
    * Context7 Pattern: Get high-value items based on actual market data
    */
-  async getHighValueItems(marketDataService, limit = 50) {
-    try {
+  async getHighValueItems() {
+    return this.execute(async() => {
       this.logger.debug('Getting high-value items from market data');
 
       const cacheKey = `high_value_items_${limit}`;
@@ -84,17 +84,14 @@ class SmartItemSelectorService extends BaseService {
       });
 
       return sortedItems;
-    } catch (error) {
-      this.logger.error('Error getting high-value items', error);
-      throw error;
-    }
+    }, 'getHighValueItems', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get trending items based on actual market activity
    */
-  async getTrendingItems(marketDataService, limit = 20) {
-    try {
+  async getTrendingItems() {
+    return this.execute(async() => {
       this.logger.debug('Getting trending items from market data');
 
       const cacheKey = `trending_items_${limit}`;
@@ -158,17 +155,14 @@ class SmartItemSelectorService extends BaseService {
       });
 
       return sortedItems;
-    } catch (error) {
-      this.logger.error('Error getting trending items', error);
-      throw error;
-    }
+    }, 'getTrendingItems', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get stable trading items for consistent profit
    */
-  async getStableItems(marketDataService, limit = 30) {
-    try {
+  async getStableItems() {
+    return this.execute(async() => {
       this.logger.debug('Getting stable trading items from market data');
 
       const cacheKey = `stable_items_${limit}`;
@@ -197,17 +191,14 @@ class SmartItemSelectorService extends BaseService {
       });
 
       return stableItems;
-    } catch (error) {
-      this.logger.error('Error getting stable items', error);
-      throw error;
-    }
+    }, 'getStableItems', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get items by category based on market performance
    */
-  async getItemsByCategory(marketDataService, category, limit = 25) {
-    try {
+  async getItemsByCategory() {
+    return this.execute(async() => {
       this.logger.debug('Getting items by category from market data', { category });
 
       const cacheKey = `category_items_${category}_${limit}`;
@@ -236,17 +227,14 @@ class SmartItemSelectorService extends BaseService {
       });
 
       return categoryItems;
-    } catch (error) {
-      this.logger.error('Error getting items by category', error, { category });
-      throw error;
-    }
+    }, 'getItemsByCategory', { logSuccess: true });
   }
 
   /**
    * Context7 Pattern: Get personalized recommendations based on user preferences
    */
-  async getPersonalizedRecommendations(marketDataService, userPreferences, limit = 20) {
-    try {
+  async getPersonalizedRecommendations() {
+    return this.execute(async() => {
       this.logger.debug('Getting personalized recommendations', { userPreferences });
 
       const cacheKey = `personalized_${JSON.stringify(userPreferences)}_${limit}`;
@@ -279,10 +267,7 @@ class SmartItemSelectorService extends BaseService {
       });
 
       return recommendations;
-    } catch (error) {
-      this.logger.error('Error getting personalized recommendations', error);
-      throw error;
-    }
+    }, 'getPersonalizedRecommendations', { logSuccess: true });
   }
 
   /**

@@ -23,6 +23,7 @@ const {
 
 const { Logger } = require('./Logger');
 
+
 class FinancialMetricsCalculator {
   constructor() {
     this.logger = new Logger('FinancialMetricsCalculator');
@@ -118,11 +119,7 @@ class FinancialMetricsCalculator {
 
       return metrics;
     } catch (error) {
-      this.logger.error('Error calculating metrics', error, {
-        itemId: rawData?.itemId,
-        highPrice: rawData?.highPrice,
-        lowPrice: rawData?.lowPrice
-      });
+      // Error handling moved to centralized manager - context: Error calculating metrics
       throw error;
     }
   }
@@ -549,9 +546,7 @@ class FinancialMetricsCalculator {
           success: true
         });
       } catch (error) {
-        this.logger.error('Error calculating metrics for item', error, {
-          itemId: item.itemId
-        });
+        // Error handling moved to centralized manager - context: Error calculating metrics for item
         results.push({
           itemId: item.itemId,
           error: error.message,

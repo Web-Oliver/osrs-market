@@ -12,10 +12,13 @@ const { BaseController } = require('./BaseController');
 const { DataCollectionService } = require('../services/DataCollectionService');
 const { validateRequest } = require('../validators/DataCollectionValidator');
 
+
 class DataCollectionController extends BaseController {
-  constructor() {
+  constructor(dependencies = {}) {
     super('DataCollectionController');
-    this.dataCollectionService = new DataCollectionService();
+    
+    // SOLID: Dependency Injection (DIP) - Eliminates direct dependency violation
+    this.dataCollectionService = dependencies.dataCollectionService || new DataCollectionService();
   }
 
   /**
@@ -65,9 +68,7 @@ class DataCollectionController extends BaseController {
 
       return ApiResponse.success(res, stats, 'Collection statistics retrieved successfully');
     } catch (error) {
-      this.logger.error('Error fetching collection statistics', error, {
-        requestId: req.id
-      });
+      // Error handling moved to centralized manager - context: Error fetching collection statistics
       next(error);
     }
   }
@@ -98,10 +99,7 @@ class DataCollectionController extends BaseController {
 
       return ApiResponse.success(res, updatedConfig, 'Configuration updated successfully');
     } catch (error) {
-      this.logger.error('Error updating configuration', error, {
-        body: req.body,
-        requestId: req.id
-      });
+      // Error handling moved to centralized manager - context: Error updating configuration
       next(error);
     }
   }
@@ -114,7 +112,7 @@ class DataCollectionController extends BaseController {
     () => {
       const status = this.dataCollectionService.getCollectionStatus();
       const selectedItems = status.selectedItems;
-      
+
       return {
         items: selectedItems,
         count: selectedItems.length,
@@ -129,7 +127,7 @@ class DataCollectionController extends BaseController {
    * POST /api/data-collection/refresh-selection
    */
   refreshItemSelection = this.createPostEndpoint(
-    async () => {
+    async() => {
       await this.dataCollectionService.refreshSmartSelection();
 
       const status = this.dataCollectionService.getCollectionStatus();
@@ -192,9 +190,7 @@ class DataCollectionController extends BaseController {
 
       return ApiResponse.success(res, marketData, 'Latest collected data retrieved successfully');
     } catch (error) {
-      this.logger.error('Error fetching latest collected data', error, {
-        requestId: req.id
-      });
+      // Error handling moved to centralized manager - context: Error fetching latest collected data
       next(error);
     }
   }
@@ -222,9 +218,7 @@ class DataCollectionController extends BaseController {
 
       return ApiResponse.success(res, metrics, 'Collection metrics retrieved successfully');
     } catch (error) {
-      this.logger.error('Error fetching collection metrics', error, {
-        requestId: req.id
-      });
+      // Error handling moved to centralized manager - context: Error fetching collection metrics
       next(error);
     }
   }
@@ -277,9 +271,7 @@ class DataCollectionController extends BaseController {
 
       return ApiResponse.success(res, performance, 'Performance analytics retrieved successfully');
     } catch (error) {
-      this.logger.error('Error fetching performance analytics', error, {
-        requestId: req.id
-      });
+      // Error handling moved to centralized manager - context: Error fetching performance analytics
       next(error);
     }
   }
@@ -352,10 +344,7 @@ class DataCollectionController extends BaseController {
       });
 
     } catch (error) {
-      this.logger.error('Error exporting data', error, {
-        format: req.query.format,
-        requestId: req.id
-      });
+      // Error handling moved to centralized manager - context: Error exporting data
       next(error);
     }
   }
@@ -425,7 +414,7 @@ class DataCollectionController extends BaseController {
   async startPipeline(req, res) {
     try {
       const result = await this.dataCollectionService.startDataPipeline();
-      
+
       res.json({
         success: true,
         message: 'Data pipeline started successfully',
@@ -448,7 +437,7 @@ class DataCollectionController extends BaseController {
   async stopPipeline(req, res) {
     try {
       const result = await this.dataCollectionService.stopDataPipeline();
-      
+
       res.json({
         success: true,
         message: 'Data pipeline stopped successfully',
@@ -472,7 +461,7 @@ class DataCollectionController extends BaseController {
     try {
       const status = this.dataCollectionService.getPipelineStatus();
       const health = this.dataCollectionService.getHealth();
-      
+
       res.json({
         success: true,
         data: {
@@ -502,7 +491,7 @@ class DataCollectionController extends BaseController {
   async pushToAI(req, res) {
     try {
       const result = await this.dataCollectionService.pushDataToAI();
-      
+
       res.json({
         success: true,
         message: 'Data pushed to AI service',
@@ -525,7 +514,7 @@ class DataCollectionController extends BaseController {
   async testAIConnection(req, res) {
     try {
       const isConnected = await this.dataCollectionService.testAIServiceConnection();
-      
+
       res.json({
         success: true,
         data: {

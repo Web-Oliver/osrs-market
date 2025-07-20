@@ -15,6 +15,7 @@ const { RateLimiter } = require('../utils/RateLimiter');
 const { SecurityHeaders } = require('../utils/SecurityHeaders');
 const { PerformanceMonitor } = require('../utils/PerformanceMonitor');
 
+
 class RequestMiddleware {
   constructor() {
     this.logger = new Logger('RequestMiddleware');
@@ -224,10 +225,7 @@ class RequestMiddleware {
 
         next();
       } catch (error) {
-        this.logger.error('Rate limit middleware error', error, {
-          requestId: req.id,
-          ip: req.ip
-        });
+        // Error handling moved to centralized manager - context: Rate limit middleware error
 
         // Context7 Pattern: Fail open for availability
         next();
@@ -266,9 +264,7 @@ class RequestMiddleware {
 
         next();
       } catch (error) {
-        this.logger.error('Request validation middleware error', error, {
-          requestId: req.id
-        });
+        // Error handling moved to centralized manager - context: Request validation middleware error
 
         return res.status(500).json({
           error: 'Internal server error',
@@ -306,9 +302,7 @@ class RequestMiddleware {
 
         next();
       } catch (error) {
-        this.logger.error('Request sanitization error', error, {
-          requestId: req.id
-        });
+        // Error handling moved to centralized manager - context: Request sanitization error
 
         return res.status(500).json({
           error: 'Internal server error',

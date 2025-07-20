@@ -25,7 +25,7 @@ class ValidationMiddleware {
    * @returns {Function} Express middleware function
    */
   static create(validator, options = {}) {
-    const { 
+    const {
       validateBody = true,
       validateParams = false,
       validateQuery = false,
@@ -36,11 +36,17 @@ class ValidationMiddleware {
     return (req, res, next) => {
       try {
         const validationTarget = {};
-        
+
         // Build validation target based on options
-        if (validateBody) validationTarget.body = req.body;
-        if (validateParams) validationTarget.params = req.params;
-        if (validateQuery) validationTarget.query = req.query;
+        if (validateBody) {
+          validationTarget.body = req.body;
+        }
+        if (validateParams) {
+          validationTarget.params = req.params;
+        }
+        if (validateQuery) {
+          validationTarget.query = req.query;
+        }
 
         // Execute validation
         const result = validator(validationTarget);
@@ -54,9 +60,15 @@ class ValidationMiddleware {
 
         // Optionally strip unknown fields
         if (stripUnknown && result.sanitized) {
-          if (validateBody) req.body = result.sanitized.body || req.body;
-          if (validateParams) req.params = result.sanitized.params || req.params;
-          if (validateQuery) req.query = result.sanitized.query || req.query;
+          if (validateBody) {
+            req.body = result.sanitized.body || req.body;
+          }
+          if (validateParams) {
+            req.params = result.sanitized.params || req.params;
+          }
+          if (validateQuery) {
+            req.query = result.sanitized.query || req.query;
+          }
         }
 
         next();
@@ -66,7 +78,7 @@ class ValidationMiddleware {
           url: req.url,
           method: req.method
         });
-        
+
         return ApiResponse.internalServerError(res, 'Validation error occurred');
       }
     };
@@ -99,8 +111,8 @@ class ValidationMiddleware {
     for (const [section, sectionSchema] of Object.entries(schema)) {
       const sectionData = data[section] || {};
       const sectionResult = ValidationMiddleware.validateSection(
-        sectionData, 
-        sectionSchema, 
+        sectionData,
+        sectionSchema,
         section,
         options
       );
@@ -131,16 +143,16 @@ class ValidationMiddleware {
     for (const [field, rules] of Object.entries(schema)) {
       const value = data[field];
       const fieldPath = `${sectionName}.${field}`;
-      
+
       const fieldResult = ValidationMiddleware.validateField(
-        value, 
-        rules, 
+        value,
+        rules,
         fieldPath,
         options
       );
 
       errors.push(...fieldResult.errors);
-      
+
       if (fieldResult.isValid || options.allowUnknown) {
         sanitized[field] = fieldResult.sanitized !== undefined ? fieldResult.sanitized : value;
       }
@@ -249,89 +261,89 @@ class ValidationMiddleware {
     let sanitized = value;
 
     switch (type) {
-      case 'string':
-        if (typeof value !== 'string') {
-          sanitized = String(value);
-        }
-        break;
+    case 'string':
+      if (typeof value !== 'string') {
+        sanitized = String(value);
+      }
+      break;
 
-      case 'number':
-        if (typeof value !== 'number') {
-          const num = Number(value);
-          if (isNaN(num)) {
-            errors.push(`${fieldPath} must be a valid number`);
-          } else {
-            sanitized = num;
-          }
-        }
-        break;
-
-      case 'integer':
-        if (!Number.isInteger(Number(value))) {
-          errors.push(`${fieldPath} must be an integer`);
+    case 'number':
+      if (typeof value !== 'number') {
+        const num = Number(value);
+        if (isNaN(num)) {
+          errors.push(`${fieldPath} must be a valid number`);
         } else {
-          sanitized = parseInt(value);
+          sanitized = num;
         }
-        break;
+      }
+      break;
 
-      case 'boolean':
-        if (typeof value !== 'boolean') {
-          if (value === 'true' || value === '1' || value === 1) {
-            sanitized = true;
-          } else if (value === 'false' || value === '0' || value === 0) {
-            sanitized = false;
-          } else {
-            errors.push(`${fieldPath} must be a boolean`);
-          }
-        }
-        break;
+    case 'integer':
+      if (!Number.isInteger(Number(value))) {
+        errors.push(`${fieldPath} must be an integer`);
+      } else {
+        sanitized = parseInt(value);
+      }
+      break;
 
-      case 'array':
-        if (!Array.isArray(value)) {
-          errors.push(`${fieldPath} must be an array`);
-        }
-        break;
-
-      case 'object':
-        if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-          errors.push(`${fieldPath} must be an object`);
-        }
-        break;
-
-      case 'email':
-        if (typeof value === 'string') {
-          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          if (!emailRegex.test(value)) {
-            errors.push(`${fieldPath} must be a valid email address`);
-          }
+    case 'boolean':
+      if (typeof value !== 'boolean') {
+        if (value === 'true' || value === '1' || value === 1) {
+          sanitized = true;
+        } else if (value === 'false' || value === '0' || value === 0) {
+          sanitized = false;
         } else {
-          errors.push(`${fieldPath} must be a string email address`);
+          errors.push(`${fieldPath} must be a boolean`);
         }
-        break;
+      }
+      break;
 
-      case 'url':
-        if (typeof value === 'string') {
-          try {
-            new URL(value);
-          } catch {
-            errors.push(`${fieldPath} must be a valid URL`);
-          }
-        } else {
-          errors.push(`${fieldPath} must be a string URL`);
+    case 'array':
+      if (!Array.isArray(value)) {
+        errors.push(`${fieldPath} must be an array`);
+      }
+      break;
+
+    case 'object':
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        errors.push(`${fieldPath} must be an object`);
+      }
+      break;
+
+    case 'email':
+      if (typeof value === 'string') {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(value)) {
+          errors.push(`${fieldPath} must be a valid email address`);
         }
-        break;
+      } else {
+        errors.push(`${fieldPath} must be a string email address`);
+      }
+      break;
 
-      case 'date':
-        const date = new Date(value);
-        if (isNaN(date.getTime())) {
-          errors.push(`${fieldPath} must be a valid date`);
-        } else {
-          sanitized = date;
+    case 'url':
+      if (typeof value === 'string') {
+        try {
+          new URL(value);
+        } catch {
+          errors.push(`${fieldPath} must be a valid URL`);
         }
-        break;
+      } else {
+        errors.push(`${fieldPath} must be a string URL`);
+      }
+      break;
 
-      default:
-        errors.push(`Unknown validation type: ${type}`);
+    case 'date':
+      const date = new Date(value);
+      if (isNaN(date.getTime())) {
+        errors.push(`${fieldPath} must be a valid date`);
+      } else {
+        sanitized = date;
+      }
+      break;
+
+    default:
+      errors.push(`Unknown validation type: ${type}`);
     }
 
     return { errors, sanitized };
@@ -344,7 +356,7 @@ class ValidationMiddleware {
   static required(fields) {
     return ValidationMiddleware.create((data) => {
       const errors = [];
-      
+
       fields.forEach(field => {
         const value = data.body?.[field] || data.params?.[field] || data.query?.[field];
         if (value === undefined || value === null || value === '') {
@@ -379,7 +391,7 @@ class ValidationMiddleware {
     return ValidationMiddleware.create((data) => {
       const id = data.params?.[paramName];
       const mongoIdRegex = /^[0-9a-fA-F]{24}$/;
-      
+
       if (!id || !mongoIdRegex.test(id)) {
         return {
           isValid: false,

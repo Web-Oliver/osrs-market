@@ -12,6 +12,7 @@
 const { Logger } = require('./Logger');
 const { WebSocketLoggingService } = require('../services/WebSocketLoggingService');
 
+
 class LoggerManager {
   constructor() {
     this.loggers = new Map();

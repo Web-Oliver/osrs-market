@@ -12,10 +12,13 @@ const { BaseController } = require('./BaseController');
 const { ItemMappingService } = require('../services/ItemMappingService');
 const { ItemValidator } = require('../validators/ItemValidator');
 
+
 class ItemMappingController extends BaseController {
-  constructor() {
+  constructor(dependencies = {}) {
     super('ItemMappingController');
-    this.itemMappingService = new ItemMappingService();
+    
+    // SOLID: Dependency Injection (DIP) - Eliminates direct dependency violation
+    this.itemMappingService = dependencies.itemMappingService || new ItemMappingService();
     this.itemValidator = new ItemValidator();
   }
 
@@ -24,7 +27,7 @@ class ItemMappingController extends BaseController {
    * POST /api/items/import
    */
   importMappings = this.createPostEndpoint(
-    async (importData) => {
+    async(importData) => {
       const { force } = importData;
       const options = { force };
       return await this.itemMappingService.importAllItemMappings(options);
@@ -40,9 +43,9 @@ class ItemMappingController extends BaseController {
    * GET /api/items/:itemId
    */
   getItem = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       const { itemId } = params;
-      
+
       if (!this.itemValidator.isValidItemId(itemId)) {
         const error = new Error('Invalid item ID provided');
         error.statusCode = 400;
@@ -70,7 +73,7 @@ class ItemMappingController extends BaseController {
    * GET /api/items
    */
   getItems = this.createPaginatedEndpoint(
-    async (params) => {
+    async(params) => {
       return await this.itemMappingService.getItems(params);
     },
     {
@@ -88,9 +91,9 @@ class ItemMappingController extends BaseController {
    * GET /api/items/search
    */
   searchItems = this.createGetEndpoint(
-    async (params) => {
+    async(params) => {
       const { searchTerm, sanitizedParams } = params;
-      
+
       if (!searchTerm) {
         const error = new Error('Search term is required');
         error.statusCode = 400;
@@ -123,7 +126,7 @@ class ItemMappingController extends BaseController {
    * GET /api/items/high-value
    */
   getHighValueItems = this.createGetEndpoint(
-    async (options) => {
+    async(options) => {
       const items = await this.itemMappingService.getHighValueItems(options);
       return {
         items,
@@ -222,10 +225,7 @@ class ItemMappingController extends BaseController {
       }, 'Items retrieved successfully');
 
     } catch (error) {
-      this.logger.error('Error getting items by category', error, {
-        category: req.params.category,
-        requestId: req.id
-      });
+      // Error handling moved to centralized manager - context: Error getting items by category
       next(error);
     }
   }
@@ -283,10 +283,7 @@ class ItemMappingController extends BaseController {
       return ApiResponse.created(res, item, 'Item created successfully');
 
     } catch (error) {
-      this.logger.error('Error creating item', error, {
-        body: req.body,
-        requestId: req.id
-      });
+      // Error handling moved to centralized manager - context: Error creating item
       next(error);
     }
   }
@@ -331,11 +328,7 @@ class ItemMappingController extends BaseController {
       return ApiResponse.success(res, updatedItem, 'Item updated successfully');
 
     } catch (error) {
-      this.logger.error('Error updating item', error, {
-        itemId: req.params.itemId,
-        body: req.body,
-        requestId: req.id
-      });
+      // Error handling moved to centralized manager - context: Error updating item
       next(error);
     }
   }
@@ -378,10 +371,7 @@ class ItemMappingController extends BaseController {
       }, 'Item deleted successfully');
 
     } catch (error) {
-      this.logger.error('Error deleting item', error, {
-        itemId: req.params.itemId,
-        requestId: req.id
-      });
+      // Error handling moved to centralized manager - context: Error deleting item
       next(error);
     }
   }
@@ -439,10 +429,7 @@ class ItemMappingController extends BaseController {
       return ApiResponse.success(res, enhancedResponse, 'Enhanced item data retrieved successfully');
 
     } catch (error) {
-      this.logger.error('Error getting enhanced item', error, {
-        itemId: req.params.itemId,
-        requestId: req.id
-      });
+      // Error handling moved to centralized manager - context: Error getting enhanced item
       next(error);
     }
   }
@@ -468,9 +455,7 @@ class ItemMappingController extends BaseController {
       return ApiResponse.success(res, insights, 'Business insights retrieved successfully');
 
     } catch (error) {
-      this.logger.error('Error getting business insights', error, {
-        requestId: req.id
-      });
+      // Error handling moved to centralized manager - context: Error getting business insights
       next(error);
     }
   }
@@ -519,10 +504,7 @@ class ItemMappingController extends BaseController {
       return ApiResponse.success(res, result, `Items found using ${criteria} criteria`);
 
     } catch (error) {
-      this.logger.error('Error finding items by business criteria', error, {
-        criteria: req.params.criteria,
-        requestId: req.id
-      });
+      // Error handling moved to centralized manager - context: Error finding items by business criteria
       next(error);
     }
   }
