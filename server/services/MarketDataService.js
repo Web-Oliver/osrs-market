@@ -18,6 +18,8 @@ const { BaseService } = require('./BaseService');
 const { MarketPriceSnapshotModel } = require('../models/MarketPriceSnapshotModel');
 const { FinancialCalculationService } = require('./consolidated/FinancialCalculationService');
 const { MarketDataFetchService } = require('./consolidated/MarketDataFetchService');
+const { DatabaseUtility } = require('../utils/DatabaseUtility');
+const { QueryBuilderService } = require('./QueryBuilderService');
 const { MarketDataProcessingService } = require('./consolidated/MarketDataProcessingService');
 const { DataTransformer } = require('../utils/DataTransformer');
 
@@ -87,10 +89,11 @@ this.logger.info('Getting 1-hour market data');
               createdAt: new Date()
             };
 
-            await MarketPriceSnapshotModel.findOneAndUpdate(
+            // DRY: Use DatabaseUtility for standardized upsert operation
+            await DatabaseUtility.performUpsert(
+              MarketPriceSnapshotModel,
               { itemId: parseInt(itemId), interval },
-              snapshotData,
-              { upsert: true, new: true }
+              snapshotData
             );
 
             count++;
@@ -126,10 +129,9 @@ this.logger.info('Getting 1-hour market data');
         query.itemId = parseInt(itemId);
       }
 
+      // DRY: Use DatabaseUtility for standardized date range filtering
       if (startDate || endDate) {
-        query.createdAt = {};
-        if (startDate) query.createdAt.$gte = new Date(startDate);
-        if (endDate) query.createdAt.$lte = new Date(endDate);
+        Object.assign(query, DatabaseUtility.buildDateRangeQuery(startDate, endDate, 'createdAt'));
       }
 
       const snapshots = await MarketPriceSnapshotModel

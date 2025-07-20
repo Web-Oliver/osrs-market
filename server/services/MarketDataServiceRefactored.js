@@ -18,6 +18,7 @@
  */
 
 const { BaseService } = require('./BaseService');
+const { DatabaseUtility } = require('../utils/DatabaseUtility');
 const { MarketPriceSnapshotModel } = require('../models/MarketPriceSnapshotModel');
 
 class MarketDataServiceRefactored extends BaseService {
@@ -153,10 +154,9 @@ const query = { interval };
         query.itemId = parseInt(itemId);
       }
 
+      // DRY: Use DatabaseUtility for standardized date range filtering
       if (startDate || endDate) {
-        query.createdAt = {};
-        if (startDate) query.createdAt.$gte = new Date(startDate);
-        if (endDate) query.createdAt.$lte = new Date(endDate);
+        Object.assign(query, DatabaseUtility.buildDateRangeQuery(startDate, endDate, 'createdAt'));
       }
 
       const snapshots = await MarketPriceSnapshotModel

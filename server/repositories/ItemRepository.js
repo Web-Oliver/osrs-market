@@ -13,6 +13,8 @@ const { BaseService } = require('../services/BaseService');
 const { ItemModel } = require('../models/ItemModel');
 const { DataTransformer } = require('../utils/DataTransformer');
 const { AppConstants } = require('../config/AppConstants');
+const { DatabaseUtility } = require('../utils/DatabaseUtility');
+const { QueryBuilderService } = require('../services/QueryBuilderService');
 
 // DOMAIN ENTITIES INTEGRATION
 const { Item } = require('../domain/entities/Item');
@@ -104,29 +106,28 @@ class ItemRepository extends BaseService {
         options
       });
 
-      const query = ItemModel.find({
-        $text: { $search: searchTerm },
-        status: 'active'
-      }, {
-        score: { $meta: 'textScore' },
-        ...this.defaultProjection
+      // DRY: Use QueryBuilderService for standardized search query
+      const queryFilter = QueryBuilderService.searchQuery(searchTerm, {
+        members: options.members,
+        tradeable: options.tradeable
       });
 
-      query.sort({ score: { $meta: 'textScore' } });
+      const projection = {
+        score: { $meta: 'textScore' },
+        ...this.defaultProjection
+      };
 
-      if (options.limit) {
-        query.limit(options.limit);
-      }
+      const queryOptions = {
+        sort: { score: { $meta: 'textScore' } },
+        limit: options.limit,
+        lean: true
+      };
 
-      if (options.members !== undefined) {
-        query.where('members').equals(options.members);
-      }
-
-      if (options.tradeable !== undefined) {
-        query.where('tradeable_on_ge').equals(options.tradeable);
-      }
-
-      const items = await query.exec();
+      const items = await ItemModel
+        .find(queryFilter, projection)
+        .sort(queryOptions.sort)
+        .limit(queryOptions.limit || 50)
+        .lean();
 
       this.logger.debug('Search completed successfully', {
         searchTerm,
@@ -150,19 +151,16 @@ class ItemRepository extends BaseService {
         limit
       });
 
-      const query = ItemModel.find({
-        value: { $gte: minValue },
-        tradeable_on_ge: true,
-        status: 'active'
-      }, this.defaultProjection);
+      // DRY: Use QueryBuilderService for standardized high-value query
+      const queryFilter = QueryBuilderService.highValueItemsQuery(minValue, {
+        members: options.members
+      });
 
-      query.sort({ value: -1 }).limit(limit);
-
-      if (options.members !== undefined) {
-        query.where('members').equals(options.members);
-      }
-
-      const items = await query.exec();
+      const items = await ItemModel
+        .find(queryFilter, this.defaultProjection)
+        .sort({ value: -1 })
+        .limit(limit)
+        .lean();
 
       this.logger.debug('High-value items retrieved', {
         minValue,
@@ -377,66 +375,34 @@ class ItemRepository extends BaseService {
    */
   async getPaginatedItems(options = {}) {
     return this.execute(async () => {
-      const page = Math.max(1, options.page || 1);
-      const limit = Math.min(100, Math.max(1, options.limit || 20));
-      const skip = (page - 1) * limit;
+      this.logger.debug('Getting paginated items', { options });
 
-      this.logger.debug('Getting paginated items', {
-        page,
-        limit,
-        skip
+      // DRY: Use QueryBuilderService for standardized item query
+      const queryFilter = QueryBuilderService.activeItemsQuery({
+        members: options.members,
+        tradeable: options.tradeable,
+        minValue: options.minValue,
+        maxValue: options.maxValue
       });
 
-      const query = { status: 'active' };
-
-      if (options.members !== undefined) {
-        query.members = options.members;
-      }
-
-      if (options.tradeable !== undefined) {
-        query.tradeable_on_ge = options.tradeable;
-      }
-
-      if (options.minValue) {
-        query.value = { $gte: options.minValue };
-      }
-
-      if (options.maxValue) {
-        query.value = { ...query.value, $lte: options.maxValue };
-      }
-
-      const [items, totalCount] = await Promise.all([
-        ItemModel.find(query, this.defaultProjection)
-          .sort(options.sort || { name: 1 })
-          .skip(skip)
-          .limit(limit)
-          .exec(),
-        ItemModel.countDocuments(query)
-      ]);
-
-      const totalPages = Math.ceil(totalCount / limit);
-      const hasNextPage = page < totalPages;
-      const hasPrevPage = page > 1;
+      // DRY: Use DatabaseUtility for standardized pagination
+      const result = await DatabaseUtility.performPaginatedQuery(ItemModel, queryFilter, {
+        page: options.page,
+        limit: options.limit,
+        sort: options.sort || { name: 1 },
+        projection: this.defaultProjection,
+        maxLimit: 100
+      });
 
       this.logger.debug('Paginated items retrieved', {
-        page,
-        limit,
-        totalCount,
-        totalPages,
-        itemCount: items.length
+        page: result.pagination.page,
+        limit: result.pagination.limit,
+        totalCount: result.pagination.totalCount,
+        totalPages: result.pagination.totalPages,
+        itemCount: result.items.length
       });
 
-      return {
-        items,
-        pagination: {
-          page,
-          limit,
-          totalCount,
-          totalPages,
-          hasNextPage,
-          hasPrevPage
-        }
-      };
+      return result;
     }, 'getPaginatedItems', { logSuccess: true });
   }
 

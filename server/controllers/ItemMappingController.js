@@ -11,6 +11,8 @@
 const { BaseController } = require('./BaseController');
 const { ItemMappingService } = require('../services/ItemMappingService');
 const { ItemValidator } = require('../validators/ItemValidator');
+const { ErrorHandler } = require('../middleware/ErrorHandler');
+const { ApiResponse } = require('../utils/ApiResponse');
 
 
 class ItemMappingController extends BaseController {
@@ -45,18 +47,14 @@ class ItemMappingController extends BaseController {
       const { itemId } = params;
 
       if (!this.itemValidator.isValidItemId(itemId)) {
-        const error = new Error('Invalid item ID provided');
-        error.statusCode = 400;
-        throw error;
+        // DRY: Use ErrorHandler for consistent error creation
+        throw ErrorHandler.createValidationError('Invalid item ID provided', { itemId });
       }
 
       const item = await this.itemMappingService.getItemById(itemId);
 
-      if (!item) {
-        const error = new Error('Item not found');
-        error.statusCode = 404;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateService(item, 'Item', itemId);
 
       return item;
     },
@@ -84,11 +82,8 @@ class ItemMappingController extends BaseController {
     async(params) => {
       const { searchTerm, sanitizedParams } = params;
 
-      if (!searchTerm) {
-        const error = new Error('Search term is required');
-        error.statusCode = 400;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateRequiredParams({ searchTerm }, ['searchTerm']);
 
       const items = await this.itemMappingService.searchItems(searchTerm, sanitizedParams);
 
@@ -126,11 +121,9 @@ class ItemMappingController extends BaseController {
         const options = {};
 
         if (req.query.limit) {
-          const limit = parseInt(req.query.limit);
-          if (limit < 1 || limit > 100) {
-            throw new Error('Limit must be between 1 and 100');
-          }
-          options.limit = limit;
+          // DRY: Use BaseController validation utility for pagination
+          const paginationParams = this.validatePagination({ limit: req.query.limit }, 20, 100);
+          options.limit = paginationParams.limit;
         }
 
         if (req.query.minValue) {
@@ -189,11 +182,13 @@ class ItemMappingController extends BaseController {
       const options = {};
 
       if (req.query.limit) {
-        const limit = parseInt(req.query.limit);
-        if (limit < 1 || limit > 100) {
-          return ApiResponse.badRequest(res, 'Limit must be between 1 and 100');
+        try {
+          // DRY: Use BaseController validation utility for pagination
+          const paginationParams = this.validatePagination({ limit: req.query.limit }, 20, 100);
+          options.limit = paginationParams.limit;
+        } catch (error) {
+          return ApiResponse.badRequest(res, error.message);
         }
-        options.limit = limit;
       }
 
       if (req.query.tradeable !== undefined) {

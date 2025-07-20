@@ -24,11 +24,8 @@ class WatchlistController extends BaseController {
     async(params) => {
       const { userId } = params;
 
-      if (!userId) {
-        const error = new Error('User ID is required');
-        error.statusCode = 400;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateRequiredParams({ userId }, ['userId']);
 
       const watchlist = await WatchlistModel.findByUserId(userId);
 
@@ -70,9 +67,8 @@ class WatchlistController extends BaseController {
       parseBody: (req) => {
         const { userId, itemId, itemName, addedDate, currentPrice, currentMargin } = req.body;
 
-        if (!userId || !itemId || !itemName) {
-          throw new Error('User ID, Item ID, and Item Name are required');
-        }
+        // DRY: Use BaseController validation utility
+        this.validateRequiredParams({ userId, itemId, itemName }, ['userId', 'itemId', 'itemName']);
 
         return {
           userId,
@@ -113,9 +109,8 @@ class WatchlistController extends BaseController {
         const { itemId } = req.params;
         const { userId } = req.query;
 
-        if (!userId || !itemId) {
-          throw new Error('User ID and Item ID are required');
-        }
+        // DRY: Use BaseController validation utility
+        this.validateRequiredParams({ userId, itemId }, ['userId', 'itemId']);
 
         return {
           userId,
@@ -162,9 +157,8 @@ class WatchlistController extends BaseController {
         const { itemId } = req.params;
         const { userId, currentPrice, currentMargin, notes } = req.body;
 
-        if (!userId || !itemId) {
-          throw new Error('User ID and Item ID are required');
-        }
+        // DRY: Use BaseController validation utility
+        this.validateRequiredParams({ userId, itemId }, ['userId', 'itemId']);
 
         return {
           userId,
@@ -185,11 +179,8 @@ class WatchlistController extends BaseController {
     async(params) => {
       const { userId } = params;
 
-      if (!userId) {
-        const error = new Error('User ID is required');
-        error.statusCode = 400;
-        throw error;
-      }
+      // DRY: Use BaseController validation utility
+      this.validateRequiredParams({ userId }, ['userId']);
 
       const totalItems = await WatchlistModel.countByUserId(userId);
       const watchlist = await WatchlistModel.findByUserId(userId);
