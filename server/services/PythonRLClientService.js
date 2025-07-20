@@ -107,22 +107,23 @@ class PythonRLClientService extends BaseService {
         features: features.slice(0, 5) // Log first 5 features for debugging
       });
 
-      const response = await this.makeRequest('POST', '/api/v1/predictions/predict', {
-        observation: features,
-        item_id: null,
-        feature_engineering: true,
+      const response = await this.makeRequest('POST', '/api/v1/predictions', {
+        features: features,
+        model_id: null,
+        include_confidence: true,
         timestamp: Date.now()
       });
 
-      const prediction = response.data;
+      const apiResponse = response.data;
+      const prediction = apiResponse.data || apiResponse;
 
       this.logger.info('Successfully received prediction from Python RL service', {
-        success: prediction.success,
+        status: apiResponse.status,
         action: prediction.action,
         action_name: prediction.action_name,
         confidence: prediction.confidence,
         model_id: prediction.model_id,
-        prediction_time_ms: prediction.prediction_time_ms
+        execution_time_ms: apiResponse.execution_time_ms
       });
 
       return {
@@ -132,9 +133,9 @@ class PythonRLClientService extends BaseService {
         expectedReturn: prediction.expected_return || 0,
         qValues: prediction.q_values || [],
         modelVersion: prediction.model_id,
-        processingTime: prediction.prediction_time_ms,
+        processingTime: apiResponse.execution_time_ms || 0,
         processed_features: prediction.processed_features,
-        timestamp: prediction.timestamp || Date.now()
+        timestamp: apiResponse.timestamp || Date.now()
       };
     }, 'predict', { logSuccess: true });
   }
@@ -152,31 +153,36 @@ class PythonRLClientService extends BaseService {
         dataSize: JSON.stringify(trainingData).length
       });
 
-      const response = await this.makeRequest('POST', '/api/v1/training/train', {
-        data: trainingData,
+      const response = await this.makeRequest('POST', '/api/v1/training/start', {
+        training_data: trainingData,
+        config: {
+          algorithm: 'DQN',
+          episodes: trainingData.length
+        },
         timestamp: Date.now()
       });
 
-      const trainingResult = response.data;
+      const apiResponse = response.data;
+      const trainingResult = apiResponse.data || apiResponse;
 
       this.logger.info('Successfully completed training with Python RL service', {
-        success: trainingResult.success,
-        episodes_trained: trainingResult.episodes_trained,
-        average_loss: trainingResult.average_loss,
-        average_reward: trainingResult.average_reward,
-        training_time_ms: trainingResult.training_time_ms,
-        model_id: trainingResult.model_id
+        status: apiResponse.status,
+        session_id: trainingResult.session_id,
+        episodes_planned: trainingResult.episodes_planned,
+        model_id: trainingResult.model_id,
+        execution_time_ms: apiResponse.execution_time_ms
       });
 
       return {
-        success: trainingResult.success,
-        episodesTrained: trainingResult.episodes_trained,
-        averageLoss: trainingResult.average_loss,
-        averageReward: trainingResult.average_reward,
-        trainingTime: trainingResult.training_time_ms,
+        success: apiResponse.status === 'success',
+        sessionId: trainingResult.session_id,
+        episodesTrained: trainingResult.episodes_planned || 0,
+        averageLoss: trainingResult.initial_loss || 0,
+        averageReward: trainingResult.initial_reward || 0,
+        trainingTime: apiResponse.execution_time_ms || 0,
         modelVersion: trainingResult.model_id,
         metrics: trainingResult.metrics || {},
-        timestamp: trainingResult.timestamp || Date.now()
+        timestamp: apiResponse.timestamp || Date.now()
       };
     }, 'train', { logSuccess: true });
   }
@@ -193,15 +199,17 @@ class PythonRLClientService extends BaseService {
         modelId
       });
 
-      const response = await this.makeRequest('POST', '/api/v1/models/save', {
-        modelId: modelId,
+      const response = await this.makeRequest('POST', '/api/v1/models', {
+        model_id: modelId,
+        action: 'save',
         timestamp: Date.now()
       });
 
-      const saveResult = response.data;
+      const apiResponse = response.data;
+      const saveResult = apiResponse.data || apiResponse;
 
       this.logger.info('Successfully saved model with Python RL service', {
-        success: saveResult.success,
+        status: apiResponse.status,
         model_id: saveResult.model_id,
         file_path: saveResult.file_path,
         file_size_bytes: saveResult.file_size_bytes,
@@ -209,12 +217,12 @@ class PythonRLClientService extends BaseService {
       });
 
       return {
-        success: saveResult.success,
+        success: apiResponse.status === 'success',
         modelId: saveResult.model_id,
         modelPath: saveResult.file_path,
         modelSize: saveResult.file_size_bytes,
         version: saveResult.version,
-        savedAt: saveResult.saved_at || Date.now()
+        savedAt: apiResponse.timestamp || Date.now()
       };
     }, 'saveModel', { logSuccess: true });
   }
@@ -231,28 +239,29 @@ class PythonRLClientService extends BaseService {
         modelId
       });
 
-      const response = await this.makeRequest('POST', '/api/v1/models/load', {
+      const response = await this.makeRequest('GET', `/api/v1/models/${modelId}`, null);
         modelId: modelId,
         timestamp: Date.now()
       });
 
-      const loadResult = response.data;
+      const apiResponse = response.data;
+      const loadResult = apiResponse.data || apiResponse;
 
       this.logger.info('Successfully loaded model with Python RL service', {
-        success: loadResult.success,
+        status: apiResponse.status,
         model_id: loadResult.model_id,
-        file_path: loadResult.file_path,
+        algorithm: loadResult.algorithm,
         version: loadResult.version,
-        loaded_at: loadResult.loaded_at
+        status_field: loadResult.status
       });
 
       return {
-        success: loadResult.success,
+        success: apiResponse.status === 'success',
         modelId: loadResult.model_id,
-        modelPath: loadResult.file_path,
+        modelPath: loadResult.file_path || '',
         version: loadResult.version,
-        modelInfo: loadResult.model_info || {},
-        loadedAt: loadResult.loaded_at || Date.now()
+        modelInfo: loadResult || {},
+        loadedAt: apiResponse.timestamp || Date.now()
       };
     }, 'loadModel', { logSuccess: true });
   }
@@ -266,28 +275,30 @@ class PythonRLClientService extends BaseService {
     return this.execute(async () => {
       this.logger.debug('Requesting training status from Python RL service');
 
-      const response = await this.makeRequest('GET', '/api/v1/training/training/stats');
-      const status = response.data;
+      const response = await this.makeRequest('GET', '/api/v1/training/current');
+      const apiResponse = response.data;
+      const status = apiResponse.data || apiResponse;
 
       this.logger.debug('Successfully received training status from Python RL service', {
-        isTraining: status.isTraining,
-        currentEpisode: status.currentEpisode,
-        totalEpisodes: status.totalEpisodes,
-        modelVersion: status.modelVersion
+        status: apiResponse.status,
+        is_training: status.is_training,
+        current_episode: status.current_episode,
+        total_episodes: status.total_episodes,
+        model_id: status.model_id
       });
 
       return {
-        isTraining: status.isTraining,
-        currentEpisode: status.currentEpisode,
-        totalEpisodes: status.totalEpisodes,
-        progress: status.progress,
-        currentLoss: status.currentLoss,
-        averageReward: status.averageReward,
-        epsilon: status.epsilon,
-        modelVersion: status.modelVersion,
-        uptime: status.uptime,
-        lastTrainingTime: status.lastTrainingTime,
-        timestamp: status.timestamp || Date.now()
+        isTraining: status.is_training || false,
+        currentEpisode: status.current_episode || 0,
+        totalEpisodes: status.total_episodes || 0,
+        progress: status.progress || 0,
+        currentLoss: status.current_loss || 0,
+        averageReward: status.average_reward || 0,
+        epsilon: status.epsilon || 0,
+        modelVersion: status.model_id,
+        uptime: status.uptime || 0,
+        lastTrainingTime: status.last_training_time,
+        timestamp: apiResponse.timestamp || Date.now()
       };
     }, 'getTrainingStatus', { logSuccess: true });
   }
@@ -304,28 +315,29 @@ class PythonRLClientService extends BaseService {
         modelId
       });
 
-      const endpoint = modelId ? `/api/v1/predictions/predictions/metrics/${modelId}` : '/api/v1/models/models/stats';
+      const endpoint = modelId ? `/api/v1/models/${modelId}` : '/api/v1/models';
       const response = await this.makeRequest('GET', endpoint);
-      const metrics = response.data;
+      const apiResponse = response.data;
+      const metrics = apiResponse.data || apiResponse;
 
       this.logger.debug('Successfully received model metrics from Python RL service', {
-        modelId: metrics.modelId,
-        totalTrades: metrics.totalTrades,
-        profitability: metrics.profitability,
-        winRate: metrics.winRate
+        status: apiResponse.status,
+        model_id: metrics.model_id,
+        algorithm: metrics.algorithm,
+        performance: metrics.performance_metrics
       });
 
       return {
-        modelId: metrics.modelId,
-        totalTrades: metrics.totalTrades,
-        profitability: metrics.profitability,
-        winRate: metrics.winRate,
-        averageProfit: metrics.averageProfit,
-        totalProfit: metrics.totalProfit,
-        maxDrawdown: metrics.maxDrawdown,
-        sharpeRatio: metrics.sharpeRatio,
-        recentPerformance: metrics.recentPerformance || [],
-        timestamp: metrics.timestamp || Date.now()
+        modelId: metrics.model_id,
+        totalTrades: metrics.performance_metrics?.total_trades || 0,
+        profitability: metrics.performance_metrics?.profitability || 0,
+        winRate: metrics.performance_metrics?.win_rate || 0,
+        averageProfit: metrics.performance_metrics?.average_profit || 0,
+        totalProfit: metrics.performance_metrics?.total_profit || 0,
+        maxDrawdown: metrics.performance_metrics?.max_drawdown || 0,
+        sharpeRatio: metrics.performance_metrics?.sharpe_ratio || 0,
+        recentPerformance: metrics.performance_metrics?.recent_performance || [],
+        timestamp: apiResponse.timestamp || Date.now()
       };
     }, 'getModelMetrics', { logSuccess: true });
   }
@@ -339,22 +351,24 @@ class PythonRLClientService extends BaseService {
     return this.execute(async () => {
 this.logger.debug('Performing health check on Python RL service');
 
-      const response = await this.makeRequest('GET', '/health/detailed');
-      const health = response.data;
+      const response = await this.makeRequest('GET', '/api/v1/health');
+      const apiResponse = response.data;
+      const health = apiResponse.data || apiResponse;
 
       this.logger.debug('Python RL service health check completed', {
-        status: health.status,
-        version: health.version,
-        uptime: health.uptime
+        status: apiResponse.status,
+        version: apiResponse.version,
+        uptime: health.uptime_seconds,
+        components: health.components
       });
 
       return {
-        status: health.status,
-        version: health.version,
-        uptime: health.uptime,
-        memoryUsage: health.memoryUsage,
-        modelLoaded: health.modelLoaded,
-        timestamp: health.timestamp || Date.now()
+        status: apiResponse.status,
+        version: apiResponse.version,
+        uptime: health.uptime_seconds || 0,
+        memoryUsage: health.resource_usage?.memory_mb || 0,
+        modelLoaded: health.components?.rl_agent === 'healthy',
+        timestamp: apiResponse.timestamp || Date.now()
       };
     }, 'healthCheck', { logSuccess: true });
   }

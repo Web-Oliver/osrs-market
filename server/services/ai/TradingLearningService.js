@@ -254,8 +254,8 @@ class TradingLearningService extends BaseService {
       const nextStates = batch.map(exp => exp.nextState);
       const dones = batch.map(exp => exp.done);
 
-      // Call AI model update
-      const result = await this.aiModel.learn({
+      // Call AI model training
+      const result = await this.aiModel.train({
         states,
         actions,
         rewards,
